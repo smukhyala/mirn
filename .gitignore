@@ -3,9 +3,11 @@
 .env.*
 !.env.example
 
-# Datasets and caches — never commit data
-data/
-datasets/
+# Datasets and caches — never commit data.
+# Anchored with a leading slash: an unanchored `data/` also matches the
+# source package src/mirn/data/ and silently drops it from the repo.
+/data/
+/datasets/
 .cache/
 *.parquet
 *.bag
@@ -15,12 +17,12 @@ datasets/
 *.h5
 
 # Model checkpoints
-checkpoints/
+/checkpoints/
 *.ckpt
 *.pt
 *.pth
-wandb/
-runs/
+/wandb/
+/runs/
 
 # Python
 __pycache__/
@@ -28,8 +30,8 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
-build/
-dist/
+/build/
+/dist/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
