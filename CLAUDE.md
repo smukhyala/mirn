@@ -107,6 +107,26 @@ Nav2 defaults (1000 rollouts × 56 steps) imply ~56,000 predictor queries per co
 
 ---
 
+## `demo/` — teaching artifact, not infrastructure and not evidence
+
+`demo/perturbation-playground.html` is a single self-contained page: two social-force worlds on a shared
+seeded noise stream, one with a robot and one without, with a live true / measured / phantom readout.
+
+Its status is deliberately narrow:
+
+- **It is not science.** The crowd is a toy SFM — precisely the deterministic model that would make the
+  research question circular. Nothing in it may be cited, plotted, or reported as a result.
+- **It is not project infrastructure.** It shares no code with `src/mirn/`. Do not import from it, do not
+  refactor `src/` to accommodate it, and do not grow it into a dashboard, a server, or a build target.
+- **It is worth keeping** because it teaches the thesis faster than the paper does: stretch the forecast
+  horizon and the measured perturbation climbs while the true effect holds still; switch the humans to
+  robot-blind and true collapses to zero while measured does not. That is the confounding argument, live.
+- **It doubles as the Milestone 9 widget.** Pairwise human preference collection is this canvas with
+  different chrome. Keep the rendering separable from the physics for that reason.
+
+If asked to make it "real", push back: the real estimator lives in `src/mirn/estimator/`, is validated
+against PeRoI, and reports in MDP units. The demo is an intuition pump with no error bars.
+
 ## Working style
 
 - **Milestones 1–2 are reading and writing. Do not write code during them.** If asked to start implementing before the related-work paragraph exists, say so.
