@@ -1,0 +1,48 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Datasets and caches — never commit data
+data/
+datasets/
+.cache/
+*.parquet
+*.bag
+*.db3
+*.pkl
+*.npz
+*.h5
+
+# Model checkpoints
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+wandb/
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code local overrides (keep shared config, drop machine-local)
+.claude/settings.local.json
