@@ -127,3 +127,80 @@ def test_calibration_floor_does_not_offer_the_order_dependent_divergence() -> No
     for parameter in experiment.parameters():
         if parameter.name == "divergence":
             assert "frechet" not in parameter.choices
+
+
+_COMPARISON_COLUMNS = [
+    "estimator",
+    "divergence",
+    "value",
+    "ci_low",
+    "ci_high",
+    "units",
+    "n_samples",
+    "influence",
+    "seed",
+]
+
+
+def _comparison_frame(**overrides: object) -> pd.DataFrame:
+    params = _fast_params("estimator_comparison")
+    for key in overrides:
+        params[key] = overrides[key]
+    experiment = EXPERIMENTS.create("estimator_comparison")
+    return experiment.run(params, seed=0).frame
+
+
+def test_estimator_comparison_columns_are_exact() -> None:
+    frame = _comparison_frame()
+    assert list(frame.columns) == _COMPARISON_COLUMNS
+
+
+def test_estimator_comparison_reports_all_three_estimators() -> None:
+    frame = _comparison_frame()
+    reported = sorted(frame["estimator"].tolist())
+    assert reported == ["cvm_residual", "paired", "paired_debiased"]
+
+
+def test_paired_reports_exactly_zero_at_zero_influence() -> None:
+    """The arms are bitwise identical at influence 0, so the paired estimator has nothing to
+    measure. Anything other than exactly 0.0 means the pairing invariant has broken."""
+    frame = _comparison_frame(influence=0.0)
+    paired_rows = frame[frame["estimator"] == "paired"]
+    assert float(paired_rows["value"].to_numpy()[0]) == 0.0
+
+
+def test_the_naive_estimator_reports_a_positive_number_at_zero_influence() -> None:
+    """The critique in one assertion: with no robot effect whatsoever, the forecast-residual
+    estimator still reports metres of 'perturbation'."""
+    frame = _comparison_frame(influence=0.0)
+    naive_rows = frame[frame["estimator"] == "cvm_residual"]
+    assert float(naive_rows["value"].to_numpy()[0]) > 0.0
+
+
+def test_paired_value_increases_with_influence() -> None:
+    low = _comparison_frame(influence=0.5)
+    high = _comparison_frame(influence=1.5)
+    low_value = float(low[low["estimator"] == "paired"]["value"].to_numpy()[0])
+    high_value = float(high[high["estimator"] == "paired"]["value"].to_numpy()[0])
+    assert high_value > low_value
+
+
+def test_debiased_estimator_reports_mdp_units() -> None:
+    frame = _comparison_frame()
+    debiased = frame[frame["estimator"] == "paired_debiased"]
+    assert debiased["units"].to_numpy()[0] == "mdp"
+
+
+def test_confidence_intervals_bracket_every_point_estimate() -> None:
+    frame = _comparison_frame()
+    for index in range(len(frame)):
+        row = frame.iloc[index]
+        assert row["ci_low"] <= row["value"] <= row["ci_high"]
+
+
+def test_comparison_payload_carries_each_identification_string() -> None:
+    experiment = EXPERIMENTS.create("estimator_comparison")
+    result = experiment.run(_fast_params("estimator_comparison"), seed=0)
+    identifications = result.payload["identifications"]
+    assert identifications["cvm_residual"].startswith("UNMET:")
+    assert not identifications["paired"].startswith("UNMET:")
