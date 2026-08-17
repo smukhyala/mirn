@@ -204,3 +204,99 @@ def test_comparison_payload_carries_each_identification_string() -> None:
     identifications = result.payload["identifications"]
     assert identifications["cvm_residual"].startswith("UNMET:")
     assert not identifications["paired"].startswith("UNMET:")
+
+
+_SWEEP_COLUMNS = [
+    "axis",
+    "axis_value",
+    "reported_value",
+    "reported_ci_low",
+    "reported_ci_high",
+    "true_value",
+    "mdp_95",
+    "exceeds_floor",
+    "influence",
+    "divergence",
+    "seed",
+]
+
+
+def _sweep_result(**overrides: object):
+    params = _fast_params("confounding_sweep")
+    for key in overrides:
+        params[key] = overrides[key]
+    return EXPERIMENTS.create("confounding_sweep").run(params, seed=0)
+
+
+def test_confounding_sweep_columns_are_exact() -> None:
+    assert list(_sweep_result().frame.columns) == _SWEEP_COLUMNS
+
+
+def test_confounding_sweep_frame_columns_satisfy_the_figure_contract() -> None:
+    """viz.figures.confounding_sweep_figure reads these names; keep the two in lockstep."""
+    from mirn.viz.figures import confounding_sweep_figure
+
+    figure = confounding_sweep_figure(_sweep_result(n_points=6).frame)
+    assert len(figure.axes) == 1
+    # The frame is in metres; the figure must render MDP units (CLAUDE.md guardrail 3).
+    assert "MDP" in figure.axes[0].get_ylabel()
+
+
+def test_true_perturbation_is_exactly_zero_at_every_sweep_point() -> None:
+    """The pin. If this ever fails, the sweep is measuring two moving quantities and proves
+    nothing about confounding."""
+    frame = _sweep_result(influence=0.0, n_points=6).frame
+    for index in range(len(frame)):
+        assert float(frame["true_value"].to_numpy()[index]) == 0.0
+
+
+def test_reported_perturbation_rises_along_the_noise_axis_while_truth_stays_flat() -> None:
+    frame = _sweep_result(axis="predictor_noise", influence=0.0, n_points=6).frame
+    reported = frame["reported_value"].to_numpy()
+    for index in range(1, len(reported)):
+        assert reported[index] > reported[index - 1]
+    assert float(frame["true_value"].to_numpy()[-1]) == 0.0
+
+
+def test_reported_perturbation_rises_along_the_horizon_axis() -> None:
+    frame = _sweep_result(axis="forecast_horizon", influence=0.0, n_points=6).frame
+    reported = frame["reported_value"].to_numpy()
+    assert reported[-1] > reported[0]
+
+
+def test_horizon_axis_values_are_distinct_integers() -> None:
+    frame = _sweep_result(axis="forecast_horizon", n_points=16).frame
+    values = frame["axis_value"].tolist()
+    assert len(set(values)) == len(values)
+    for value in values:
+        assert float(value) == int(value)
+
+
+def test_the_reported_curve_crosses_the_detection_floor() -> None:
+    """The single number the experiment exists to produce: the predictor error at which a
+    world with exactly zero perturbation reads as a detected perturbation."""
+    result = _sweep_result(axis="predictor_noise", influence=0.0, n_points=8)
+    crossing = result.payload["floor_crossing_axis_value"]
+    assert crossing is not None
+    assert crossing > 0.0
+    assert bool(result.frame["exceeds_floor"].to_numpy()[-1]) is True
+
+
+def test_floor_crossing_is_none_when_the_curve_never_clears_the_floor() -> None:
+    result = _sweep_result(axis="predictor_noise", influence=0.0, n_points=4, noise_max=0.001)
+    assert result.payload["floor_crossing_axis_value"] is None
+
+
+def test_mdp_is_identical_on_every_row() -> None:
+    """One floor per sweep, repeated so a single CSV row is self-contained."""
+    frame = _sweep_result(n_points=6).frame
+    values = frame["mdp_95"].tolist()
+    for value in values:
+        assert value == values[0]
+
+
+def test_axis_choices_are_exactly_the_two_documented_axes() -> None:
+    experiment = EXPERIMENTS.create("confounding_sweep")
+    for parameter in experiment.parameters():
+        if parameter.name == "axis":
+            assert parameter.choices == ("predictor_noise", "forecast_horizon")

@@ -6,7 +6,11 @@ so callers can do `EXPERIMENTS.create("calibration_floor")` without importing su
 
 from __future__ import annotations
 
-from mirn.experiments import calibration_floor, estimator_comparison  # noqa: F401
+from mirn.experiments import (  # noqa: F401
+    calibration_floor,
+    confounding_sweep,
+    estimator_comparison,
+)
 from mirn.experiments.base import (
     EXPERIMENTS,
     Experiment,
