@@ -618,6 +618,8 @@ an empty formula would silently render as a blank panel in the UI."""
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from mirn.method.cards import MethodCard
@@ -680,7 +682,7 @@ def test_blank_entry_inside_assumptions_raises() -> None:
 
 def test_card_is_frozen() -> None:
     card = _valid_card()
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         card.title = "something else"  # type: ignore[misc]
 ```
 
