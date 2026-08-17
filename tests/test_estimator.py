@@ -121,3 +121,11 @@ def test_debiased_reports_mdp_units_by_dividing_through_the_floor() -> None:
     # (clipped) raw-metre debiased estimate divided by that floor, exactly.
     expected_value = max((undebiased.value - small_floor), 0.0) / small_floor
     assert result.value == pytest.approx(expected_value)
+
+
+def test_diagnostic_estimators_declare_their_assumption_unmet() -> None:
+    """Both single-arm estimators must announce, in their first six characters, that they do not
+    identify the estimand. This is the guard against one of them being quoted as a result."""
+    for name in ("cvm_residual", "noisy_oracle_residual"):
+        estimator = ESTIMATORS.create(name)
+        assert estimator.identification().startswith("UNMET:")

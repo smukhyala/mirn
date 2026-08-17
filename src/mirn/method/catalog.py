@@ -219,6 +219,31 @@ def _build_cards() -> dict[str, MethodCard]:
 
     card_list.append(
         MethodCard(
+            key="noisy_oracle_residual",
+            kind="estimator",
+            title="Noisy oracle residual (diagnostic)",
+            one_liner="A perfect causal predictor corrupted by a known amount of error.",
+            estimand_tex=_SHARED_ESTIMAND_TEX,
+            formula_tex=(
+                "\\hat{Y}_{n,k} = Y^{(\\mathrm{no\\ robot})}_{n,k} + \\varepsilon,"
+                " \\quad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I_2), \\qquad"
+                " \\hat{\\Delta}^{\\mathrm{oracle}} = \\tfrac{1}{N}\\sum_n \\tfrac{1}{K_n}"
+                "\\sum_k d\\big(\\hat{Y}_{n,k}, Y^{(\\mathrm{robot})}_{n,k}\\big)"
+            ),
+            assumptions=(_identification_of("noisy_oracle_residual"),),
+            breaks_when=(
+                "Always, by construction. When the true perturbation is zero and \\(d\\) is ADE, "
+                "its expectation is \\(\\sigma\\sqrt{\\pi/2}\\) — a straight line through the "
+                "origin in predictor error, with no dependence on the robot whatsoever.",
+                "It is a diagnostic instrument for exhibiting that failure, and reporting a "
+                "number from it as a measurement of perturbation would be a category error.",
+            ),
+            citation="Wayfinder §11 measurement 5",
+        )
+    )
+
+    card_list.append(
+        MethodCard(
             key="split_half_null",
             kind="calibration",
             title="Split-half null distribution",

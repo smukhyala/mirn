@@ -7,7 +7,7 @@ directly.
 
 from __future__ import annotations
 
-from mirn.estimator import paired, residual  # noqa: F401
+from mirn.estimator import noisy_oracle, paired, residual  # noqa: F401
 from mirn.estimator.base import ESTIMATORS, PerturbationEstimator, bootstrap_ci
 
 __all__ = ["ESTIMATORS", "PerturbationEstimator", "bootstrap_ci"]
