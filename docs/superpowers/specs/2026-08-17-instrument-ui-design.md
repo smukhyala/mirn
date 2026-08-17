@@ -71,8 +71,13 @@ boundary and not a convention. It is always installed; without the `app` extra, 
 else in the codebase imports it.
 
 `tests/test_boundary.py` enforces the rule by walking every module under `src/mirn/` and asserting that none
-of them import a web package or `mirn_app`, and that `import mirn` succeeds. The test reads source with
-`ast.parse` rather than importing, so it holds even when the `app` extra happens to be installed.
+of them import a web package, and that `import mirn` succeeds. The test reads source with `ast.parse` rather
+than importing, so it holds even when the `app` extra happens to be installed.
+
+`mirn/cli.py` is the single allowed exception to the `mirn_app` half of the rule, and the test encodes it as
+an explicit allowlist rather than a blanket exemption: `cli.py` imports `mirn_app.server` inside the body of
+`_cmd_serve`, so the library stays importable without the extra and an absent extra yields an instruction
+rather than a traceback. Every other module under `src/mirn/` is asserted not to mention `mirn_app` at all.
 
 ### `pyproject.toml` changes
 
@@ -338,6 +343,7 @@ the boundary test still passes. `cli.py` is the sole module permitted to `print(
 | `GET /api/meta` | theme tokens, `default_seed()`, and every experiment's `name/title/claim/parameters()` |
 | `POST /api/experiment/{name}` | body `{params: {...}, seed: int}` → `ExperimentResult.payload` plus the frame as records |
 | `GET /api/method/{key}` | one `MethodCard` as JSON |
+| `GET /api/methods` | every `MethodCard` keyed by name, so the page fetches the catalogue once at boot instead of issuing one request per card per section |
 | `GET /api/scene` | query `influence`, `seed`, `scene_index` → factual and counterfactual trajectories for the viewer |
 | `POST /api/export` | runs every experiment at the supplied parameters and writes CSVs to `results/`, returning the written paths |
 
