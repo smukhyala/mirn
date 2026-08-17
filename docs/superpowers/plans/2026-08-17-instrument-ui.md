@@ -1798,8 +1798,12 @@ def test_experiment_result_as_json_carries_rows_and_payload() -> None:
     json.dumps(blob)
 
 
-def test_registry_is_wired() -> None:
-    assert EXPERIMENTS.names() == tuple(sorted(EXPERIMENTS.names()))
+def test_experiments_registry_reports_its_kind_on_an_unknown_name() -> None:
+    """EXPERIMENTS is a real Registry wired with the 'experiment' kind, so a bad lookup produces a
+    message a caller can act on. Registration itself is exercised by the experiment tasks; asserting
+    names() is sorted would be vacuous, since Registry.names() always sorts."""
+    with pytest.raises(KeyError, match="experiment"):
+        EXPERIMENTS.get("no_such_experiment")
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -2028,7 +2032,15 @@ def _coerce(parameter: ExperimentParameter, raw_value: object) -> object:
             raise ValueError(
                 f"parameter '{parameter.name}' expects an integer, got {raw_value!r}"
             ) from error
-        coerced: object = int(round(numeric_value))
+        try:
+            coerced: object = int(round(numeric_value))
+        except (OverflowError, ValueError) as error:
+            # int(round(inf)) raises OverflowError, which would sail past the API layer's
+            # `except ValueError` and surface as a 500 instead of a 400. ValueError is the
+            # single exception type resolve() is allowed to raise.
+            raise ValueError(
+                f"parameter '{parameter.name}' must be a finite integer, got {raw_value!r}"
+            ) from error
     else:
         try:
             coerced = float(raw_value)  # type: ignore[arg-type]
