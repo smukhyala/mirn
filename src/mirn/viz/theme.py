@@ -10,10 +10,15 @@ data ink and muted on chrome — no gradients, no shadows, no chart junk.
 from __future__ import annotations
 
 import dataclasses
+import re
 from dataclasses import dataclass
 
 import matplotlib
 from matplotlib import cycler
+
+_HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-f]{6}$")
+
+_CSS_GENERIC_FONT_KEYWORDS = ("sans-serif", "monospace", "serif")
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +37,15 @@ class Palette:
     floor: str
     accent: str
 
+    def __post_init__(self) -> None:
+        fields = dataclasses.fields(self)
+        for field in fields:
+            value = getattr(self, field.name)
+            if _HEX_COLOR_PATTERN.match(value) is None:
+                raise ValueError(
+                    f"Palette.{field.name}={value!r} is not a lowercase #rrggbb colour"
+                )
+
 
 PALETTE = Palette(
     background="#0b0d10",
@@ -49,6 +63,22 @@ PALETTE = Palette(
 
 SANS_STACK = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
 MONO_STACK = "'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace"
+
+
+def _stack_to_families(stack: str) -> list[str]:
+    """Parse a CSS font-stack string into an ordered list of matplotlib family names.
+
+    Strips whitespace and surrounding quotes from each entry and drops CSS generic keywords
+    (`sans-serif`, `monospace`, `serif`), which are not matplotlib family names.
+    """
+    families: list[str] = []
+    raw_names = stack.split(",")
+    for raw_name in raw_names:
+        stripped_name = raw_name.strip()
+        unquoted_name = stripped_name.strip("'\"")
+        if unquoted_name not in _CSS_GENERIC_FONT_KEYWORDS:
+            families.append(unquoted_name)
+    return families
 
 
 def series_colors() -> tuple[str, ...]:
@@ -86,6 +116,13 @@ def matplotlib_rc() -> dict[str, object]:
     rc["legend.labelcolor"] = PALETTE.ink
     rc["font.size"] = 9.0
     rc["figure.dpi"] = 160
+    sans_families = _stack_to_families(SANS_STACK)
+    sans_families.append("DejaVu Sans")
+    mono_families = _stack_to_families(MONO_STACK)
+    mono_families.append("DejaVu Sans Mono")
+    rc["font.family"] = "sans-serif"
+    rc["font.sans-serif"] = sans_families
+    rc["font.monospace"] = mono_families
     return rc
 
 
