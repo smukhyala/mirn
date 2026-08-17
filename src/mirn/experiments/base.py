@@ -214,7 +214,12 @@ def _coerce(parameter: ExperimentParameter, raw_value: object) -> object:
             raise ValueError(
                 f"parameter '{parameter.name}' expects an integer, got {raw_value!r}"
             ) from error
-        coerced: object = int(round(numeric_value))
+        try:
+            coerced: object = int(round(numeric_value))
+        except (OverflowError, ValueError) as error:
+            raise ValueError(
+                f"parameter '{parameter.name}' must be a finite integer, got {raw_value!r}"
+            ) from error
     else:
         try:
             coerced = float(raw_value)  # type: ignore[arg-type]

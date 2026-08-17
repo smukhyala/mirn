@@ -39,6 +39,19 @@ def _choice_param() -> ExperimentParameter:
     )
 
 
+def _int_param() -> ExperimentParameter:
+    return ExperimentParameter(
+        name="steps",
+        label="Steps",
+        kind="int",
+        default=5,
+        minimum=0.0,
+        maximum=100.0,
+        step=1.0,
+        help_text="Number of rollout steps.",
+    )
+
+
 class _Dummy(Experiment):
     name = "dummy"
     title = "Dummy"
@@ -97,6 +110,43 @@ def test_resolve_rejects_a_choice_outside_the_declared_set() -> None:
 def test_resolve_rejects_an_uncoercible_numeric() -> None:
     with pytest.raises(ValueError, match="influence"):
         _Dummy().resolve({"influence": "not-a-number"})
+
+
+class _WithInt(_Dummy):
+    def parameters(self) -> tuple[ExperimentParameter, ...]:
+        return (_float_param(), _choice_param(), _int_param())
+
+
+def test_resolve_rejects_the_string_inf_for_an_int_parameter() -> None:
+    """int(round(...)) is unguarded against OverflowError; float('inf') as a string must still
+    become a labelled ValueError, not an unhandled OverflowError, since the API layer only
+    catches ValueError to produce an HTTP 400."""
+    with pytest.raises(ValueError, match="steps"):
+        _WithInt().resolve({"steps": "inf"})
+
+
+def test_resolve_rejects_positive_infinity_for_an_int_parameter() -> None:
+    with pytest.raises(ValueError, match="steps"):
+        _WithInt().resolve({"steps": float("inf")})
+
+
+def test_resolve_rejects_negative_infinity_for_an_int_parameter() -> None:
+    with pytest.raises(ValueError, match="steps"):
+        _WithInt().resolve({"steps": float("-inf")})
+
+
+def test_resolve_rejects_nan_for_an_int_parameter() -> None:
+    """int(round(nan)) raises Python's raw, unlabelled ValueError; the guard must relabel it to
+    name the parameter like every other rejection in this file."""
+    with pytest.raises(ValueError, match="steps"):
+        _WithInt().resolve({"steps": float("nan")})
+
+
+def test_resolve_still_rejects_infinity_for_a_float_parameter_via_bounds() -> None:
+    """Regression guard: the int-path fix must not change the float path, which already rejects
+    infinity correctly through the ordinary maximum-bound check."""
+    with pytest.raises(ValueError, match="influence"):
+        _Dummy().resolve({"influence": float("inf")})
 
 
 def test_duplicate_parameter_names_are_rejected_by_resolve() -> None:
@@ -179,5 +229,8 @@ def test_experiment_result_as_json_carries_rows_and_payload() -> None:
     json.dumps(blob)
 
 
-def test_registry_is_wired() -> None:
-    assert EXPERIMENTS.names() == tuple(sorted(EXPERIMENTS.names()))
+def test_experiments_registry_reports_its_kind_on_an_unknown_name() -> None:
+    """EXPERIMENTS is a real Registry wired with the 'experiment' kind, so a bad lookup produces
+    a message a caller can act on. Registration itself is exercised by the experiment tasks."""
+    with pytest.raises(KeyError, match="experiment"):
+        EXPERIMENTS.get("no_such_experiment")
