@@ -9,17 +9,30 @@ provably non-causal agents are removed, which is why this is a first-class gate 
 `select_non_interacting_agent` and `drop_agent` live here and are imported by that test, so the
 gate and the experiment can never drift apart.
 
-Caveat on what "non-interacting" actually buys us here. The exclusion radius is 4.5 m against a
-3.0 m displacement decay length (`DISPLACEMENT_DECAY_LENGTH_M` in `data/synthetic.py`), so the
-removed agent still retains roughly `exp(-4.5 / 3.0) ≈ 22%` of the peak displacement amplitude —
-it is *weakly interacting*, not truly non-interacting. A genuinely non-interacting pedestrian is
-impossible in this fixture: the box is 12 m tall with the robot fixed at its centre (y = 6), so no
-pedestrian's closest approach can exceed 6.0 m, which is only two decay lengths (`exp(-2) ≈ 13.5%`
-residual amplitude at best). Exact invariance is therefore established only at `influence = 0.0`,
-where both arms are bitwise identical and the delta is exactly zero by construction, not by
-selection. At `influence > 0` this experiment is a *bounded sensitivity* check against
-CausalAgents' reported 25-38% relative minADE shift — not a proof that the removed agent carries
-zero robot effect.
+Eligibility is measured on the **counterfactual** (robot-absent) arm's pedestrian trajectories,
+not the factual arm's, even though the robot's own position is only available on the factual arm
+(the counterfactual `Scene.robot` is `None` by contract — `RolloutPair` requires it). This matters:
+`_generate_pair` always directs its displacement to *increase* a pedestrian's lateral offset from
+the robot, never decrease it, so a factual-arm closest-approach is always `>=` the same
+pedestrian's counterfactual-arm closest-approach. Selecting eligibility from the factual arm would
+therefore select partly on the very displacement being tested — selection on the outcome, the same
+class of error this project's guardrails exist to keep out of the estimator itself. Selecting from
+the counterfactual arm instead makes the choice depend only on the pedestrian's undisturbed path,
+which is influence-independent by construction: the same agent is removed at every influence level
+for a fixed seed and scene count (see `test_placebo_removed_agent_is_influence_independent`).
+
+Caveat on what "non-interacting" actually buys us here. The exclusion radius is 4.0 m against a
+3.0 m displacement decay length (`DISPLACEMENT_DECAY_LENGTH_M` in `data/synthetic.py`), measured on
+the counterfactual arm, so the removed agent still retains roughly `exp(-4.0 / 3.0) ≈ 26%` of the
+peak displacement amplitude — it is *weakly interacting*, not truly non-interacting, and slightly
+more so than under the (biased) factual-arm selection this replaced. A genuinely non-interacting
+pedestrian is impossible in this fixture: the box is 12 m tall with the robot fixed at its centre
+(y = 6), so no pedestrian's closest approach can exceed 6.0 m, which is only two decay lengths
+(`exp(-2) ≈ 13.5%` residual amplitude at best). Exact invariance is therefore established only at
+`influence = 0.0`, where both arms are bitwise identical and the delta is exactly zero by
+construction, not by selection. At `influence > 0` this experiment is a *bounded sensitivity*
+check against CausalAgents' reported 25-38% relative minADE shift — not a proof that the removed
+agent carries zero robot effect.
 """
 
 from __future__ import annotations
@@ -57,16 +70,25 @@ PLACEBO_COLUMNS: tuple[str, ...] = (
     "seed",
 )
 
-# Measured, not guessed: at n_scenes=3 (the fast-test scene count) seeds 0, 1 and 17 each have no
-# commonly-eligible agent at 5.0 m or 6.0 m — seed 1's tightest common candidate tops out at
-# 4.780 m. 4.5 m clears all three seeds with margin while staying comfortably above the 3.0 m
-# displacement decay length. See the module docstring for what this radius does and does not
-# establish.
-DEFAULT_EXCLUSION_RADIUS_M = 4.5
+# Measured against COUNTERFACTUAL-arm distances (see module docstring for why that arm and not
+# the factual arm), not guessed: at n_scenes=3 (the fast-test scene count), seeds 0 and 1 tie for
+# the tightest common candidate at 4.497 m; seed 17's tightest common candidate is looser, at
+# 4.576 m. 4.0 m clears all three seeds (0, 1, 17) with roughly 0.5 m of headroom below the
+# binding 4.497 m constraint, rather than being tuned to the exact worst case with no margin — a
+# future seed or scene-count change is less likely to break `run()`. It remains comfortably above
+# the 3.0 m displacement decay length. See the module docstring for what this radius does and does
+# not establish.
+DEFAULT_EXCLUSION_RADIUS_M = 4.0
 
 
 def select_non_interacting_agent(pair: RolloutPair, exclusion_radius_m: float) -> str | None:
     """The id of a pedestrian that never comes within `exclusion_radius_m` of the robot.
+
+    Distance is measured on the **counterfactual** arm's (undisplaced) pedestrian path against the
+    robot's fixed position, read from the factual arm since the counterfactual `Scene.robot` is
+    `None` by contract. Measuring on the factual arm would select partly on the robot's own
+    displacement, which always pushes a pedestrian's factual-arm distance to be `>=` its
+    counterfactual-arm distance — selection on the outcome. See the module docstring.
 
     Returns the lowest such `agent_id` so the choice is deterministic, or None when every
     pedestrian in the pair passes close to the robot at some point.
@@ -80,7 +102,7 @@ def select_non_interacting_agent(pair: RolloutPair, exclusion_radius_m: float) -
     robot_positions = robot.positions
 
     candidate_ids: list[str] = []
-    for pedestrian in pair.factual.pedestrians:
+    for pedestrian in pair.counterfactual.pedestrians:
         offsets = pedestrian.positions - robot_positions
         distances = np.sqrt(np.sum(offsets * offsets, axis=1))
         closest_approach = float(np.min(distances))
@@ -101,6 +123,10 @@ def select_common_non_interacting_agent(
     Selecting from one scene and deleting from all of them would be wrong: an agent that stays
     clear of the robot in scene 0 may pass right by it in scene 2, and removing it there would
     delete real signal and make the placebo test measure the wrong thing.
+
+    Like `select_non_interacting_agent`, distance is measured on each pair's counterfactual
+    (undisplaced) pedestrian path against its factual arm's robot position, not on the factual
+    arm's (displaced) pedestrian path — see the module docstring for why.
     """
     if len(pairs) < 1:
         raise ValueError("select_common_non_interacting_agent requires at least one pair")
@@ -113,7 +139,7 @@ def select_common_non_interacting_agent(
             raise ValueError(
                 "select_common_non_interacting_agent requires every factual arm to have a robot"
             )
-        for pedestrian in pair.factual.pedestrians:
+        for pedestrian in pair.counterfactual.pedestrians:
             offsets = pedestrian.positions - robot.positions
             distances = np.sqrt(np.sum(offsets * offsets, axis=1))
             if float(np.min(distances)) > exclusion_radius_m:
@@ -164,10 +190,12 @@ def drop_agent(pair: RolloutPair, agent_id: str) -> RolloutPair:
 
 
 def _closest_approach_across_pairs(pairs: Sequence[RolloutPair], agent_id: str) -> float:
-    """`agent_id`'s minimum distance to the robot, over every timestep of every pair's factual
+    """`agent_id`'s minimum distance to the robot, over every timestep of every pair's
+    counterfactual (undisplaced) arm, against the robot position read from that pair's factual
     arm. This is the same quantity `select_common_non_interacting_agent` checks against the
     exclusion radius internally, recomputed here for the one selected agent so it can be reported
-    in the payload."""
+    in the payload — deliberately the counterfactual-arm value, not the factual-arm one, so the
+    reported number matches the criterion eligibility was actually judged against."""
     closest: float | None = None
     for pair in pairs:
         robot = pair.factual.robot
@@ -175,7 +203,7 @@ def _closest_approach_across_pairs(pairs: Sequence[RolloutPair], agent_id: str) 
             raise ValueError(
                 "_closest_approach_across_pairs requires every factual arm to have a robot"
             )
-        trajectory = pair.factual.pedestrian_by_id(agent_id)
+        trajectory = pair.counterfactual.pedestrian_by_id(agent_id)
         offsets = trajectory.positions - robot.positions
         distances = np.sqrt(np.sum(offsets * offsets, axis=1))
         pair_min = float(np.min(distances))

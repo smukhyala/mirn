@@ -444,3 +444,19 @@ def test_placebo_residual_displacement_is_zero_only_at_zero_influence() -> None:
 
     positive_influence = _placebo_result(influence=1.0)
     assert float(positive_influence.payload["removed_agent_residual_displacement_m"]) > 0.0
+
+
+def test_placebo_removed_agent_is_influence_independent() -> None:
+    """Eligibility is measured on the counterfactual (undisplaced) arm, which never depends on
+    `influence`, so the same agent must be removed at every influence level for a fixed seed and
+    scene count. A regression guard: if a future change moves eligibility back onto the factual
+    (displaced) arm, this is the test that catches it."""
+    influences = (0.0, 0.5, 1.0, 2.0)
+    removed_agent_ids: list[str] = []
+    for influence in influences:
+        result = _placebo_result(influence=influence)
+        removed_agent_ids.append(str(result.payload["removed_agent_id"]))
+
+    first_agent_id = removed_agent_ids[0]
+    for agent_id in removed_agent_ids:
+        assert agent_id == first_agent_id
