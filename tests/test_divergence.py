@@ -8,22 +8,23 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
 
+from mirn.data.synthetic import SyntheticAdapter
 from mirn.divergence import DIVERGENCES
 from mirn.divergence.frechet import DiscreteFrechet
 from mirn.divergence.wasserstein import SinkhornConvergenceError, SinkhornW2
 
 # Point-cloud coordinate values, used to build the `path`/`a`/`b`/`cloud` arrays that these
 # property tests feed directly into each registered divergence's `between_paths`/`between_clouds`.
-# Kept to +/-1.0 (down from +/-50) so that SinkhornW2's default (epsilon=2.0, max_iter=500,
-# tol=1e-9, see `mirn.divergence.wasserstein`) reliably reaches its convergence tolerance and
+# Kept to +/-1.0 (down from +/-50) so that SinkhornW2's default (epsilon=0.05, max_iter=50000,
+# tol=1e-5, see `mirn.divergence.wasserstein`) reliably reaches its convergence tolerance and
 # never raises `SinkhornConvergenceError` here: log-domain Sinkhorn's convergence rate degrades
 # exponentially in cost-scale / epsilon in both directions (too small a cost/epsilon ratio behaves
 # like a near-hard assignment; too large makes the plan near-uniform), and at the original +/-50
-# range almost no draw (including exact-duplicate hypothesis-shrunk points) converged within 500
-# iterations, some plateauing well above `tol` no matter how many further iterations ran. +/-1.0
-# was stress-tested over 500 synthetic draws per candidate range, including forced-duplicate-point
-# clouds, with a worst case of 29 iterations at this epsilon, i.e. comfortable margin under the
-# 500-iteration budget. This does not reduce what these tests actually verify: identity /
+# range almost no draw (including exact-duplicate hypothesis-shrunk points) converged, some
+# plateauing well above `tol` no matter how many further iterations ran. +/-1.0 was re-stress-
+# tested against the current defaults over 150 synthetic 5x7 draws (450 Sinkhorn solves, counting
+# the two self-terms) plus four hand-built duplicate-point / all-zeros clouds: zero
+# non-convergences. This does not reduce what these tests actually verify: identity /
 # non-negativity / translation-invariance / rotation-invariance are scale-independent properties,
 # so exercising them at a smaller scale is exactly as rigorous as at a larger one.
 COORDINATE = st.floats(min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False)
@@ -254,10 +255,11 @@ def test_sinkhorn_w2_stays_finite_at_small_epsilon_on_large_clouds() -> None:
     # This scenario is deliberately pushed into a small-epsilon / large-cloud regime specifically
     # to stress-test log-domain numerical stability (the class docstring: "the solver stays finite
     # even at small epsilon on large clouds"), which is inherently slow to converge — the class's
-    # own defaults (max_iter=500, tol=1e-9) do not reach `tol` here (verified empirically: the
-    # cross term alone needs ~1600 iterations just to reach 1e-4). max_iter/tol are widened only
-    # for this instance, not the class default, so this now also proves the value it returns is a
-    # genuinely converged one rather than merely finite.
+    # own default tol=1e-9 is unreachable at epsilon=0.01 within any practical budget (at
+    # epsilon=0.05 the row-marginal violation on clouds like these still decays like 1/iteration,
+    # reaching only ~1e-6 after 20000 iterations). max_iter/tol are widened/loosened only for this
+    # instance, not the class default, so this still proves the value it returns is a genuinely
+    # converged one rather than merely finite.
     sinkhorn = SinkhornW2(epsilon=0.01, max_iter=3000, tol=1e-4)
     value = sinkhorn.between_clouds(cloud_a, cloud_b)
     assert math.isfinite(value)
@@ -286,11 +288,10 @@ def test_sinkhorn_w2_debiasing_gives_exact_zero_on_separately_allocated_equal_cl
     cloud_copy = cloud.copy()
     assert cloud is not cloud_copy
 
-    # tol is loosened from the class default (1e-9) to 1e-4: this cloud's Sinkhorn potentials
-    # plateau around ~1e-7 (float64 log-domain noise floor for this input), so 1e-9 never
-    # actually gets hit within max_iter=500 even though the returned value is already accurate
-    # to the precision this test cares about (abs=1e-9 on the final debiased distance, not on the
-    # intermediate potential-convergence criterion).
+    # tol is loosened from the class default (1e-9) to 1e-4 and epsilon held at 0.1, well below
+    # the class default: the point of this test is the debiasing identity, which holds exactly at
+    # any epsilon and does not need a tightly converged plan. Keeping tol loose here keeps the
+    # test fast; the convergence criterion itself is covered by its own tests below.
     sinkhorn = SinkhornW2(epsilon=0.1, tol=1e-4)
     value = sinkhorn.between_clouds(cloud, cloud_copy)
     assert value == pytest.approx(0.0, abs=1e-9)
@@ -307,10 +308,10 @@ def test_sinkhorn_w2_debiased_value_is_small_within_a_shared_distribution() -> N
     sample_b = rng.normal(loc=0.0, scale=1.0, size=(150, 2))
     separated = rng.normal(loc=20.0, scale=1.0, size=(150, 2))
 
-    # tol is loosened from the class default (1e-9) to 1e-4: at n=150 points, some of these
-    # self-distance terms need well over 500 iterations to reach 1e-9 (verified empirically),
+    # tol is loosened from the class default (1e-9) to 1e-4 and epsilon held at 0.1: at
+    # epsilon=0.1 these 150-point solves need ~1200-2000 iterations to reach 1e-9 (measured),
     # while the coarse assertion below only needs the two distances resolved to a small fraction
-    # of their own magnitude.
+    # of their own magnitude. Loose tol here is a runtime choice, not a correctness one.
     sinkhorn = SinkhornW2(epsilon=0.1, tol=1e-4)
     within_distribution = sinkhorn.between_clouds(sample_a, sample_b)
     across_distributions = sinkhorn.between_clouds(sample_a, separated)
@@ -320,8 +321,8 @@ def test_sinkhorn_w2_debiased_value_is_small_within_a_shared_distribution() -> N
 
 def test_sinkhorn_w2_raises_convergence_error_on_non_convergence() -> None:
     # max_iter=1 with a tiny tol on a non-trivial (well-separated) cloud pair cannot possibly
-    # reach f_change < tol in a single iteration, so this must surface as a dedicated exception
-    # rather than silently returning the unconverged first iterate.
+    # drive the row-marginal violation below tol in a single iteration, so this must surface as a
+    # dedicated exception rather than silently returning the unconverged first iterate.
     rng = np.random.default_rng(3)
     cloud_a = rng.normal(size=(50, 2))
     cloud_b = rng.normal(size=(50, 2)) + 5.0
@@ -332,19 +333,22 @@ def test_sinkhorn_w2_raises_convergence_error_on_non_convergence() -> None:
 
     message = str(excinfo.value)
     assert "1 iteration" in message
-    assert "f_change" in message
+    assert "marginal_violation" in message
     assert "tol=" in message
     assert "epsilon=" in message
+    # The message must tell the caller what to do about it, not just that it happened.
+    assert "max_iter" in message
+    assert "raise epsilon" in message
 
 
 def test_sinkhorn_w2_converges_at_default_settings() -> None:
-    # The normal-use counterpart to the non-convergence test above: default max_iter/tol on an
-    # ordinary, well-scaled cloud pair must converge and must not raise SinkhornConvergenceError.
-    # Log-domain Sinkhorn's convergence rate degrades exponentially in cost-scale / epsilon, so
-    # "ordinary" here means a scale commensurate with the default epsilon=0.05 (verified
-    # empirically to converge comfortably within max_iter=500 for all three of the debiased
-    # divergence's Sinkhorn solves: a-vs-b, a-vs-a, and b-vs-b) — not an arbitrary-scale input,
-    # which is exactly the caller error this exception exists to surface.
+    # The normal-use counterpart to the non-convergence test above: default epsilon/max_iter/tol
+    # on an ordinary, well-scaled cloud pair must converge and must not raise
+    # SinkhornConvergenceError. Log-domain Sinkhorn's convergence rate degrades exponentially in
+    # cost-scale / epsilon, so "ordinary" here means a scale commensurate with the default
+    # epsilon (measured: all three of the debiased divergence's solves — a-vs-b, a-vs-a, b-vs-b —
+    # converge here at the defaults). This is exactly the caller error the exception exists to
+    # surface, so the happy path needs its own test.
     rng = np.random.default_rng(13)
     cloud_a = rng.normal(loc=0.0, scale=1.0, size=(30, 2))
     cloud_b = rng.normal(loc=1.0, scale=1.0, size=(30, 2))
@@ -353,6 +357,73 @@ def test_sinkhorn_w2_converges_at_default_settings() -> None:
     value = sinkhorn.between_clouds(cloud_a, cloud_b)
     assert math.isfinite(value)
     assert value >= 0.0
+
+
+def test_sinkhorn_w2_convergence_criterion_is_row_marginal_violation() -> None:
+    """The criterion must be the marginal that was NOT just updated.
+
+    A full Sinkhorn iteration updates `f` from `g` and then `g` from `f`, so the *column*
+    marginal is satisfied exactly by construction at the top of the next iteration. Measuring
+    that one would make the criterion trivially zero, and the solver would declare convergence
+    on iteration 1 for every input. This test pins the criterion down from the outside: with
+    max_iter=1 and a tol far looser than any real setting but far tighter than a single
+    iteration achieves, a genuinely non-trivial criterion must still refuse to converge on a
+    well-separated cloud pair.
+    """
+    rng = np.random.default_rng(23)
+    cloud_a = rng.normal(size=(25, 2))
+    cloud_b = rng.normal(size=(25, 2)) + 4.0
+
+    trivially_zero_would_pass = SinkhornW2(epsilon=1.0, max_iter=1, tol=1e-3)
+    with pytest.raises(SinkhornConvergenceError):
+        trivially_zero_would_pass.between_clouds(cloud_a, cloud_b)
+
+    # The reported violation must also be a real, finite, positive number of the right order —
+    # a row marginal is a probability mass summing to 1, so its L-inf violation is in (0, 1].
+    with pytest.raises(SinkhornConvergenceError) as excinfo:
+        SinkhornW2(epsilon=1.0, max_iter=1, tol=1e-3).between_clouds(cloud_a, cloud_b)
+    message = str(excinfo.value)
+    marginal_text = message.split("marginal_violation=")[1].split(",")[0]
+    reported_violation = float(marginal_text)
+    assert 0.0 < reported_violation <= 1.0
+
+
+def test_sinkhorn_w2_converges_on_the_degenerate_self_term() -> None:
+    """The degenerate self-pair `OT(a, a)` must converge, and at a tol far tighter than default.
+
+    `between_clouds` solves this term twice on every call, and an exact self-pair is the case
+    whose dual is least well determined (the optimal plan is a hard identity permutation and the
+    potentials are only fixed up to a constant shift). Row-marginal violation is invariant to
+    that shift, so the self-term is not the binding constraint on convergence — measured, real
+    30-point split-half self-pairs drive it to 1.4e-17. Pinning that here keeps a future change
+    to the criterion from quietly reintroducing a self-term stall.
+    """
+    scenes = SyntheticAdapter(n_scenes=2, n_pedestrians=5, n_steps=6, seed=0).load("counterfactual")
+    pedestrian_positions: list[np.ndarray] = []
+    for scene in scenes:
+        for pedestrian in scene.pedestrians:
+            pedestrian_positions.append(pedestrian.positions)
+    cloud = np.concatenate(pedestrian_positions, axis=0)
+
+    tight = SinkhornW2(epsilon=0.05, max_iter=20000, tol=1e-9)
+    self_distance = tight.between_clouds(cloud, cloud)
+    assert self_distance == 0.0
+
+
+def test_sinkhorn_w2_convergence_is_invariant_to_a_constant_potential_shift() -> None:
+    """Adding a constant to every coordinate leaves the cost matrix — and therefore the whole
+    Sinkhorn problem, including the row marginals — untouched, so the criterion must behave
+    identically. A criterion sensitive to the constant-shift direction in the duals would not
+    give a bit-identical answer here."""
+    rng = np.random.default_rng(31)
+    cloud_a = rng.normal(size=(20, 2))
+    cloud_b = rng.normal(size=(20, 2)) + 1.5
+    offset = np.array([12.0, -7.0], dtype=np.float64)
+
+    sinkhorn = SinkhornW2()
+    original = sinkhorn.between_clouds(cloud_a, cloud_b)
+    shifted = sinkhorn.between_clouds(cloud_a + offset, cloud_b + offset)
+    assert original == pytest.approx(shifted, abs=1e-6)
 
 
 # --- DiscreteFrechet ----------------------------------------------------------------------

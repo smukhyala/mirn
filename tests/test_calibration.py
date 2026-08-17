@@ -16,15 +16,36 @@ def _counterfactual_scenes(n_scenes: int = 6, n_pedestrians: int = 10, n_steps: 
     return adapter.load("counterfactual")
 
 
+def _small_counterfactual_scenes():
+    """A deliberately small fixture for the `sinkhorn_w2` arm of the null-sampling test.
+
+    The default fixture pools 60 pedestrians x 20 steps, so each split-half cloud carries 600
+    points and each `SinkhornW2.between_clouds` call runs three 600 x 600 Sinkhorn solves. At the
+    class's post-fix defaults (see `mirn.divergence.wasserstein`: max_iter=20000 rather than 500,
+    because the convergence criterion is now row-marginal violation against tol=1e-9) that is
+    minutes per split. Shrinking the CLOUD, not the tolerance, is the right lever: what this test
+    asserts — that every null sample is finite and non-negative — is a scale-independent property,
+    so 10 pedestrians x 6 steps (30 points per half) exercises it exactly as well.
+    """
+    return _counterfactual_scenes(n_scenes=2, n_pedestrians=5, n_steps=6)
+
+
 # --- split_half_null ---------------------------------------------------------------------------
 
 
 def test_split_half_null_samples_are_finite_and_non_negative() -> None:
     scenes = _counterfactual_scenes()
-    for divergence in ("ade", "fde", "sinkhorn_w2"):
+    for divergence in ("ade", "fde"):
         null_samples = split_half_null(scenes, divergence, seed=1, n_splits=25)
         assert np.all(np.isfinite(null_samples))
         assert np.all(null_samples >= 0.0)
+
+    # Same assertions for sinkhorn_w2, on a smaller fixture purely for runtime; see
+    # `_small_counterfactual_scenes`. The split count is unchanged.
+    small_scenes = _small_counterfactual_scenes()
+    sinkhorn_samples = split_half_null(small_scenes, "sinkhorn_w2", seed=1, n_splits=25)
+    assert np.all(np.isfinite(sinkhorn_samples))
+    assert np.all(sinkhorn_samples >= 0.0)
 
 
 def test_split_half_null_rejects_frechet_naming_cloud_capable_alternatives() -> None:
