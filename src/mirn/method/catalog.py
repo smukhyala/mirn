@@ -237,6 +237,9 @@ def _build_cards() -> dict[str, MethodCard]:
                 "origin in predictor error, with no dependence on the robot whatsoever.",
                 "It is a diagnostic instrument for exhibiting that failure, and reporting a "
                 "number from it as a measurement of perturbation would be a category error.",
+                "The counterfactual arm is consulted, but only to be corrupted with noise "
+                "before comparison — never as a legitimate forecast input. That is what makes "
+                "this look like a residual estimator while testing nothing about the robot.",
             ),
             citation="Wayfinder §11 measurement 5",
         )

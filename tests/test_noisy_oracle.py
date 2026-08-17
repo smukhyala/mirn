@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
 
+from mirn.contracts import RolloutPair, Scene, Trajectory
 from mirn.data.synthetic import SyntheticAdapter
 from mirn.estimator import ESTIMATORS
 
@@ -83,3 +85,42 @@ def test_result_carries_units_and_identification() -> None:
     assert result.divergence_name == "ade"
     assert result.n_samples == 8
     assert result.identification.startswith("UNMET:")
+
+
+def test_estimate_raises_on_empty_pairs() -> None:
+    estimator = ESTIMATORS.create("noisy_oracle_residual", predictor_error_std=0.1)
+    with pytest.raises(ValueError, match="RolloutPair"):
+        estimator.estimate((), seed=0)
+
+
+def _rollout_pair_with_no_pedestrians() -> RolloutPair:
+    """A RolloutPair whose two arms both carry zero pedestrians. `Scene.__post_init__` and
+    `RolloutPair.__post_init__` place no minimum on pedestrian count, so this is a legitimate
+    construction through the public contract, not a fixture that contorts around a guard."""
+    robot_positions = np.zeros((3, 2), dtype=np.float64)
+    robot_trajectory = Trajectory(agent_id="robot", positions=robot_positions, t0=0.0, dt=0.1)
+
+    factual_scene = Scene(
+        scene_id="empty",
+        pedestrians=(),
+        robot=robot_trajectory,
+        robot_present=True,
+        source="test",
+        seed=0,
+    )
+    counterfactual_scene = Scene(
+        scene_id="empty",
+        pedestrians=(),
+        robot=None,
+        robot_present=False,
+        source="test",
+        seed=0,
+    )
+    return RolloutPair(factual=factual_scene, counterfactual=counterfactual_scene)
+
+
+def test_estimate_raises_on_pair_with_no_paired_agents() -> None:
+    estimator = ESTIMATORS.create("noisy_oracle_residual", predictor_error_std=0.1)
+    pairs = (_rollout_pair_with_no_pedestrians(),)
+    with pytest.raises(ValueError, match="no paired agents"):
+        estimator.estimate(pairs, seed=0)
