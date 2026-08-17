@@ -4987,32 +4987,58 @@ function drawSweep(canvas, rows, payload) {
   const frame = plotFrame(canvas);
   const { context, left, right, top, bottom } = frame;
 
+  // CLAUDE.md guardrail 3: perturbation is reported in MDP units against the measured null,
+  // never in raw metres. The CSV keeps metres so it stays auditable; every DISPLAY normalises.
+  // Normalised, the detection floor is exactly y = 1 and "crosses the floor" means "crosses 1".
+  const floor = payload.mdp_95;
+  context.font = "11px " + (state.theme["--mirn-font-mono"] || "monospace");
+  if (!(floor > 0)) {
+    context.fillStyle = token("--mirn-ink-muted");
+    context.textAlign = "center";
+    context.fillText(
+      "no positive detection floor - cannot express in MDP units",
+      (left + right) / 2,
+      (top + bottom) / 2
+    );
+    return;
+  }
+  const norm = (value) => value / floor;
+
   const xValues = rows.map((row) => row.axis_value);
-  const highs = rows.map((row) => row.reported_ci_high);
+  const highs = rows.map((row) => norm(row.reported_ci_high));
   const xLow = Math.min(...xValues);
   const xHigh = Math.max(...xValues);
-  const yHigh = Math.max(...highs, payload.mdp_95) * 1.1 || 1;
+  const yHigh = Math.max(...highs, 1.0) * 1.15;
 
   const xScale = makeScale(xLow, xHigh, left, right);
   const yScale = makeScale(0, yHigh, bottom, top);
 
+  const floorY = yScale(1.0);
   context.fillStyle = token("--mirn-floor");
   context.globalAlpha = 0.22;
-  const floorY = yScale(payload.mdp_95);
   context.fillRect(left, floorY, right - left, bottom - floorY);
   context.globalAlpha = 1;
+
+  context.strokeStyle = token("--mirn-floor");
+  context.lineWidth = 1.2;
+  context.setLineDash([4, 4]);
+  context.beginPath();
+  context.moveTo(left, floorY);
+  context.lineTo(right, floorY);
+  context.stroke();
+  context.setLineDash([]);
 
   context.fillStyle = token("--mirn-naive");
   context.globalAlpha = 0.18;
   context.beginPath();
   rows.forEach((row, index) => {
     const x = xScale(row.axis_value);
-    const y = yScale(row.reported_ci_high);
+    const y = yScale(norm(row.reported_ci_high));
     if (index === 0) context.moveTo(x, y);
     else context.lineTo(x, y);
   });
   for (let index = rows.length - 1; index >= 0; index -= 1) {
-    context.lineTo(xScale(rows[index].axis_value), yScale(rows[index].reported_ci_low));
+    context.lineTo(xScale(rows[index].axis_value), yScale(norm(rows[index].reported_ci_low)));
   }
   context.closePath();
   context.fill();
@@ -5029,7 +5055,7 @@ function drawSweep(canvas, rows, payload) {
     context.beginPath();
     rows.forEach((row, index) => {
       const x = xScale(row.axis_value);
-      const y = yScale(row[entry.key]);
+      const y = yScale(norm(row[entry.key]));
       if (index === 0) context.moveTo(x, y);
       else context.lineTo(x, y);
     });
@@ -5040,7 +5066,7 @@ function drawSweep(canvas, rows, payload) {
   const xLabel = payload.axis === "predictor_noise"
     ? "predictor error sigma (m)"
     : "forecast horizon (steps)";
-  drawAxes(frame, xLabel, "perturbation (m)", xLow, xHigh, 0, yHigh);
+  drawAxes(frame, xLabel, "perturbation (MDP95 units)", xLow, xHigh, 0, yHigh);
 }
 
 function drawBars(canvas, rows) {
