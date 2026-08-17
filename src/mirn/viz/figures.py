@@ -79,7 +79,10 @@ def confounding_sweep_figure(sweep_frame: pd.DataFrame) -> Figure:
     """
     _require_columns(sweep_frame, _SWEEP_COLUMNS)
     if len(sweep_frame) < 2:
-        raise ValueError(f"sweep_frame needs at least 2 rows to draw a curve, got {len(sweep_frame)}")
+        raise ValueError(
+            f"sweep_frame needs at least 2 rows to draw a curve, "
+            f"got {len(sweep_frame)}"
+        )
 
     apply_matplotlib()
     figure = Figure(figsize=(5.2, 3.2))
@@ -114,7 +117,13 @@ def confounding_sweep_figure(sweep_frame: pd.DataFrame) -> Figure:
         color=PALETTE.ink,
         fontsize=8,
     )
-    axis.fill_between(axis_values, reported_low_mdp, reported_high_mdp, color=PALETTE.naive, alpha=0.18)
+    axis.fill_between(
+        axis_values,
+        reported_low_mdp,
+        reported_high_mdp,
+        color=PALETTE.naive,
+        alpha=0.18,
+    )
     axis.plot(axis_values, reported_mdp, color=PALETTE.naive, linewidth=1.8, label="reported")
     axis.plot(
         axis_values,

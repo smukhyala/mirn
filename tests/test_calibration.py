@@ -12,7 +12,12 @@ from mirn.data.synthetic import SyntheticAdapter
 
 
 def _counterfactual_scenes(n_scenes: int = 6, n_pedestrians: int = 10, n_steps: int = 20):
-    adapter = SyntheticAdapter(n_scenes=n_scenes, n_pedestrians=n_pedestrians, n_steps=n_steps, seed=0)
+    adapter = SyntheticAdapter(
+        n_scenes=n_scenes,
+        n_pedestrians=n_pedestrians,
+        n_steps=n_steps,
+        seed=0,
+    )
     return adapter.load("counterfactual")
 
 

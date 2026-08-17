@@ -238,7 +238,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--out", type=Path, required=True, help="output CSV path"
     )
     characterize_parser.add_argument(
-        "--root", type=Path, default=None, help="PeRoI dataset root (default: $MIRN_DATA_ROOT/peroi)"
+        "--root",
+        type=Path,
+        default=None,
+        help="PeRoI dataset root (default: $MIRN_DATA_ROOT/peroi)",
     )
 
     return parser

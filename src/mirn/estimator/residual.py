@@ -56,7 +56,10 @@ def _constant_velocity_residual(
 
     forecast_path = np.empty((horizon_steps, 2), dtype=np.float64)
     for step_offset in range(1, horizon_steps + 1):
-        forecast_path[step_offset - 1] = positions[anchor_index] + velocity * trajectory.dt * step_offset
+        offset_position = (
+            positions[anchor_index] + velocity * trajectory.dt * step_offset
+        )
+        forecast_path[step_offset - 1] = offset_position
 
     observed_path = positions[anchor_index + 1 : anchor_index + 1 + horizon_steps]
 
