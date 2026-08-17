@@ -71,10 +71,11 @@ def null_distribution_figure(
 
 
 def confounding_sweep_figure(sweep_frame: pd.DataFrame) -> Figure:
-    """Reported vs. true perturbation against predictor error, with the detection floor shaded.
+    """Reported vs. true perturbation against predictor error, with the detection floor marked.
 
     The argument in one image: true perturbation is pinned at zero across the whole sweep while
-    the reported number climbs through the floor.
+    the reported number climbs through the detection floor. All perturbation values are normalized
+    to MDP units (divided by the measured detection floor).
     """
     _require_columns(sweep_frame, _SWEEP_COLUMNS)
     if len(sweep_frame) < 2:
@@ -92,12 +93,32 @@ def confounding_sweep_figure(sweep_frame: pd.DataFrame) -> Figure:
     mdp_95 = float(sweep_frame["mdp_95"].to_numpy()[0])
     axis_name = str(sweep_frame["axis"].to_numpy()[0])
 
-    axis.axhspan(0.0, mdp_95, color=PALETTE.floor, alpha=0.22, linewidth=0.0)
-    axis.fill_between(axis_values, reported_low, reported_high, color=PALETTE.naive, alpha=0.18)
-    axis.plot(axis_values, reported, color=PALETTE.naive, linewidth=1.8, label="reported")
+    if mdp_95 <= 0.0:
+        raise ValueError(
+            f"sweep cannot be expressed in MDP units without a positive detection floor; "
+            f"received mdp_95={mdp_95}"
+        )
+
+    reported_mdp = reported / mdp_95
+    reported_low_mdp = reported_low / mdp_95
+    reported_high_mdp = reported_high / mdp_95
+    true_values_mdp = true_values / mdp_95
+
+    axis.axhspan(0.0, 1.0, color=PALETTE.floor, alpha=0.22, linewidth=0.0)
+    axis.axhline(1.0, color=PALETTE.floor, linewidth=1.2, linestyle="--")
+    axis.annotate(
+        "detection floor",
+        xy=(0.0, 1.0),
+        xytext=(6.0, 8.0),
+        textcoords="offset points",
+        color=PALETTE.ink,
+        fontsize=8,
+    )
+    axis.fill_between(axis_values, reported_low_mdp, reported_high_mdp, color=PALETTE.naive, alpha=0.18)
+    axis.plot(axis_values, reported_mdp, color=PALETTE.naive, linewidth=1.8, label="reported")
     axis.plot(
         axis_values,
-        true_values,
+        true_values_mdp,
         color=PALETTE.paired,
         linewidth=1.8,
         linestyle="--",
@@ -108,8 +129,8 @@ def confounding_sweep_figure(sweep_frame: pd.DataFrame) -> Figure:
         axis.set_xlabel("predictor error $\\sigma$ (m)")
     else:
         axis.set_xlabel("forecast horizon (steps)")
-    axis.set_ylabel("perturbation (m)")
-    axis.set_title("Reported perturbation tracks predictor error, not the robot")
+    axis.set_ylabel("perturbation (MDP$_{95}$ units)")
+    axis.set_title("Reported perturbation crosses the detection floor with no robot effect")
     axis.legend(loc="upper left")
     figure.tight_layout()
     return figure
