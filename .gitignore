@@ -48,3 +48,6 @@ htmlcov/
 
 # Claude Code local overrides (keep shared config, drop machine-local)
 .claude/settings.local.json
+
+# Subagent-driven-development scratch workspace (ledger, briefs, review packages)
+.superpowers/
