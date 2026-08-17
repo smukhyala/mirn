@@ -26,8 +26,8 @@ from mirn.experiments.base import (
 )
 from mirn.experiments.calibration_floor import (
     build_adapter,
+    cached_floor,
     divergence_parameter,
-    floor_from_scenes,
     n_scenes_parameter,
 )
 
@@ -120,10 +120,7 @@ class EstimatorComparison(Experiment):
         adapter = build_adapter(n_scenes, seed)
         pairs = adapter.rollout_pairs_with_influence(influence)
 
-        counterfactual_scenes: list[object] = []
-        for pair in pairs:
-            counterfactual_scenes.append(pair.counterfactual)
-        floor = floor_from_scenes(tuple(counterfactual_scenes), divergence, seed)
+        floor = cached_floor(divergence, n_scenes, seed)
 
         estimators: list[tuple[str, object]] = []
         estimators.append(

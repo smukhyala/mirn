@@ -28,8 +28,8 @@ from mirn.experiments.base import (
 )
 from mirn.experiments.calibration_floor import (
     build_adapter,
+    cached_floor,
     divergence_parameter,
-    floor_from_scenes,
     n_scenes_parameter,
 )
 from mirn.experiments.estimator_comparison import influence_parameter
@@ -164,10 +164,7 @@ class ConfoundingSweep(Experiment):
         adapter = build_adapter(n_scenes, seed)
         pairs = adapter.rollout_pairs_with_influence(influence)
 
-        counterfactual_scenes: list[object] = []
-        for pair in pairs:
-            counterfactual_scenes.append(pair.counterfactual)
-        mdp_95 = floor_from_scenes(tuple(counterfactual_scenes), divergence, seed)
+        mdp_95 = cached_floor(divergence, n_scenes, seed)
 
         paired_estimator = ESTIMATORS.create("paired", divergence=divergence)
         true_estimate = paired_estimator.estimate(pairs, seed)

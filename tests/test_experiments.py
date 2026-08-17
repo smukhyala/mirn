@@ -9,7 +9,9 @@ import json
 import pandas as pd
 import pytest
 
+from mirn.calibration.null import minimum_detectable_perturbation, split_half_null
 from mirn.experiments import EXPERIMENTS
+from mirn.experiments.calibration_floor import FLOOR_N_SPLITS, build_adapter, cached_floor
 from mirn.method.catalog import CARDS
 
 _FAST_PARAMS: dict[str, dict[str, object]] = {
@@ -127,6 +129,66 @@ def test_calibration_floor_does_not_offer_the_order_dependent_divergence() -> No
     for parameter in experiment.parameters():
         if parameter.name == "divergence":
             assert "frechet" not in parameter.choices
+
+
+def test_cached_floor_matches_every_influence() -> None:
+    """The load-bearing test: `cached_floor` is deliberately not keyed on `influence`, on the
+    belief that the counterfactual arm is the pre-displacement trajectory and therefore identical
+    at every influence level. Prove that directly, per influence, rather than assuming it. If this
+    ever fails, the cache is unsound and must not be used — do not adjust the assertion."""
+    divergence = "ade"
+    n_scenes = 3
+    seed = 0
+
+    cached_floor.cache_clear()
+    expected = cached_floor(divergence, n_scenes, seed)
+
+    influences = (0.0, 0.5, 1.0, 2.0)
+    for influence in influences:
+        adapter = build_adapter(n_scenes, seed)
+        pairs = adapter.rollout_pairs_with_influence(influence)
+        counterfactual_scenes: list[object] = []
+        for pair in pairs:
+            counterfactual_scenes.append(pair.counterfactual)
+        null_samples = split_half_null(
+            tuple(counterfactual_scenes), divergence, seed, n_splits=FLOOR_N_SPLITS
+        )
+        direct_floor = minimum_detectable_perturbation(null_samples, alpha=0.05)
+        assert direct_floor == expected, f"floor diverged at influence={influence}"
+
+
+def test_cached_floor_is_deterministic_on_repeat_call() -> None:
+    cached_floor.cache_clear()
+    first = cached_floor("ade", 3, 0)
+    second = cached_floor("ade", 3, 0)
+    assert first == second
+
+
+def test_cached_floor_keys_on_divergence_n_scenes_and_seed() -> None:
+    """Distinct argument combinations must land in distinct cache slots, and in particular a
+    changed seed must change the returned value — otherwise the key isn't actually being used and
+    every call would silently collapse onto one entry."""
+    cached_floor.cache_clear()
+    cached_floor("ade", 3, 0)
+    cached_floor("fde", 3, 0)
+    cached_floor("ade", 4, 0)
+    cached_floor("ade", 3, 1)
+    info = cached_floor.cache_info()
+    assert info.currsize == 4
+
+    value_seed_0 = cached_floor("ade", 3, 0)
+    value_seed_1 = cached_floor("ade", 3, 1)
+    assert value_seed_0 != value_seed_1
+
+
+def test_cached_floor_cache_clear_recomputes_the_same_value() -> None:
+    """Also proves the function is genuinely deterministic, not accidentally stable because it
+    never actually recomputed."""
+    cached_floor.cache_clear()
+    first = cached_floor("ade", 3, 0)
+    cached_floor.cache_clear()
+    second = cached_floor("ade", 3, 0)
+    assert first == second
 
 
 _COMPARISON_COLUMNS = [

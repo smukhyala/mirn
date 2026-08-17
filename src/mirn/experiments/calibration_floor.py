@@ -12,6 +12,7 @@ is uninterpretable without it.
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Mapping
 
 import numpy as np
@@ -93,6 +94,31 @@ def floor_from_scenes(scenes: tuple, divergence: str, seed: int) -> float:
     depending on experiment 1 having been run first — every CSV row stays self-contained.
     """
     null_samples = split_half_null(scenes, divergence, seed, n_splits=FLOOR_N_SPLITS)
+    return minimum_detectable_perturbation(null_samples, alpha=0.05)
+
+
+@functools.lru_cache(maxsize=128)
+def cached_floor(
+    divergence: str, n_scenes: int, seed: int, n_splits: int = FLOOR_N_SPLITS
+) -> float:
+    """The detection floor for a synthetic population, memoised on its determining inputs.
+
+    Deliberately not keyed on `influence`: the counterfactual arm returned by
+    `SyntheticAdapter.load("counterfactual")` is `base_positions` — drawn from the per-scene RNG
+    before `influence` is ever multiplied in (see `mirn.data.synthetic._generate_pair`). The
+    robot-free population is therefore identical at every influence level, so the null it produces
+    and the floor derived from it are identical too. `test_cached_floor_matches_every_influence`
+    in `tests/test_experiments.py` asserts that equivalence directly rather than assuming it; do
+    not widen this cache key to include `influence` without re-deriving that proof, and do not add
+    `influence` as a silently-ignored keyword either.
+
+    `estimator_comparison` and `confounding_sweep` both recompute this same 200-split null on
+    every run at every influence level they sweep; caching on the four arguments that actually
+    determine the value turns that into a single computation per (divergence, n_scenes, seed).
+    """
+    adapter = build_adapter(n_scenes, seed)
+    scenes = adapter.load("counterfactual")
+    null_samples = split_half_null(scenes, divergence, seed, n_splits=n_splits)
     return minimum_detectable_perturbation(null_samples, alpha=0.05)
 
 
