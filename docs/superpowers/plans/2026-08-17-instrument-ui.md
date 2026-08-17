@@ -2771,6 +2771,14 @@ git commit -m "Add the estimator_comparison experiment: naive vs paired on ident
 - Consumes: `build_adapter`, `divergence_parameter`, `floor_from_scenes`, `n_scenes_parameter` from `calibration_floor`; `influence_parameter` from `estimator_comparison`; `ESTIMATORS`.
 - Produces: `@EXPERIMENTS.register("confounding_sweep")` → `ConfoundingSweep`. Frame columns exactly `axis, axis_value, reported_value, reported_ci_low, reported_ci_high, true_value, mdp_95, exceeds_floor, influence, divergence, seed` — matching what `viz.figures.confounding_sweep_figure` (Task 2) already reads.
 
+**Units — decided during Task 2's review, binding here.** These frame columns carry **raw metres**,
+with `mdp_95` alongside them, so a CSV row stays self-contained and any reader can re-derive the
+normalisation. Every *display* surface — `viz.figures.confounding_sweep_figure` and the page's
+`drawSweep` — divides by `mdp_95` and reports MDP units, per `CLAUDE.md` guardrail 3 ("Never report
+perturbation in raw metres outside `mirn.calibration`"). Normalised, the detection floor sits at
+exactly `y = 1`. Do **not** normalise inside this experiment and do **not** add duplicate normalised
+columns; the split is deliberate.
+
 **Claim:** *True perturbation is pinned at zero; reported perturbation climbs with predictor error and crosses the detection floor.*
 
 This is wayfinder §11 measurement 5, the experiment the document calls "the killer plot" and "a direct critique of a published loss function".
@@ -2818,6 +2826,8 @@ def test_confounding_sweep_frame_columns_satisfy_the_figure_contract() -> None:
 
     figure = confounding_sweep_figure(_sweep_result(n_points=6).frame)
     assert len(figure.axes) == 1
+    # The frame is in metres; the figure must render MDP units (CLAUDE.md guardrail 3).
+    assert "MDP" in figure.axes[0].get_ylabel()
 
 
 def test_true_perturbation_is_exactly_zero_at_every_sweep_point() -> None:
