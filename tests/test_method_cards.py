@@ -4,6 +4,8 @@ an empty formula would silently render as a blank panel in the UI."""
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from mirn.method.cards import MethodCard
@@ -64,7 +66,24 @@ def test_blank_entry_inside_assumptions_raises() -> None:
         _valid_card(assumptions=("fine", "  "))
 
 
+def test_blank_entry_inside_breaks_when_raises() -> None:
+    with pytest.raises(ValueError, match="breaks_when"):
+        _valid_card(breaks_when=("fine", "  "))
+
+
 def test_card_is_frozen() -> None:
     card = _valid_card()
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         card.title = "something else"  # type: ignore[misc]
+
+
+def test_blank_citation_raises() -> None:
+    with pytest.raises(ValueError, match="citation"):
+        _valid_card(citation="   ")
+
+
+def test_non_null_citation_round_trips() -> None:
+    citation_text = "Cuturi, NeurIPS 2013"
+    card = _valid_card(citation=citation_text)
+    row = card.as_dict()
+    assert row["citation"] == citation_text
