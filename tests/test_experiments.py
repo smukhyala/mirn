@@ -362,3 +362,65 @@ def test_axis_choices_are_exactly_the_two_documented_axes() -> None:
     for parameter in experiment.parameters():
         if parameter.name == "axis":
             assert parameter.choices == ("predictor_noise", "forecast_horizon")
+
+
+_PLACEBO_COLUMNS = [
+    "variant",
+    "n_pedestrians",
+    "value",
+    "ci_low",
+    "ci_high",
+    "delta_vs_full",
+    "influence",
+    "seed",
+]
+
+
+def _placebo_result(**overrides: object):
+    params = _fast_params("placebo")
+    for key in overrides:
+        params[key] = overrides[key]
+    return EXPERIMENTS.create("placebo").run(params, seed=0)
+
+
+def test_placebo_columns_are_exact() -> None:
+    assert list(_placebo_result().frame.columns) == _PLACEBO_COLUMNS
+
+
+def test_placebo_reports_a_full_and_a_reduced_variant() -> None:
+    frame = _placebo_result().frame
+    assert sorted(frame["variant"].tolist()) == ["full", "pedestrian_removed"]
+
+
+def test_removing_a_non_interacting_pedestrian_barely_moves_the_estimate() -> None:
+    """The placebo gate. A large delta here means the estimator is measuring the population
+    rather than the robot."""
+    frame = _placebo_result(influence=1.0).frame
+    reduced = frame[frame["variant"] == "pedestrian_removed"]
+    delta = abs(float(reduced["delta_vs_full"].to_numpy()[0]))
+    mdp_relative = delta / max(float(frame["value"].to_numpy()[0]), 1e-12)
+    assert mdp_relative < 0.25
+
+
+def test_placebo_removes_exactly_one_pedestrian() -> None:
+    frame = _placebo_result().frame
+    full = int(frame[frame["variant"] == "full"]["n_pedestrians"].to_numpy()[0])
+    reduced = int(
+        frame[frame["variant"] == "pedestrian_removed"]["n_pedestrians"].to_numpy()[0]
+    )
+    assert reduced == full - 1
+
+
+def test_placebo_payload_names_the_removed_agent() -> None:
+    result = _placebo_result()
+    removed = result.payload["removed_agent_id"]
+    assert type(removed) is str
+    assert len(removed) > 0
+
+
+def test_placebo_delta_is_exactly_zero_at_zero_influence() -> None:
+    """Both arms identical means both variants estimate exactly 0.0, so the delta is exactly 0.0
+    — not merely small."""
+    frame = _placebo_result(influence=0.0).frame
+    reduced = frame[frame["variant"] == "pedestrian_removed"]
+    assert float(reduced["delta_vs_full"].to_numpy()[0]) == 0.0

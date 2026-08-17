@@ -10,6 +10,7 @@ from mirn.experiments import (  # noqa: F401
     calibration_floor,
     confounding_sweep,
     estimator_comparison,
+    placebo,
 )
 from mirn.experiments.base import (
     EXPERIMENTS,
