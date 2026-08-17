@@ -10,6 +10,17 @@ from scipy.special import logsumexp
 from mirn.divergence.base import DIVERGENCES, Divergence, validate_cloud, validate_path
 
 
+class SinkhornConvergenceError(RuntimeError):
+    """Raised when `SinkhornW2`'s log-domain Sinkhorn loop fails to reach `tol` within
+    `max_iter` iterations.
+
+    This helper defines the calibration layer's null distribution (Task 4), so a silently
+    unconverged transport cost would corrupt the project's detection floor. Falling through
+    `max_iter` and returning the last iterate anyway is never acceptable; this exception makes
+    non-convergence observable instead.
+    """
+
+
 @DIVERGENCES.register("sinkhorn_w2")
 class SinkhornW2(Divergence):
     """Debiased entropic-regularised 2-Wasserstein distance between two point clouds with
@@ -26,7 +37,7 @@ class SinkhornW2(Divergence):
     from the same distribution. This class returns the debiased Sinkhorn divergence (Genevay et
     al. / Feydy et al.):
 
-        S(a, b) = OT(a, b) - 0.5 * OT(a, a) - 0.5 * OT(a, a)
+        S(a, b) = OT(a, b) - 0.5 * OT(a, a) - 0.5 * OT(b, b)
 
     with all three terms solved by the same log-domain Sinkhorn loop, at the same `epsilon`,
     `max_iter`, and `tol`, so the bias correction is exact rather than approximate. `S` can come
@@ -36,7 +47,27 @@ class SinkhornW2(Divergence):
 
     name = "sinkhorn_w2"
 
-    def __init__(self, epsilon: float = 0.05, max_iter: int = 500, tol: float = 1e-9) -> None:
+    # `epsilon`/`tol` defaults, both revised while adding `SinkhornConvergenceError` (see below):
+    # the old defaults (epsilon=0.05, tol=1e-9) never actually converged for real usage — they
+    # were only ever silently returning an unconverged iterate, which is exactly the corruption
+    # this exception now exists to catch rather than mask.
+    #   - `epsilon`: log-domain Sinkhorn's convergence rate degrades exponentially in
+    #     cost-scale / epsilon, and `mirn.calibration.split_half_null`'s real usage — pooled
+    #     pedestrian-trajectory point clouds on the metre scale (see `mirn.data.synthetic`'s
+    #     20 x 12 m box) — puts squared-distance costs up to several hundred. At epsilon=0.05
+    #     that plateaued around 1e-2 (verified against `split_half_null`'s own synthetic
+    #     fixture), seven orders of magnitude short of tol. epsilon=2.0 reaches a tight tol with
+    #     comfortable margin (well under 500 iterations) for that real-world scale.
+    #   - `tol`: even at epsilon=2.0, `between_clouds`'s two self-distance terms (`OT(a, a)`,
+    #     `OT(b, b)` in the debiasing formula below) never reach 1e-9 — an exact self-pair has a
+    #     non-unique optimal transport plan, so the potentials keep drifting at a floating-point
+    #     noise floor (observed empirically around 1e-7 to 1e-8) long after the transport cost
+    #     itself has stabilised. This is a structural property of comparing a cloud to itself, not
+    #     a scale issue, so no `epsilon` choice fixes it. tol=1e-6 sits above that noise floor
+    #     (verified against the same fixture, worst case 266 of 500 iterations) while still being
+    #     tight enough to catch a genuine caller error like `max_iter=1`.
+    # Explicit-epsilon/tol call sites elsewhere in this codebase are unaffected by either default.
+    def __init__(self, epsilon: float = 2.0, max_iter: int = 500, tol: float = 1e-6) -> None:
         if epsilon <= 0:
             raise ValueError(f"SinkhornW2 epsilon must be > 0, got {epsilon}")
         if max_iter < 1:
@@ -89,6 +120,8 @@ class SinkhornW2(Divergence):
         f_potential = np.zeros(n_points, dtype=np.float64)
         g_potential = np.zeros(m_points, dtype=np.float64)
 
+        converged = False
+        f_change = float("inf")
         for iteration in range(self.max_iter):
             f_previous = f_potential
 
@@ -100,9 +133,17 @@ class SinkhornW2(Divergence):
             log_col_sum = logsumexp(col_exponent, axis=0)
             g_potential = self.epsilon * (log_nu - log_col_sum)
 
-            f_change = np.max(np.abs(f_potential - f_previous))
+            f_change = float(np.max(np.abs(f_potential - f_previous)))
             if f_change < self.tol:
+                converged = True
                 break
+
+        if not converged:
+            raise SinkhornConvergenceError(
+                "SinkhornW2's log-domain Sinkhorn loop did not converge: ran "
+                f"{self.max_iter} iteration(s) without reaching tol; final f_change="
+                f"{f_change!r}, tol={self.tol!r}, epsilon={self.epsilon!r}"
+            )
 
         log_plan = (f_potential[:, np.newaxis] + g_potential[np.newaxis, :] - cost) / self.epsilon
         plan = np.exp(log_plan)

@@ -75,6 +75,8 @@ def test_trajectory_dt_must_be_finite() -> None:
 def test_trajectory_t0_must_be_finite() -> None:
     with pytest.raises(ValueError):
         Trajectory(agent_id="a", positions=np.zeros((3, 2)), t0=math.inf, dt=1.0)
+    with pytest.raises(ValueError):
+        Trajectory(agent_id="a", positions=np.zeros((3, 2)), t0=math.nan, dt=1.0)
 
 
 def test_trajectory_positions_must_be_finite() -> None:
@@ -304,6 +306,31 @@ def test_rollout_pair_rejects_robot_absent_factual() -> None:
     counterfactual = make_scene("s1", (pedestrian,), robot=None, robot_present=False, seed=1)
     with pytest.raises(ValueError):
         RolloutPair(factual=factual_bad, counterfactual=counterfactual)
+
+
+def test_rollout_pair_rejects_mismatched_shared_agent_dt() -> None:
+    # Scene.__post_init__ only enforces dt-consistency *within* one scene (each scene here has a
+    # single pedestrian, so that check is trivially satisfied). RolloutPair.__post_init__ is the
+    # only guard against the same shared agent running on two different clocks across arms.
+    pedestrian_factual = straight_line_trajectory(
+        agent_id="p1", t0=0.0, dt=1.0, n_steps=3, origin=(0.0, 0.0), velocity=(1.0, 0.0)
+    )
+    pedestrian_counterfactual = straight_line_trajectory(
+        agent_id="p1", t0=0.0, dt=0.5, n_steps=3, origin=(0.0, 0.0), velocity=(1.0, 0.0)
+    )
+    robot = straight_line_trajectory(
+        agent_id="robot", t0=0.0, dt=1.0, n_steps=3, origin=(5.0, 5.0), velocity=(0.0, 0.0)
+    )
+    factual = make_scene("s1", (pedestrian_factual,), robot=robot, robot_present=True, seed=1)
+    counterfactual = make_scene(
+        "s1", (pedestrian_counterfactual,), robot=None, robot_present=False, seed=1
+    )
+    with pytest.raises(ValueError) as excinfo:
+        RolloutPair(factual=factual, counterfactual=counterfactual)
+    message = str(excinfo.value)
+    assert "identical dt" in message
+    assert "shared agent 'p1'" in message
+    assert "1.0 != 0.5" in message
 
 
 def test_rollout_pair_rejects_disjoint_agent_sets() -> None:

@@ -5,9 +5,14 @@ strict: validation happens once, in `__post_init__`, and a violated invariant is
 `ValueError` (or `KeyError` for lookups) — never a warning and never a silent coercion.
 
 Arrays stored on these contracts are normalised to `numpy.float64` and marked read-only
-(`flags.writeable = False`) so that a "frozen" dataclass is genuinely immutable end to end, not
-just at the attribute-assignment level. Because `frozen=True` blocks attribute assignment from
-`__post_init__`, normalised values are written back via `object.__setattr__`.
+(`flags.writeable = False`) so that accidental in-place mutation through the public attribute is
+caught immediately (numpy raises `ValueError` on the write) rather than silently corrupting
+shared state. This is not genuine immutability: a determined caller can flip `flags.writeable`
+back to `True` and mutate the array anyway — numpy does not enforce the flag against that, it is
+a standard numpy idiom for catching mistakes, not a security boundary. We deliberately do not
+defend against the determined-caller case with per-access defensive copies; copying on every
+access would cost real time in the estimator loops. Because `frozen=True` blocks attribute
+assignment from `__post_init__`, normalised values are written back via `object.__setattr__`.
 """
 
 from __future__ import annotations

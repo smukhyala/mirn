@@ -35,6 +35,38 @@ def test_register_duplicate_name_raises_value_error() -> None:
             pass
 
 
+def test_register_same_class_object_twice_is_idempotent() -> None:
+    registry = Registry("widget")
+
+    @registry.register("gadget")
+    class Gadget:
+        pass
+
+    # Re-registering the exact same class object under the same name must be a no-op, not raise.
+    result = registry.register("gadget")(Gadget)
+    assert result is Gadget
+    assert registry.get("gadget") is Gadget
+    assert registry.names() == ("gadget",)
+
+
+def test_register_different_class_same_name_still_raises_after_idempotent_reregistration() -> None:
+    registry = Registry("widget")
+
+    @registry.register("gadget")
+    class GadgetA:
+        pass
+
+    # An idempotent re-registration of GadgetA must not weaken the guard against a genuinely
+    # different class later claiming the same name.
+    registry.register("gadget")(GadgetA)
+
+    with pytest.raises(ValueError):
+
+        @registry.register("gadget")
+        class GadgetB:
+            pass
+
+
 def test_get_unknown_name_raises_key_error_listing_available_names() -> None:
     registry = Registry("widget")
 

@@ -24,14 +24,23 @@ class Registry:
     def register(self, name: str) -> Callable[[type], type]:
         """Return a class decorator that registers the decorated type under `name`.
 
-        Raises ValueError if `name` is already registered.
+        Idempotent when `name` is already registered to this exact class object (`cls is
+        existing`) — re-registering the same type a second time is a no-op, not an error. This
+        matters for modules that can legitimately be imported/executed more than once (e.g. a
+        submodule re-run under `__main__` via `python -m`) while still calling an unconditional
+        `@registry.register(...)` decorator at module scope.
+
+        Raises ValueError if `name` is already registered to a *different* class object.
         """
 
         def decorator(cls: type) -> type:
             if name in self._entries:
+                existing = self._entries[name]
+                if existing is cls:
+                    return cls
                 message = (
                     f"{self._kind} '{name}' is already registered "
-                    f"(existing entry: {self._entries[name]!r})"
+                    f"(existing entry: {existing!r})"
                 )
                 raise ValueError(message)
             self._entries[name] = cls

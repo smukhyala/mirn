@@ -209,11 +209,20 @@ class PeroiAdapter(DatasetAdapter):
 # makes Python import this module twice under two different names (once as "mirn.data.peroi",
 # a side effect of `mirn.data.__init__` eagerly importing every adapter submodule for
 # registration; once as "__main__", to run the CLI below) — see the CPython runpy warning
-# "found in sys.modules after import of package ... but prior to execution of ...". An
-# unconditional decorator would attempt to register "peroi" twice and raise. `Registry.register`
-# itself must keep raising on a genuine duplicate name (that behaviour is contract-tested in
-# `tests/test_registry.py`), so the guard belongs here, at the single call site that can
-# legitimately re-run.
+# "found in sys.modules after import of package ... but prior to execution of ...".
+#
+# `Registry.register` is idempotent for re-registering the exact same class *object* under the
+# same name (`existing is cls`), and still raises on a genuine duplicate-name collision by a
+# different class (both behaviours are contract-tested in `tests/test_registry.py`). That alone
+# does not cover this module's runpy case, though: a `-m` re-run re-executes this file's class
+# statement from scratch in a fresh `__main__` namespace, producing a second `PeroiAdapter` class
+# object that is structurally identical but not `is` the first one (verified empirically —
+# `exec`'ing the same class body twice always yields two distinct type objects). An unconditional
+# decorator call on that second pass would therefore still raise even under the new identity
+# check. The name-presence guard below is what actually absorbs that specific double-execution;
+# it stays here, at the single call site that can legitimately re-run, rather than in
+# `Registry.register`, which cannot distinguish "the same adapter, re-executed" from "a real name
+# collision" once the class objects differ.
 if "peroi" not in DATASETS.names():
     DATASETS.register("peroi")(PeroiAdapter)
 
