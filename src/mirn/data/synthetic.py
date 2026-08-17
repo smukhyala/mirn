@@ -31,8 +31,8 @@ _BASE_SPEED_MS = 1.2
 _SPEED_NOISE_STD_MS = 0.15
 _MIN_SPEED_MS = 0.3
 _POSITION_NOISE_STD_M = 0.03
-_DISPLACEMENT_AMPLITUDE_M = 1.5
-_DISPLACEMENT_DECAY_LENGTH_M = 3.0
+DISPLACEMENT_AMPLITUDE_M = 1.5
+DISPLACEMENT_DECAY_LENGTH_M = 3.0
 _DEFAULT_INFLUENCE = 1.0
 _CONDITIONS: tuple[str, ...] = ("factual", "counterfactual")
 _VELOCITY_UNIT = np.array([1.0, 0.0], dtype=np.float64)
@@ -147,8 +147,8 @@ class SyntheticAdapter(DatasetAdapter):
                 if lateral_sign[step_index] == 0.0:
                     lateral_sign[step_index] = 1.0
 
-            decay = np.exp(-distance_from_robot / _DISPLACEMENT_DECAY_LENGTH_M)
-            displacement_magnitude = influence * _DISPLACEMENT_AMPLITUDE_M * decay
+            decay = np.exp(-distance_from_robot / DISPLACEMENT_DECAY_LENGTH_M)
+            displacement_magnitude = influence * DISPLACEMENT_AMPLITUDE_M * decay
 
             displacement = np.empty((self.n_steps, 2), dtype=np.float64)
             for step_index in range(self.n_steps):

@@ -12,6 +12,7 @@ import pytest
 from mirn.calibration.null import minimum_detectable_perturbation, split_half_null
 from mirn.experiments import EXPERIMENTS
 from mirn.experiments.calibration_floor import FLOOR_N_SPLITS, build_adapter, cached_floor
+from mirn.experiments.placebo import DEFAULT_EXCLUSION_RADIUS_M
 from mirn.method.catalog import CARDS
 
 _FAST_PARAMS: dict[str, dict[str, object]] = {
@@ -424,3 +425,22 @@ def test_placebo_delta_is_exactly_zero_at_zero_influence() -> None:
     frame = _placebo_result(influence=0.0).frame
     reduced = frame[frame["variant"] == "pedestrian_removed"]
     assert float(reduced["delta_vs_full"].to_numpy()[0]) == 0.0
+
+
+def test_placebo_removed_agent_honours_its_own_exclusion_radius() -> None:
+    """The selection actually did what it claims: the reported closest approach must exceed the
+    exclusion radius it was selected against."""
+    result = _placebo_result()
+    closest_approach_m = float(result.payload["removed_agent_closest_approach_m"])
+    assert closest_approach_m > DEFAULT_EXCLUSION_RADIUS_M
+
+
+def test_placebo_residual_displacement_is_zero_only_at_zero_influence() -> None:
+    """Honest statement of what this experiment does and does not prove: the removed agent is not
+    perfectly isolated from the robot, so its residual displacement is exactly zero only when
+    influence itself is zero, and strictly positive otherwise."""
+    zero_influence = _placebo_result(influence=0.0)
+    assert float(zero_influence.payload["removed_agent_residual_displacement_m"]) == 0.0
+
+    positive_influence = _placebo_result(influence=1.0)
+    assert float(positive_influence.payload["removed_agent_residual_displacement_m"]) > 0.0
