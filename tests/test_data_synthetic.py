@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from mirn.contracts import RolloutPair
-from mirn.data.synthetic import SyntheticAdapter
+from mirn.data.synthetic import (
+    BOX_HEIGHT_M,
+    BOX_WIDTH_M,
+    DISPLACEMENT_AMPLITUDE_M,
+    DISPLACEMENT_DECAY_LENGTH_M,
+    SyntheticAdapter,
+)
 
 
 def _mean_paired_displacement(pairs: tuple[RolloutPair, ...]) -> float:
@@ -116,3 +123,98 @@ def test_load_and_characterize_conditions() -> None:
     )
     assert tuple(frame.columns) == expected_columns
     assert len(frame) == 2
+
+
+def test_default_settings_reproduce_the_previous_trajectories_bitwise() -> None:
+    """The whole rest of the suite depends on these exact numbers. Not allclose — array_equal."""
+    adapter = SyntheticAdapter(n_scenes=3, n_pedestrians=12, n_steps=60, seed=0)
+    explicit = SyntheticAdapter(
+        n_scenes=3,
+        n_pedestrians=12,
+        n_steps=60,
+        seed=0,
+        robot_position=(BOX_WIDTH_M / 2.0, BOX_HEIGHT_M / 2.0),
+        displacement_amplitude_m=DISPLACEMENT_AMPLITUDE_M,
+        displacement_decay_length_m=DISPLACEMENT_DECAY_LENGTH_M,
+    )
+    default_pairs = adapter.rollout_pairs_with_influence(1.0)
+    explicit_pairs = explicit.rollout_pairs_with_influence(1.0)
+    for pair_index in range(len(default_pairs)):
+        default_agents = default_pairs[pair_index].paired_agents()
+        explicit_agents = explicit_pairs[pair_index].paired_agents()
+        for agent_index in range(len(default_agents)):
+            assert np.array_equal(
+                default_agents[agent_index][0].positions,
+                explicit_agents[agent_index][0].positions,
+            )
+
+
+def test_a_larger_amplitude_pushes_people_further() -> None:
+    weak = SyntheticAdapter(n_scenes=2, seed=0, displacement_amplitude_m=0.5)
+    strong = SyntheticAdapter(n_scenes=2, seed=0, displacement_amplitude_m=3.0)
+    weak_gap = _mean_arm_gap(weak.rollout_pairs_with_influence(1.0))
+    strong_gap = _mean_arm_gap(strong.rollout_pairs_with_influence(1.0))
+    assert strong_gap > weak_gap
+
+
+def test_a_longer_reach_pushes_more_people() -> None:
+    short = SyntheticAdapter(n_scenes=2, seed=0, displacement_decay_length_m=1.0)
+    long_reach = SyntheticAdapter(n_scenes=2, seed=0, displacement_decay_length_m=6.0)
+    assert _mean_arm_gap(long_reach.rollout_pairs_with_influence(1.0)) > _mean_arm_gap(
+        short.rollout_pairs_with_influence(1.0)
+    )
+
+
+def test_moving_the_robot_changes_who_is_affected() -> None:
+    centre = SyntheticAdapter(n_scenes=2, seed=0)
+    corner = SyntheticAdapter(n_scenes=2, seed=0, robot_position=(2.0, 1.0))
+    centre_pairs = centre.rollout_pairs_with_influence(1.0)
+    corner_pairs = corner.rollout_pairs_with_influence(1.0)
+    centre_first = centre_pairs[0].paired_agents()[0][0].positions
+    corner_first = corner_pairs[0].paired_agents()[0][0].positions
+    assert not np.array_equal(centre_first, corner_first)
+
+
+def test_the_counterfactual_arm_never_depends_on_robot_settings() -> None:
+    """The robot-absent world must be identical no matter how the robot is configured — the floor
+    cache keys on this and would silently return a wrong value otherwise."""
+    baseline = SyntheticAdapter(n_scenes=2, seed=0)
+    altered = SyntheticAdapter(
+        n_scenes=2, seed=0, robot_position=(3.0, 9.0),
+        displacement_amplitude_m=4.0, displacement_decay_length_m=1.0,
+    )
+    baseline_pairs = baseline.rollout_pairs_with_influence(1.0)
+    altered_pairs = altered.rollout_pairs_with_influence(1.0)
+    for pair_index in range(len(baseline_pairs)):
+        baseline_agents = baseline_pairs[pair_index].paired_agents()
+        altered_agents = altered_pairs[pair_index].paired_agents()
+        for agent_index in range(len(baseline_agents)):
+            assert np.array_equal(
+                baseline_agents[agent_index][1].positions,
+                altered_agents[agent_index][1].positions,
+            )
+
+
+def test_rejects_a_non_positive_decay_length() -> None:
+    with pytest.raises(ValueError, match="displacement_decay_length_m"):
+        SyntheticAdapter(displacement_decay_length_m=0.0)
+
+
+def test_rejects_a_negative_amplitude() -> None:
+    with pytest.raises(ValueError, match="displacement_amplitude_m"):
+        SyntheticAdapter(displacement_amplitude_m=-1.0)
+
+
+def test_rejects_a_robot_outside_the_box() -> None:
+    with pytest.raises(ValueError, match="robot_position"):
+        SyntheticAdapter(robot_position=(999.0, 1.0))
+
+
+def _mean_arm_gap(pairs: tuple) -> float:
+    totals: list[float] = []
+    for pair in pairs:
+        for factual_traj, counterfactual_traj in pair.paired_agents():
+            offsets = factual_traj.positions - counterfactual_traj.positions
+            distances = np.sqrt(np.sum(offsets * offsets, axis=1))
+            totals.append(float(np.mean(distances)))
+    return float(np.mean(np.asarray(totals)))
