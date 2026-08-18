@@ -7,6 +7,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
+import warnings
 from pathlib import Path
 
 from mirn.viz import theme
@@ -89,11 +90,54 @@ def test_apply_matplotlib_mutates_rcparams_to_dark() -> None:
     assert matplotlib.rcParams["figure.facecolor"] == theme.DARK_PALETTE.background
 
 
+def test_apply_matplotlib_emits_no_findfont_warning() -> None:
+    """A broken font-fallback chain fails silently unless something actually draws.
+
+    `font.sans-serif` / `font.monospace` are lists of family names; naming one that is not
+    installed makes matplotlib fall back with a `findfont` UserWarning. Inspecting the rc dict
+    can't catch that — only building a real figure on a real canvas and drawing it can.
+    """
+    import matplotlib
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+
+    matplotlib.use("Agg")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        theme.apply_matplotlib()
+        figure = Figure()
+        canvas = FigureCanvasAgg(figure)
+        axes = figure.add_subplot(1, 1, 1)
+        axes.set_title("test title")
+        axes.set_xlabel("x label")
+        axes.plot([0, 1, 2], [0, 1, 4])
+        canvas.draw()
+
+    for warning in caught:
+        message = str(warning.message)
+        assert "findfont" not in message
+
+
 def test_font_stacks_reach_matplotlib_with_a_dejavu_fallback() -> None:
     rc = theme.matplotlib_rc()
     assert rc["font.sans-serif"][0] == "Inter"
     assert rc["font.sans-serif"][-1] == "DejaVu Sans"
     assert rc["font.monospace"][-1] == "DejaVu Sans Mono"
+
+
+def test_matplotlib_rc_font_families_drop_css_generic_keywords() -> None:
+    """`sans-serif` / `monospace` / `serif` are CSS generics, not matplotlib family names."""
+    rc = theme.matplotlib_rc()
+    sans_families = rc["font.sans-serif"]
+    mono_families = rc["font.monospace"]
+    generic_keywords = ("sans-serif", "monospace", "serif")
+    for family in sans_families:
+        for keyword in generic_keywords:
+            assert family != keyword
+    for family in mono_families:
+        for keyword in generic_keywords:
+            assert family != keyword
 
 
 def test_series_colors_requires_a_palette_and_returns_its_members() -> None:
@@ -125,4 +169,16 @@ def test_palette_rejects_uppercase_hex() -> None:
         kwargs[field.name] = getattr(theme.DARK_PALETTE, field.name)
     kwargs["ink"] = "#ABCDEF"
     with pytest.raises(ValueError, match="ink"):
+        theme.Palette(**kwargs)
+
+
+def test_palette_rejects_non_hex_colour_name() -> None:
+    import pytest
+
+    kwargs: dict[str, str] = {}
+    fields = dataclasses.fields(theme.DARK_PALETTE)
+    for field in fields:
+        kwargs[field.name] = getattr(theme.DARK_PALETTE, field.name)
+    kwargs["background"] = "red"
+    with pytest.raises(ValueError, match="background"):
         theme.Palette(**kwargs)
