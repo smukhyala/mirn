@@ -58,15 +58,18 @@
         <input type="range" id="scene-n-pedestrians" min="2" max="40" step="1" value="12">
       </label>
     </form>
+    <p class="error" id="scene-error" hidden></p>
     <ul class="legend">
       <li><span class="swatch swatch-counterfactual"></span>robot absent</li>
       <li><span class="swatch swatch-factual"></span>robot present</li>
       <li><span class="swatch swatch-accent"></span>robot</li>
+      <li><span class="swatch swatch-paired"></span>the robot's effect on this person</li>
     </ul>
   </div>
   <div class="scene-stage">
     <canvas id="scene-canvas" width="760" height="456" aria-label="Paired pedestrian trajectories"></canvas>
     <div class="scene-readouts">
+      <button type="button" id="scene-playpause" class="scene-playpause">Pause</button>
       <span class="scene-readout">Elapsed <output id="scene-clock">0.0</output> s</span>
       <span class="scene-readout">Widest gap <output id="scene-gap">0.00</output> m</span>
     </div>

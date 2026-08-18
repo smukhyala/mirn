@@ -601,8 +601,11 @@ function drawScene(canvas, scene, step) {
     context.globalAlpha = 1;
   }
 
-  // The connector. This mark IS the robot's effect on that person — the whole thesis in one line.
-  context.strokeStyle = token("--mirn-accent");
+  // The connector. This mark IS the robot's effect on that person — the whole thesis in one line
+  // — so it wears the paired estimator's colour: the quantity this line traces out is exactly
+  // what the paired estimator reports below, and the legend's "robot" swatch already claims
+  // --mirn-accent.
+  context.strokeStyle = token("--mirn-paired");
   context.lineWidth = 1.2;
   for (let index = 0; index < scene.factual.length; index += 1) {
     const here = scene.factual[index].positions[step];
@@ -628,7 +631,9 @@ function drawScene(canvas, scene, step) {
 
   if (scene.robot) {
     const robot = scene.robot[0];
-    context.fillStyle = token("--mirn-naive");
+    // Matches the legend's "robot" swatch (--mirn-accent). --mirn-naive is the page's colour for
+    // the flawed naive estimator (.stat-naive, .breaks-when) and must not double as the robot.
+    context.fillStyle = token("--mirn-accent");
     context.beginPath();
     context.arc(scale.x(robot[0]), scale.y(robot[1]), 7, 0, Math.PI * 2);
     context.fill();
@@ -691,9 +696,25 @@ const SCENE_CONTROLS = [
   { id: "scene-n-pedestrians", decimals: 0 },
 ];
 
+function showSceneError(message) {
+  const errorNode = document.getElementById("scene-error");
+  errorNode.textContent = message;
+  errorNode.hidden = false;
+}
+
+function clearSceneError() {
+  const errorNode = document.getElementById("scene-error");
+  errorNode.hidden = true;
+  errorNode.textContent = "";
+}
+
 // Nothing here computes a measured quantity: it reads slider values, builds a query string, and
 // stores whatever /api/scene returns. On a settings change, playback keeps running rather than
-// resetting to step 0 — only `player.step` is clamped into the new scene's range.
+// resetting to step 0 — only `player.step` is clamped into the new scene's range. A failed fetch
+// (the hero element's version of the pending/error pattern the beat sections already use) shows
+// the server's own message in `#scene-error` rather than failing silently to the console; a
+// following successful fetch clears it. This function does not throw — callers do not need a
+// `.catch`.
 async function fetchScene() {
   const params = new URLSearchParams();
   params.set("influence", document.getElementById("scene-influence").value);
@@ -704,15 +725,18 @@ async function fetchScene() {
   params.set("amplitude", document.getElementById("scene-amplitude").value);
   params.set("decay", document.getElementById("scene-decay").value);
   params.set("n_pedestrians", document.getElementById("scene-n-pedestrians").value);
-  const scene = await getJSON("/api/scene?" + params.toString());
-  state.scene = scene;
-  const maxStep = scene.n_steps - 1;
-  if (player.step > maxStep) player.step = maxStep;
+  try {
+    const scene = await getJSON("/api/scene?" + params.toString());
+    state.scene = scene;
+    const maxStep = scene.n_steps - 1;
+    if (player.step > maxStep) player.step = maxStep;
+    clearSceneError();
+  } catch (error) {
+    showSceneError(error.message);
+  }
 }
 
-const debouncedFetchScene = debounce(() => {
-  fetchScene().catch((error) => { console.error(error); });
-}, DEBOUNCE_MS);
+const debouncedFetchScene = debounce(fetchScene, DEBOUNCE_MS);
 
 function wireSceneControls() {
   for (const control of SCENE_CONTROLS) {
@@ -725,18 +749,32 @@ function wireSceneControls() {
   }
 }
 
-// The scrub input doubles as the scene's only play/pause affordance (Task 6's DOM has no
-// dedicated button): dragging it pauses and jumps the player to the dragged step on every
-// "input" event, and releasing it ("change") resumes real-time playback from there.
+// Single source of truth for play/pause state, shared by the scrub input and the persistent
+// button below: flips `player.playing`, clears `player.accumulatorMs` on resume so a paused
+// stretch never replays as a burst of catch-up steps, and keeps the button's label in sync.
+function setPlaying(playing) {
+  player.playing = playing;
+  if (playing) {
+    player.accumulatorMs = 0;
+  }
+  document.getElementById("scene-playpause").textContent = playing ? "Pause" : "Play";
+}
+
+// Dragging the scrub pauses and seeks on every "input" event. Releasing it does NOT resume —
+// a viewer who scrubs to inspect a moment should not have playback restart out from under them.
+// Resuming is the persistent play/pause button's job.
 function wireScrub() {
   const scrub = document.getElementById("scene-scrub");
   scrub.addEventListener("input", () => {
-    player.playing = false;
     player.step = Number(scrub.value);
+    setPlaying(false);
   });
-  scrub.addEventListener("change", () => {
-    player.playing = true;
-    player.accumulatorMs = 0;
+}
+
+function wirePlayPause() {
+  const button = document.getElementById("scene-playpause");
+  button.addEventListener("click", () => {
+    setPlaying(!player.playing);
   });
 }
 
@@ -764,6 +802,7 @@ async function boot() {
 
   wireSceneControls();
   wireScrub();
+  wirePlayPause();
   await fetchScene();
   window.requestAnimationFrame(tick);
 

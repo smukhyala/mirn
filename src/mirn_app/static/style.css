@@ -66,12 +66,24 @@ body {
 }
 .scene-readouts {
   display: flex;
+  align-items: center;
   gap: 1.5rem;
   font-family: var(--mirn-font-mono);
   font-size: 0.8rem;
   color: var(--mirn-ink-muted);
 }
 .scene-readout output { color: var(--mirn-ink); }
+.scene-playpause {
+  background: var(--mirn-background);
+  color: var(--mirn-accent);
+  border: 1px solid var(--mirn-accent);
+  border-radius: 3px;
+  padding: 0.3rem 0.7rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.scene-playpause:hover { background: var(--mirn-surface); }
 .scene-scrub-control { margin-top: 0.25rem; }
 
 .legend { list-style: none; margin: 1rem 0 0; padding: 0; font-size: 0.8rem; color: var(--mirn-ink-muted); }
@@ -80,6 +92,7 @@ body {
 .swatch-counterfactual { background: var(--mirn-counterfactual); }
 .swatch-factual { background: var(--mirn-factual); }
 .swatch-accent { background: var(--mirn-accent); }
+.swatch-paired { background: var(--mirn-paired); }
 
 /* Everything below the hero is reading, so it gets the narrow, prose-width column instead of the
    hero's wide grid. */
