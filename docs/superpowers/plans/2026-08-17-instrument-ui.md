@@ -4018,17 +4018,43 @@ def test_only_the_cli_references_the_app_package() -> None:
 
 
 def test_importing_mirn_pulls_in_no_web_package() -> None:
+    """Run in a FRESH interpreter, deliberately.
+
+    Asserting `forbidden not in sys.modules` in-process is fragile: any earlier test in the same
+    pytest session that imports FastAPI (tests/test_app_api.py does, and sorts before this file
+    alphabetically under pytest's deterministic name-sorted collection) would leave it loaded and
+    fail this test for a reason having nothing to do with mirn leaking anything. A false failure in
+    a boundary test is worse than no test — it teaches people to ignore the gate. Subprocess
+    isolation makes the check independent of whatever else was collected. Do not "simplify" this
+    back into an in-process import.
+    """
+    import subprocess
     import sys
 
-    import mirn  # noqa: F401
-    import mirn.experiments  # noqa: F401
-    import mirn.method  # noqa: F401
-    import mirn.viz  # noqa: F401
+    root_lines: list[str] = []
+    for forbidden in _FORBIDDEN_ROOTS:
+        root_lines.append(f"    {forbidden!r},")
+    roots_literal = "\n".join(root_lines)
 
-    for forbidden in ("fastapi", "uvicorn", "starlette"):
-        assert forbidden not in sys.modules, (
-            f"importing mirn pulled in {forbidden}; the library/app boundary has leaked"
-        )
+    script = (
+        "import sys\n"
+        "import mirn\n"
+        "import mirn.experiments\n"
+        "import mirn.method\n"
+        "import mirn.viz\n"
+        "forbidden_roots = (\n" + roots_literal + "\n)\n"
+        "for root in forbidden_roots:\n"
+        "    if root in sys.modules:\n"
+        "        raise SystemExit('importing mirn pulled in ' + root)\n"
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True
+    )
+    assert completed.returncode == 0, (
+        "the library/app boundary has leaked at import time:\n"
+        f"stdout: {completed.stdout}\nstderr: {completed.stderr}"
+    )
 ```
 
 - [ ] **Step 2: Run test to verify it fails or passes for the right reason**
