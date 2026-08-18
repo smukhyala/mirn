@@ -70,14 +70,43 @@ def test_only_the_cli_references_the_app_package() -> None:
 
 
 def test_importing_mirn_pulls_in_no_web_package() -> None:
+    """Runs the import in a fresh interpreter subprocess rather than in-process.
+
+    An in-process check inspects `sys.modules` for the whole pytest session, not just for this
+    test. Task 13 adds `tests/test_app_api.py`, which imports `fastapi.testclient` at module
+    level; that file sorts before this one alphabetically and pytest's default collection order
+    is name-sorted, so an in-process check would find `fastapi` already loaded by an unrelated
+    test and fail for a reason that has nothing to do with `mirn` leaking a dependency. A false
+    failure in this test is worse than no test: it trains people to ignore the one gate that
+    protects the library. A subprocess is immune to whatever else pytest has already collected,
+    so do not "simplify" this back to an in-process `sys.modules` check.
+    """
+    import subprocess
     import sys
 
-    import mirn  # noqa: F401
-    import mirn.experiments  # noqa: F401
-    import mirn.method  # noqa: F401
-    import mirn.viz  # noqa: F401
+    root_list: list[str] = []
+    for root in _FORBIDDEN_ROOTS:
+        root_list.append(root)
 
-    for forbidden in ("fastapi", "uvicorn", "starlette"):
-        assert forbidden not in sys.modules, (
-            f"importing mirn pulled in {forbidden}; the library/app boundary has leaked"
-        )
+    import_lines: list[str] = [
+        "import sys",
+        "import mirn",
+        "import mirn.experiments",
+        "import mirn.method",
+        "import mirn.viz",
+    ]
+    check_lines: list[str] = []
+    for root in root_list:
+        check_lines.append(f"assert {root!r} not in sys.modules, {root!r}")
+
+    script = "\n".join(import_lines) + "\n" + "\n".join(check_lines) + "\n"
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"importing mirn pulled in a forbidden web package in a fresh interpreter; "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
