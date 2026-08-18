@@ -1,2 +1,77 @@
-<main><h1>MIRN</h1></main>
+<!-- KaTeX vendored from https://github.com/KaTeX/KaTeX/releases/tag/v0.16.11 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MIRN — measuring robot-induced perturbation</title>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/static/style.css">
 <style>/* MIRN_THEME */</style>
+</head>
+<body>
+<header class="masthead">
+  <p class="eyebrow">A measurement instrument</p>
+  <h1>How much did the robot disturb people?</h1>
+  <p class="standfirst">
+    The field answers this by running a trajectory predictor with the robot's future zeroed and
+    subtracting what the human actually did. That number is partly prediction error wearing a
+    causal label. This page walks the argument, computing every figure live.
+  </p>
+  <p class="synthetic-banner" id="data-note">All data on this page is synthetic.</p>
+</header>
+
+<section class="scene-panel">
+  <div class="scene-copy">
+    <h2>The paired rollout</h2>
+    <p>
+      One crowd, run twice from the same seed and the same exogenous noise: once with a robot in
+      the middle of the box, once with no robot at all. Because everything else is held identical,
+      the difference between an agent's two paths <em>is</em> the robot's causal effect on it — no
+      forecaster involved.
+    </p>
+    <label class="control">
+      <span class="control-label">Robot influence <output id="influence-readout">1.00</output></span>
+      <input type="range" id="scene-influence" min="0" max="2" step="0.05" value="1">
+    </label>
+    <ul class="legend">
+      <li><span class="swatch swatch-counterfactual"></span>robot absent</li>
+      <li><span class="swatch swatch-factual"></span>robot present</li>
+      <li><span class="swatch swatch-accent"></span>robot</li>
+    </ul>
+  </div>
+  <canvas id="scene-canvas" width="760" height="456" aria-label="Paired pedestrian trajectories"></canvas>
+</section>
+
+<main id="sections"></main>
+
+<footer class="page-footer">
+  <button id="export-button" type="button">Export every experiment to results/</button>
+  <p id="export-status" class="export-status"></p>
+  <p class="seed-note">Seed <output id="seed-readout">0</output> — every figure here is reproducible from it.</p>
+</footer>
+
+<template id="section-template">
+  <section class="experiment">
+    <p class="section-index"></p>
+    <h2 class="section-title"></h2>
+    <p class="section-claim"></p>
+    <div class="experiment-body">
+      <form class="controls"></form>
+      <div class="output">
+        <div class="readout"></div>
+        <canvas class="plot" width="520" height="300"></canvas>
+        <p class="plot-note"></p>
+      </div>
+    </div>
+    <details class="mathematics">
+      <summary>The mathematics</summary>
+      <div class="cards"></div>
+    </details>
+  </section>
+</template>
+
+<script src="/static/vendor/katex/katex.min.js" defer></script>
+<script src="/static/app.js" type="module"></script>
+</body>
+</html>
