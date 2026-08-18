@@ -15,6 +15,7 @@ from collections.abc import Sequence
 import matplotlib
 
 from mirn.experiments import EXPERIMENTS
+from mirn.experiments.base import ExperimentResult
 from mirn.paths import default_seed, results_dir
 
 matplotlib.use("Agg")
@@ -39,7 +40,7 @@ def _parse_params(raw_params: Sequence[str]) -> dict[str, object]:
     return parsed
 
 
-def _write_figure(experiment_name: str, result: object, figure_path: str) -> None:
+def _write_figure(experiment_name: str, result: ExperimentResult, figure_path: str) -> None:
     """Render the figure that belongs to this experiment, if it has one."""
     from mirn.viz.figures import confounding_sweep_figure, null_distribution_figure
 
@@ -53,12 +54,12 @@ def _write_figure(experiment_name: str, result: object, figure_path: str) -> Non
     if builder == "null_distribution":
         import numpy as np
 
-        samples = np.asarray(result.payload["null_samples"], dtype=float)  # type: ignore[attr-defined]
-        mdp_95 = float(result.payload["mdp_95"])  # type: ignore[attr-defined]
-        divergence = str(result.payload["divergence"])  # type: ignore[attr-defined]
+        samples = np.asarray(result.payload["null_samples"], dtype=float)
+        mdp_95 = float(result.payload["mdp_95"])
+        divergence = str(result.payload["divergence"])
         figure = null_distribution_figure(samples, mdp_95, divergence)
     else:
-        figure = confounding_sweep_figure(result.frame)  # type: ignore[attr-defined]
+        figure = confounding_sweep_figure(result.frame)
     figure.savefig(figure_path)
 
 
@@ -106,7 +107,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
         out_path = str(results_dir() / f"{args.experiment}.csv")
     else:
         out_path = args.out
-    result.frame.to_csv(out_path, index=False)
+    try:
+        result.frame.to_csv(out_path, index=False)
+    except OSError as error:
+        print(f"could not write CSV to '{out_path}': {error}", file=sys.stderr)
+        return 1
     print(f"wrote {len(result.frame)} rows to {out_path}")
 
     if args.figure is not None:
@@ -114,6 +119,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
             _write_figure(args.experiment, result, args.figure)
         except ValueError as error:
             print(str(error), file=sys.stderr)
+            return 1
+        except OSError as error:
+            print(
+                f"wrote {len(result.frame)} rows to {out_path}, but could not write figure to "
+                f"'{args.figure}': {error}",
+                file=sys.stderr,
+            )
             return 1
         print(f"wrote figure to {args.figure}")
 

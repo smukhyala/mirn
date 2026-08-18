@@ -99,3 +99,48 @@ def test_run_rejects_a_malformed_param(capsys: pytest.CaptureFixture[str], tmp_p
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "key=value" in captured.err
+
+
+def test_run_reports_an_unwritable_csv_path(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    out_path = tmp_path / "no_such_dir" / "out.csv"
+    exit_code = cli.main(
+        [
+            "run",
+            "calibration_floor",
+            "--param",
+            "n_scenes=3",
+            "--param",
+            "n_splits=20",
+            "--out",
+            str(out_path),
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert str(out_path) in captured.err
+    assert not out_path.exists()
+
+
+def test_run_reports_an_unwritable_figure_path(
+    capsys: pytest.CaptureFixture[str], tmp_path
+) -> None:
+    out_path = tmp_path / "floor.csv"
+    figure_path = tmp_path / "no_such_dir" / "fig.png"
+    exit_code = cli.main(
+        [
+            "run",
+            "calibration_floor",
+            "--param",
+            "n_scenes=3",
+            "--param",
+            "n_splits=20",
+            "--out",
+            str(out_path),
+            "--figure",
+            str(figure_path),
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert str(figure_path) in captured.err
+    assert out_path.exists()
