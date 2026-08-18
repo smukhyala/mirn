@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from mirn.viz.theme import (
-    PALETTE,
+    DARK_PALETTE,
+    LIGHT_PALETTE,
     Palette,
     apply_matplotlib,
     as_css_tokens,
@@ -13,7 +14,8 @@ from mirn.viz.theme import (
 )
 
 __all__ = [
-    "PALETTE",
+    "DARK_PALETTE",
+    "LIGHT_PALETTE",
     "Palette",
     "apply_matplotlib",
     "as_css_tokens",

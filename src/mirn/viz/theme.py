@@ -1,10 +1,12 @@
 """The single source of truth for every colour and typeface in the project.
 
 `CLAUDE.md` requires that all plot styling live here and that no plotting function set a colour
-inline. The interface obeys the same rule by construction: `matplotlib_rc` renders this palette
-for the paper figures and `as_css_tokens` renders the identical palette as CSS custom properties
-for the browser, so a one-line edit here moves both. Register is dark, minimal, high contrast on
-data ink and muted on chrome — no gradients, no shadows, no chart junk.
+inline. Since Task 1 the module carries two palettes rather than one, because paper figures and
+the browser page do not want the same register: `matplotlib_rc` / `apply_matplotlib` render
+`DARK_PALETTE` for the paper figures, staying in the dark, minimal, high-contrast DeepMind/
+Anthropic register `CLAUDE.md` asks for in publications; `as_css_tokens` / `css_root_block` render
+`LIGHT_PALETTE` for the browser page, which is mostly prose and reads better on cream. Both
+palettes live here, and only here, so no colour is ever set outside this module.
 """
 
 from __future__ import annotations
@@ -47,7 +49,7 @@ class Palette:
                 )
 
 
-PALETTE = Palette(
+DARK_PALETTE = Palette(
     background="#0b0d10",
     surface="#14181d",
     ink="#e8eaed",
@@ -59,6 +61,20 @@ PALETTE = Palette(
     paired="#4fd1a5",
     floor="#6b7684",
     accent="#b58cf0",
+)
+
+LIGHT_PALETTE = Palette(
+    background="#faf7f2",
+    surface="#f3efe7",
+    ink="#141414",
+    ink_muted="#5c5750",
+    grid="#ddd6ca",
+    factual="#b4541f",
+    counterfactual="#1f5fa8",
+    naive="#a8261f",
+    paired="#1f6b4a",
+    floor="#8a8378",
+    accent="#5b3fa8",
 )
 
 SANS_STACK = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
@@ -81,39 +97,39 @@ def _stack_to_families(stack: str) -> list[str]:
     return families
 
 
-def series_colors() -> tuple[str, ...]:
-    """The ordered categorical sequence for multi-series plots."""
+def series_colors(palette: Palette) -> tuple[str, ...]:
+    """The ordered categorical sequence for multi-series plots, drawn from `palette`."""
     return (
-        PALETTE.paired,
-        PALETTE.naive,
-        PALETTE.counterfactual,
-        PALETTE.factual,
-        PALETTE.accent,
+        palette.paired,
+        palette.naive,
+        palette.counterfactual,
+        palette.factual,
+        palette.accent,
     )
 
 
 def matplotlib_rc() -> dict[str, object]:
-    """rcParams implementing the palette, for the figure/CSV path."""
+    """rcParams implementing `DARK_PALETTE`, for the figure/CSV path."""
     rc: dict[str, object] = {}
-    rc["figure.facecolor"] = PALETTE.background
-    rc["figure.edgecolor"] = PALETTE.background
-    rc["savefig.facecolor"] = PALETTE.background
-    rc["axes.facecolor"] = PALETTE.background
-    rc["axes.edgecolor"] = PALETTE.grid
-    rc["axes.labelcolor"] = PALETTE.ink_muted
-    rc["axes.titlecolor"] = PALETTE.ink
+    rc["figure.facecolor"] = DARK_PALETTE.background
+    rc["figure.edgecolor"] = DARK_PALETTE.background
+    rc["savefig.facecolor"] = DARK_PALETTE.background
+    rc["axes.facecolor"] = DARK_PALETTE.background
+    rc["axes.edgecolor"] = DARK_PALETTE.grid
+    rc["axes.labelcolor"] = DARK_PALETTE.ink_muted
+    rc["axes.titlecolor"] = DARK_PALETTE.ink
     rc["axes.grid"] = True
     rc["axes.axisbelow"] = True
     rc["axes.spines.top"] = False
     rc["axes.spines.right"] = False
-    rc["axes.prop_cycle"] = cycler(color=list(series_colors()))
-    rc["grid.color"] = PALETTE.grid
+    rc["axes.prop_cycle"] = cycler(color=list(series_colors(DARK_PALETTE)))
+    rc["grid.color"] = DARK_PALETTE.grid
     rc["grid.linewidth"] = 0.6
-    rc["text.color"] = PALETTE.ink
-    rc["xtick.color"] = PALETTE.ink_muted
-    rc["ytick.color"] = PALETTE.ink_muted
+    rc["text.color"] = DARK_PALETTE.ink
+    rc["xtick.color"] = DARK_PALETTE.ink_muted
+    rc["ytick.color"] = DARK_PALETTE.ink_muted
     rc["legend.frameon"] = False
-    rc["legend.labelcolor"] = PALETTE.ink
+    rc["legend.labelcolor"] = DARK_PALETTE.ink
     rc["font.size"] = 9.0
     rc["figure.dpi"] = 160
     sans_families = _stack_to_families(SANS_STACK)
@@ -134,16 +150,16 @@ def apply_matplotlib() -> None:
 
 
 def as_css_tokens() -> dict[str, str]:
-    """The same palette as CSS custom properties: `{"--mirn-ink-muted": "#8b949e", ...}`.
+    """`LIGHT_PALETTE` as CSS custom properties: `{"--mirn-ink-muted": "#5c5750", ...}`.
 
     Also emits `--mirn-font-sans` and `--mirn-font-mono` so the page's typography is sourced from
     here too, not from the stylesheet.
     """
     tokens: dict[str, str] = {}
-    fields = dataclasses.fields(PALETTE)
+    fields = dataclasses.fields(LIGHT_PALETTE)
     for field in fields:
         token_name = "--mirn-" + field.name.replace("_", "-")
-        tokens[token_name] = getattr(PALETTE, field.name)
+        tokens[token_name] = getattr(LIGHT_PALETTE, field.name)
     tokens["--mirn-font-sans"] = SANS_STACK
     tokens["--mirn-font-mono"] = MONO_STACK
     return tokens
