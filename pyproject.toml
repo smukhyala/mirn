@@ -16,10 +16,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+app = [
+    "fastapi",
+    "uvicorn[standard]",
+]
 dev = [
     "pytest",
     "hypothesis",
     "ruff",
+    "httpx",
 ]
 
 [project.scripts]
@@ -27,6 +32,9 @@ mirn = "mirn.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+mirn_app = ["static/*", "static/vendor/katex/*", "static/vendor/katex/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
