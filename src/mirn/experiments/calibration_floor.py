@@ -98,28 +98,59 @@ def floor_from_scenes(scenes: tuple, divergence: str, seed: int) -> float:
 
 
 @functools.lru_cache(maxsize=128)
-def cached_floor(
+def cached_null_samples(
     divergence: str, n_scenes: int, seed: int, n_splits: int = FLOOR_N_SPLITS
-) -> float:
-    """The detection floor for a synthetic population, memoised on its determining inputs.
+) -> tuple[float, ...]:
+    """The split-half null sample itself, memoised on its determining inputs.
+
+    Returns an immutable `tuple`, not the `ndarray` `split_half_null` returns: an `lru_cache`
+    hands the exact same object out to every caller sharing a key, so returning a mutable array
+    would let one caller's in-place edit corrupt every other caller's — and every experiment
+    section's readout — silently. Build it with an explicit loop rather than a bulk conversion so
+    the values that land in the tuple are the same Python floats every other payload in this
+    project already carries.
+
+    This is the single computation `CalibrationFloor.run()`, `cached_floor()` (and therefore
+    `estimator_comparison` and `confounding_sweep`) all now share. Before this existed,
+    `CalibrationFloor.run()` called `split_half_null` directly while the other three experiments
+    went through `cached_floor`'s own separate cache, so a page load fired the identical 200-split
+    null computation up to three times over — once uncached from experiment 1's own request, and
+    at least once more from whichever of experiments 2/3 lost the race to populate `cached_floor`.
+    Routing every caller through this one cache means the first request anywhere on the page pays
+    the ~73s split-half cost once, and every other section — and every reload — reads it back
+    instantly.
 
     Deliberately not keyed on `influence`: the counterfactual arm returned by
     `SyntheticAdapter.load("counterfactual")` is `base_positions` — drawn from the per-scene RNG
     before `influence` is ever multiplied in (see `mirn.data.synthetic._generate_pair`). The
     robot-free population is therefore identical at every influence level, so the null it produces
-    and the floor derived from it are identical too. `test_cached_floor_matches_every_influence`
-    in `tests/test_experiments.py` asserts that equivalence directly rather than assuming it; do
-    not widen this cache key to include `influence` without re-deriving that proof, and do not add
-    `influence` as a silently-ignored keyword either.
-
-    `estimator_comparison` and `confounding_sweep` both recompute this same 200-split null on
-    every run at every influence level they sweep; caching on the four arguments that actually
-    determine the value turns that into a single computation per (divergence, n_scenes, seed).
+    is identical too. `test_cached_floor_matches_every_influence` in `tests/test_experiments.py`
+    asserts that equivalence directly rather than assuming it; do not widen this cache key to
+    include `influence` without re-deriving that proof, and do not add `influence` as a
+    silently-ignored keyword either.
     """
     adapter = build_adapter(n_scenes, seed)
     scenes = adapter.load("counterfactual")
     null_samples = split_half_null(scenes, divergence, seed, n_splits=n_splits)
-    return minimum_detectable_perturbation(null_samples, alpha=0.05)
+    values: list[float] = []
+    for sample_index in range(null_samples.shape[0]):
+        values.append(float(null_samples[sample_index]))
+    return tuple(values)
+
+
+@functools.lru_cache(maxsize=128)
+def cached_floor(
+    divergence: str, n_scenes: int, seed: int, n_splits: int = FLOOR_N_SPLITS
+) -> float:
+    """The detection floor for a synthetic population, memoised on its determining inputs.
+
+    Derives from `cached_null_samples` rather than recomputing the split-half null itself, so this
+    function's cache and `CalibrationFloor.run()`'s own data source are backed by the identical
+    underlying computation — see `cached_null_samples`'s docstring for why that matters.
+    """
+    samples = cached_null_samples(divergence, n_scenes, seed, n_splits)
+    null_array = np.array(samples, dtype=np.float64)
+    return minimum_detectable_perturbation(null_array, alpha=0.05)
 
 
 @EXPERIMENTS.register("calibration_floor")
@@ -129,6 +160,7 @@ class CalibrationFloor(Experiment):
     name = "calibration_floor"
     title = "The detection floor"
     claim = "A divergence reports a non-zero number even when no robot is present."
+    order = 1
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         n_splits = ExperimentParameter(
@@ -149,31 +181,34 @@ class CalibrationFloor(Experiment):
         n_scenes = int(resolved["n_scenes"])  # type: ignore[call-overload]
         n_splits = int(resolved["n_splits"])  # type: ignore[call-overload]
 
-        adapter = build_adapter(n_scenes, seed)
-        scenes = adapter.load("counterfactual")
-
-        null_samples = split_half_null(scenes, divergence, seed, n_splits=n_splits)
-        mdp_95 = minimum_detectable_perturbation(null_samples, alpha=0.05)
+        # Routed through the shared cache rather than calling split_half_null directly: this is
+        # the identical (divergence, n_scenes, seed, n_splits) computation cached_floor derives
+        # its scalar from, so at the declared defaults this section's own request is the same
+        # cache entry estimator_comparison and confounding_sweep read from too. See
+        # cached_null_samples' docstring for why one shared cache matters here.
+        samples = cached_null_samples(divergence, n_scenes, seed, n_splits)
+        null_array = np.array(samples, dtype=np.float64)
+        mdp_95 = minimum_detectable_perturbation(null_array, alpha=0.05)
 
         row: dict[str, object] = {}
         row["divergence"] = divergence
         row["n_scenes"] = n_scenes
         row["n_splits"] = n_splits
-        row["null_mean"] = float(np.mean(null_samples))
-        row["null_sd"] = float(np.std(null_samples))
+        row["null_mean"] = float(np.mean(null_array))
+        row["null_sd"] = float(np.std(null_array))
         row["mdp_95"] = mdp_95
         row["seed"] = seed
         frame = pd.DataFrame([row], columns=list(CALIBRATION_COLUMNS))
 
         sample_list: list[float] = []
-        for sample_index in range(null_samples.shape[0]):
-            sample_list.append(float(null_samples[sample_index]))
+        for sample in samples:
+            sample_list.append(float(sample))
 
         payload: dict[str, object] = {}
         payload["null_samples"] = sample_list
         payload["mdp_95"] = mdp_95
-        payload["null_mean"] = float(np.mean(null_samples))
-        payload["null_sd"] = float(np.std(null_samples))
+        payload["null_mean"] = float(np.mean(null_array))
+        payload["null_sd"] = float(np.std(null_array))
         payload["divergence"] = divergence
         payload["units"] = "metres"
         payload["note"] = (

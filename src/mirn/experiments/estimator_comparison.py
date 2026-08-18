@@ -88,6 +88,7 @@ class EstimatorComparison(Experiment):
         "On identical data the naive and paired estimators disagree, and only one consults the "
         "robot-absent arm."
     )
+    order = 2
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         horizon_steps = ExperimentParameter(

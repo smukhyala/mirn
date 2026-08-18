@@ -109,6 +109,7 @@ class ConfoundingSweep(Experiment):
         "With true perturbation pinned at exactly zero, the reported number climbs with "
         "predictor error and crosses the detection floor."
     )
+    order = 3
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         axis = ExperimentParameter(

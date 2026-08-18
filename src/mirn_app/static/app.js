@@ -2,6 +2,9 @@
 // Nothing in this file estimates, calibrates, or sweeps anything.
 
 const DEBOUNCE_MS = 250;
+const SLOW_HINT_MS = 2000;
+const SLOW_HINT_TEXT =
+  "computing… the split-half null runs 200 draws on first load and is cached afterwards.";
 
 const state = {
   theme: {},
@@ -382,6 +385,13 @@ function statBlock(label, value, ci, className) {
   return wrapper;
 }
 
+// A real placeholder, not just a dimmed empty container: a first-time visitor sees a labelled
+// "—" tile the instant a section starts computing, both on first render and on every refresh, so
+// an in-flight request never reads as a blank or broken page.
+function renderPendingReadout(target, title) {
+  target.replaceChildren(statBlock("Computing " + title.toLowerCase(), "—", null, "stat-floor"));
+}
+
 function formatCI(row) {
   return "95% CI [" + row.ci_low.toFixed(3) + ", " + row.ci_high.toFixed(3) + "]";
 }
@@ -505,6 +515,17 @@ async function drawScene(influence) {
   const xScale = makeScale(0, scene.extent.width, padding, canvas.width - padding);
   const yScale = makeScale(0, scene.extent.height, canvas.height - padding, padding);
 
+  // The arena itself, drawn from the API's extent (never a hardcoded box size) and behind
+  // everything else, so trajectories read as people crossing part of a room rather than paths
+  // floating in a void.
+  const arenaLeft = xScale(0);
+  const arenaRight = xScale(scene.extent.width);
+  const arenaTop = yScale(scene.extent.height);
+  const arenaBottom = yScale(0);
+  context.strokeStyle = token("--mirn-grid");
+  context.lineWidth = 1;
+  context.strokeRect(arenaLeft, arenaTop, arenaRight - arenaLeft, arenaBottom - arenaTop);
+
   const arms = [
     { paths: scene.counterfactual, color: token("--mirn-counterfactual"), width: 1.2 },
     { paths: scene.factual, color: token("--mirn-factual"), width: 1.6 },
@@ -540,10 +561,17 @@ async function drawScene(influence) {
   context.globalAlpha = 1;
 
   if (scene.robot) {
+    const robotX = xScale(scene.robot[0][0]);
+    const robotY = yScale(scene.robot[0][1]);
     context.fillStyle = token("--mirn-accent");
     context.beginPath();
-    context.arc(xScale(scene.robot[0][0]), yScale(scene.robot[0][1]), 6, 0, Math.PI * 2);
+    context.arc(robotX, robotY, 6, 0, Math.PI * 2);
     context.fill();
+
+    context.fillStyle = token("--mirn-ink-muted");
+    context.font = "11px " + (state.theme["--mirn-font-mono"] || "monospace");
+    context.textAlign = "left";
+    context.fillText("robot", robotX + 9, robotY + 4);
   }
 }
 
@@ -569,6 +597,20 @@ function buildSection(experiment, index) {
     output.classList.add("is-pending");
     const existingError = section.querySelector(".error");
     if (existingError) existingError.remove();
+    renderPendingReadout(readout, experiment.title);
+
+    // A request that has been in flight for a while gets an explanatory line appended to the
+    // placeholder — not because this section is known to be slow (nothing here checks
+    // experiment.name), but because ANY section could be, on a cold cache, and a viewer staring
+    // at "—" past a couple of seconds needs to know the page is working rather than stuck.
+    let slowNote = null;
+    const slowTimer = window.setTimeout(() => {
+      slowNote = document.createElement("p");
+      slowNote.className = "plot-note";
+      slowNote.textContent = SLOW_HINT_TEXT;
+      readout.appendChild(slowNote);
+    }, SLOW_HINT_MS);
+
     try {
       const result = await postJSON("/api/experiment/" + experiment.name, {
         params: readParams(form),
@@ -589,6 +631,10 @@ function buildSection(experiment, index) {
       message.textContent = error.message;
       output.appendChild(message);
     } finally {
+      window.clearTimeout(slowTimer);
+      if (slowNote) {
+        slowNote.remove();
+      }
       output.classList.remove("is-pending");
     }
   }

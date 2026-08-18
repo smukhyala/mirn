@@ -209,6 +209,7 @@ class Placebo(Experiment):
         "Deleting a pedestrian that stays far from the robot barely moves the estimate: exactly "
         "zero change when there is no robot effect, and a bounded change otherwise."
     )
+    order = 4
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         exclusion_radius = ExperimentParameter(

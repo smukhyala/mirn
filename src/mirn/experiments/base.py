@@ -137,6 +137,12 @@ class Experiment(ABC):
     name: str
     title: str
     claim: str
+    order: int
+    """Where this experiment sits in the page's narrative order (1-indexed), independent of the
+    registry's own alphabetical ordering. `EXPERIMENTS.names()` stays sorted by name — that is a
+    lookup convenience, not the reading order — so `/api/meta` sorts on this field instead before
+    handing the list to the page. Every concrete experiment must declare a unique value; see
+    `test_every_registered_experiment_declares_a_unique_order` in `tests/test_experiments.py`."""
 
     @abstractmethod
     def parameters(self) -> tuple[ExperimentParameter, ...]:
@@ -192,6 +198,7 @@ class Experiment(ABC):
         described["name"] = self.name
         described["title"] = self.title
         described["claim"] = self.claim
+        described["order"] = self.order
         described["parameters"] = parameter_rows
         return described
 

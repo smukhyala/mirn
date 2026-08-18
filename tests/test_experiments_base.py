@@ -56,6 +56,7 @@ class _Dummy(Experiment):
     name = "dummy"
     title = "Dummy"
     claim = "Nothing at all."
+    order = 1
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         return (_float_param(), _choice_param())

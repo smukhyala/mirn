@@ -53,6 +53,11 @@ def _registry_detail(error: KeyError) -> str:
     return str(error).strip('"').strip("'")
 
 
+def _narrative_order(described: dict[str, object]) -> int:
+    """Sort key for `/api/meta`'s experiment list: each experiment's declared `order` field."""
+    return int(described["order"])  # type: ignore[arg-type]
+
+
 def _trajectories_as_json(scene: Scene) -> list[dict[str, object]]:
     agents: list[dict[str, object]] = []
     for pedestrian in scene.pedestrians:
@@ -78,10 +83,17 @@ def create_app() -> FastAPI:
 
     @app.get("/api/meta")
     def meta() -> dict[str, object]:
+        # EXPERIMENTS.names() is alphabetical — a registry lookup convenience, not a reading
+        # order. The page walks an argument that has to land in a specific sequence (establish
+        # the floor, then show the estimators disagree, then show the naive number climb through
+        # that floor, then the placebo), so the described list is re-sorted on each experiment's
+        # own declared `order` before it goes out. app.js never sees the unsorted list and never
+        # branches on an experiment's name to reorder it itself.
         described: list[dict[str, object]] = []
         for name in EXPERIMENTS.names():
             experiment = EXPERIMENTS.create(name)
             described.append(experiment.describe())
+        described.sort(key=_narrative_order)
         body: dict[str, object] = {}
         body["theme"] = as_css_tokens()
         body["default_seed"] = default_seed()

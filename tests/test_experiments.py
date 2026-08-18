@@ -6,12 +6,18 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from mirn.calibration.null import minimum_detectable_perturbation, split_half_null
 from mirn.experiments import EXPERIMENTS
-from mirn.experiments.calibration_floor import FLOOR_N_SPLITS, build_adapter, cached_floor
+from mirn.experiments.calibration_floor import (
+    FLOOR_N_SPLITS,
+    build_adapter,
+    cached_floor,
+    cached_null_samples,
+)
 from mirn.experiments.placebo import DEFAULT_EXCLUSION_RADIUS_M
 from mirn.method.catalog import CARDS
 
@@ -79,6 +85,21 @@ def test_every_experiment_has_a_nonempty_title_and_claim() -> None:
         experiment = EXPERIMENTS.create(name)
         assert len(experiment.title.strip()) > 0
         assert len(experiment.claim.strip()) > 0
+
+
+def test_every_registered_experiment_declares_a_unique_narrative_order() -> None:
+    """`/api/meta` sorts on `order` to put the page's argument in reading order, independent of
+    the alphabetical registry. A duplicate or missing value here would make that ordering
+    ambiguous or silently drop an experiment out of sequence."""
+    seen_orders: set[int] = set()
+    for name in EXPERIMENTS.names():
+        experiment = EXPERIMENTS.create(name)
+        assert type(experiment.order) is int
+        assert experiment.order not in seen_orders, (
+            f"order {experiment.order} is reused by '{name}'; every experiment must declare a "
+            "unique narrative position"
+        )
+        seen_orders.add(experiment.order)
 
 
 _CALIBRATION_COLUMNS = [
@@ -190,6 +211,81 @@ def test_cached_floor_cache_clear_recomputes_the_same_value() -> None:
     cached_floor.cache_clear()
     second = cached_floor("ade", 3, 0)
     assert first == second
+
+
+def test_cached_null_samples_matches_split_half_null_element_for_element() -> None:
+    """`cached_null_samples` now backs both `CalibrationFloor.run()`'s own histogram and
+    `cached_floor`'s scalar, so it is a bigger surface than the old cached-scalar-only design.
+    Prove it reproduces `split_half_null` exactly, element for element, rather than assume the
+    tuple conversion preserved every value and every ordering."""
+    divergence = "ade"
+    n_scenes = 3
+    seed = 0
+    n_splits = FLOOR_N_SPLITS
+
+    cached_null_samples.cache_clear()
+    cached = cached_null_samples(divergence, n_scenes, seed, n_splits)
+
+    adapter = build_adapter(n_scenes, seed)
+    scenes = adapter.load("counterfactual")
+    direct = split_half_null(scenes, divergence, seed, n_splits=n_splits)
+
+    assert type(cached) is tuple
+    assert len(cached) == direct.shape[0]
+    for sample_index in range(direct.shape[0]):
+        assert cached[sample_index] == float(direct[sample_index])
+
+
+def test_cached_floor_matches_minimum_detectable_perturbation_over_cached_samples() -> None:
+    """`cached_floor` derives its scalar from `cached_null_samples` rather than recomputing the
+    split-half null itself; prove the two really do agree rather than assume the refactor is a
+    no-op."""
+    divergence = "ade"
+    n_scenes = 3
+    seed = 0
+
+    cached_null_samples.cache_clear()
+    cached_floor.cache_clear()
+
+    samples = cached_null_samples(divergence, n_scenes, seed, FLOOR_N_SPLITS)
+    null_array = np.array(samples, dtype=np.float64)
+    expected = minimum_detectable_perturbation(null_array, alpha=0.05)
+
+    actual = cached_floor(divergence, n_scenes, seed)
+    assert actual == expected
+
+
+def test_calibration_floor_run_shares_the_cache_with_cached_floor() -> None:
+    """The whole point of the fix: at matching arguments, `CalibrationFloor.run()`'s own request
+    and `cached_floor`'s (the one `estimator_comparison`/`confounding_sweep` call) must land on
+    the identical cache entry, so a page load pays the expensive split-half computation once, not
+    once per section."""
+    divergence = "ade"
+    n_scenes = 3
+    seed = 0
+    n_splits = FLOOR_N_SPLITS
+
+    cached_null_samples.cache_clear()
+    cached_floor.cache_clear()
+
+    experiment = EXPERIMENTS.create("calibration_floor")
+    params: dict[str, object] = {
+        "divergence": divergence,
+        "n_scenes": n_scenes,
+        "n_splits": n_splits,
+    }
+    experiment.run(params, seed=seed)
+
+    info = cached_null_samples.cache_info()
+    assert info.misses == 1, "CalibrationFloor.run() should have populated the shared cache once"
+
+    floor_from_shared_cache = cached_floor(divergence, n_scenes, seed, n_splits)
+    info_after = cached_null_samples.cache_info()
+    assert info_after.misses == 1, (
+        "cached_floor should have read the sample cached_null_samples already computed, not "
+        "recomputed it"
+    )
+    assert floor_from_shared_cache > 0.0
 
 
 _COMPARISON_COLUMNS = [

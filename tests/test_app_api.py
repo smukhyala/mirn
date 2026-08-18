@@ -40,6 +40,26 @@ def test_meta_carries_theme_tokens_and_a_default_seed(client: TestClient) -> Non
     assert type(body["default_seed"]) is int
 
 
+def test_meta_orders_experiments_narratively_not_alphabetically(client: TestClient) -> None:
+    """`EXPERIMENTS.names()` is alphabetical (confounding_sweep sorts before estimator_comparison
+    sorts before placebo), which is not the order the page argues in: establish the detection
+    floor, then show the two estimators disagree, then show the naive number climb through that
+    floor, then the placebo. `/api/meta` must resequence by each experiment's declared `order`."""
+    body = client.get("/api/meta").json()
+    names_in_order: list[str] = []
+    orders: list[int] = []
+    for entry in body["experiments"]:
+        names_in_order.append(entry["name"])
+        orders.append(entry["order"])
+    assert names_in_order == [
+        "calibration_floor",
+        "estimator_comparison",
+        "confounding_sweep",
+        "placebo",
+    ]
+    assert orders == sorted(orders)
+
+
 def test_meta_parameters_are_rich_enough_to_build_a_control(client: TestClient) -> None:
     body = client.get("/api/meta").json()
     for entry in body["experiments"]:
