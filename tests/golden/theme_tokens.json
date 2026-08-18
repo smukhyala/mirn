@@ -1,0 +1,15 @@
+{
+  "--mirn-accent": "#b58cf0",
+  "--mirn-background": "#0b0d10",
+  "--mirn-counterfactual": "#5eb1f0",
+  "--mirn-factual": "#f0a35e",
+  "--mirn-floor": "#6b7684",
+  "--mirn-font-mono": "'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace",
+  "--mirn-font-sans": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+  "--mirn-grid": "#242a31",
+  "--mirn-ink": "#e8eaed",
+  "--mirn-ink-muted": "#8b949e",
+  "--mirn-naive": "#e5606d",
+  "--mirn-paired": "#4fd1a5",
+  "--mirn-surface": "#14181d"
+}

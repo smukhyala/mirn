@@ -1,0 +1,159 @@
+/* All colour and type tokens are injected by the server from mirn.viz.theme.
+   Never write a colour literal in this file. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 6rem;
+  background: var(--mirn-background);
+  color: var(--mirn-ink);
+  font-family: var(--mirn-font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.masthead { max-width: 62rem; margin: 0 auto; padding: 4rem 2rem 2rem; }
+.eyebrow {
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.7rem;
+  color: var(--mirn-ink-muted);
+}
+.masthead h1 { margin: 0 0 1rem; font-size: 2.4rem; line-height: 1.15; font-weight: 600; }
+.standfirst { margin: 0 0 1.5rem; max-width: 46rem; color: var(--mirn-ink-muted); }
+
+.synthetic-banner {
+  display: inline-block;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--mirn-grid);
+  border-radius: 3px;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.75rem;
+  color: var(--mirn-floor);
+}
+
+.scene-panel {
+  max-width: 62rem;
+  margin: 2rem auto 4rem;
+  padding: 1.75rem 2rem;
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) 1fr;
+  gap: 2rem;
+  align-items: center;
+  background: var(--mirn-surface);
+  border: 1px solid var(--mirn-grid);
+  border-radius: 6px;
+}
+.scene-copy h2 { margin: 0 0 0.75rem; font-size: 1.15rem; font-weight: 600; }
+.scene-copy p { margin: 0 0 1.25rem; color: var(--mirn-ink-muted); font-size: 0.9rem; }
+#scene-canvas { width: 100%; height: auto; display: block; }
+
+.legend { list-style: none; margin: 1rem 0 0; padding: 0; font-size: 0.8rem; color: var(--mirn-ink-muted); }
+.legend li { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
+.swatch { width: 0.85rem; height: 0.2rem; border-radius: 1px; display: inline-block; }
+.swatch-counterfactual { background: var(--mirn-counterfactual); }
+.swatch-factual { background: var(--mirn-factual); }
+.swatch-accent { background: var(--mirn-accent); }
+
+main { max-width: 62rem; margin: 0 auto; padding: 0 2rem; }
+
+.experiment { margin: 0 0 4.5rem; padding-top: 2.5rem; border-top: 1px solid var(--mirn-grid); }
+.section-index {
+  margin: 0 0 0.5rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.75rem;
+  color: var(--mirn-accent);
+}
+.experiment h2 { margin: 0 0 0.5rem; font-size: 1.5rem; font-weight: 600; }
+.section-claim { margin: 0 0 1.75rem; max-width: 44rem; color: var(--mirn-ink-muted); }
+
+.experiment-body { display: grid; grid-template-columns: minmax(14rem, 18rem) 1fr; gap: 2.5rem; }
+
+.controls { display: flex; flex-direction: column; gap: 1.1rem; }
+.control { display: flex; flex-direction: column; gap: 0.35rem; }
+.control-label { font-size: 0.8rem; color: var(--mirn-ink-muted); display: flex; justify-content: space-between; }
+.control-label output { font-family: var(--mirn-font-mono); color: var(--mirn-ink); }
+.control-help { margin: 0; font-size: 0.72rem; color: var(--mirn-floor); line-height: 1.45; }
+
+input[type="range"] { width: 100%; accent-color: var(--mirn-accent); }
+select {
+  background: var(--mirn-background);
+  color: var(--mirn-ink);
+  border: 1px solid var(--mirn-grid);
+  border-radius: 3px;
+  padding: 0.35rem 0.5rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+}
+
+.readout { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-bottom: 1.25rem; }
+.stat { min-width: 8rem; }
+.stat-label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mirn-ink-muted); }
+.stat-value { display: block; font-family: var(--mirn-font-mono); font-size: 1.5rem; line-height: 1.3; }
+.stat-ci { display: block; font-family: var(--mirn-font-mono); font-size: 0.75rem; color: var(--mirn-floor); }
+.stat-naive .stat-value { color: var(--mirn-naive); }
+.stat-paired .stat-value { color: var(--mirn-paired); }
+.stat-floor .stat-value { color: var(--mirn-floor); }
+
+canvas.plot { width: 100%; height: auto; display: block; }
+.plot-note { margin: 0.75rem 0 0; font-size: 0.78rem; color: var(--mirn-floor); max-width: 34rem; }
+
+.is-pending { opacity: 0.45; transition: opacity 120ms ease-out; }
+.error {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 2px solid var(--mirn-naive);
+  font-family: var(--mirn-font-mono);
+  font-size: 0.78rem;
+  color: var(--mirn-naive);
+}
+
+.mathematics { margin-top: 2rem; border-top: 1px dashed var(--mirn-grid); padding-top: 1rem; }
+.mathematics summary { cursor: pointer; font-size: 0.85rem; color: var(--mirn-accent); }
+.cards { display: grid; gap: 1.5rem; margin-top: 1.25rem; }
+
+.card { padding: 1.25rem 1.4rem; background: var(--mirn-surface); border: 1px solid var(--mirn-grid); border-radius: 5px; }
+.card h3 { margin: 0 0 0.25rem; font-size: 1rem; font-weight: 600; }
+.card-kind {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-accent);
+}
+.card-one-liner { margin: 0.5rem 0 1rem; color: var(--mirn-ink-muted); font-size: 0.88rem; }
+.math-label {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--mirn-ink-muted);
+}
+.math-block { overflow-x: auto; padding: 0.5rem 0; }
+.math-fallback { font-family: var(--mirn-font-mono); font-size: 0.8rem; color: var(--mirn-ink-muted); }
+.card ul { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.85rem; color: var(--mirn-ink-muted); }
+.card li { margin-bottom: 0.4rem; }
+.breaks-when li { color: var(--mirn-naive); }
+.card-citation { margin: 1rem 0 0; font-size: 0.75rem; color: var(--mirn-floor); }
+
+.page-footer { max-width: 62rem; margin: 0 auto; padding: 3rem 2rem 0; border-top: 1px solid var(--mirn-grid); }
+#export-button {
+  background: transparent;
+  color: var(--mirn-accent);
+  border: 1px solid var(--mirn-accent);
+  border-radius: 3px;
+  padding: 0.55rem 1rem;
+  font-family: var(--mirn-font-sans);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+#export-button:hover { background: var(--mirn-surface); }
+#export-button:disabled { cursor: progress; opacity: 0.55; }
+.export-status, .seed-note { font-size: 0.78rem; color: var(--mirn-floor); font-family: var(--mirn-font-mono); }
+
+@media (max-width: 900px) {
+  .scene-panel, .experiment-body { grid-template-columns: 1fr; }
+}
