@@ -38,6 +38,15 @@ mirn_app = ["static/*", "static/vendor/katex/*", "static/vendor/katex/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Task 13: importing `fastapi.testclient` (which re-exports `starlette.testclient.TestClient`)
+# unconditionally emits this warning under the installed starlette/httpx combination, regardless
+# of any code in this repo -- it fires on `import starlette.testclient` alone, before any test
+# runs. Starlette's suggested fix is a separate `httpx2` package, which is a new dependency this
+# project does not add. Ignore only this exact, known, pre-existing warning; nothing else here is
+# suppressed.
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100
