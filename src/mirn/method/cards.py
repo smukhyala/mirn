@@ -45,6 +45,7 @@ class MethodCard:
     kind: str
     title: str
     one_liner: str
+    plain_summary: str
     estimand_tex: str
     formula_tex: str
     assumptions: tuple[str, ...]
@@ -57,6 +58,12 @@ class MethodCard:
         _require_text(self.key, "key")
         _require_text(self.title, "title")
         _require_text(self.one_liner, "one_liner")
+        _require_text(self.plain_summary, "plain_summary")
+        if "\\" in self.plain_summary or "$" in self.plain_summary:
+            raise ValueError(
+                "MethodCard.plain_summary must be plain English, not notation; it is what a "
+                "reader meets before any formula. Move the maths to formula_tex."
+            )
         _require_text(self.estimand_tex, "estimand_tex")
         _require_text(self.formula_tex, "formula_tex")
         if self.kind not in _KINDS:
@@ -76,6 +83,7 @@ class MethodCard:
         row["kind"] = self.kind
         row["title"] = self.title
         row["one_liner"] = self.one_liner
+        row["plain_summary"] = self.plain_summary
         row["estimand_tex"] = self.estimand_tex
         row["formula_tex"] = self.formula_tex
         row["assumptions"] = list(self.assumptions)

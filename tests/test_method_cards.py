@@ -17,6 +17,10 @@ def _valid_card(**overrides: object) -> MethodCard:
     fields["kind"] = "divergence"
     fields["title"] = "Average displacement"
     fields["one_liner"] = "Mean pointwise separation between two time-aligned paths."
+    fields["plain_summary"] = (
+        "Walk two versions of the same journey side by side and measure how far apart "
+        "they stay on average."
+    )
     fields["estimand_tex"] = "d(a, b)"
     fields["formula_tex"] = "\\tfrac{1}{T}\\sum_t \\lVert a_t - b_t \\rVert"
     fields["assumptions"] = ("Paths are time-aligned and equal length.",)
@@ -87,3 +91,22 @@ def test_non_null_citation_round_trips() -> None:
     card = _valid_card(citation=citation_text)
     row = card.as_dict()
     assert row["citation"] == citation_text
+
+
+def test_plain_summary_is_required_and_non_empty() -> None:
+    with pytest.raises(ValueError, match="plain_summary"):
+        _valid_card(plain_summary="   ")
+
+
+def test_plain_summary_rejects_latex() -> None:
+    """It exists so a reader meets English before notation. A backslash or a dollar sign means
+    someone pasted a formula into the prose field."""
+    with pytest.raises(ValueError, match="plain_summary"):
+        _valid_card(plain_summary="the mean of \\lVert a - b \\rVert")
+    with pytest.raises(ValueError, match="plain_summary"):
+        _valid_card(plain_summary="defined as $d(a,b)$")
+
+
+def test_plain_summary_round_trips_through_as_dict() -> None:
+    card = _valid_card(plain_summary="How far apart two paths are, on average.")
+    assert card.as_dict()["plain_summary"] == "How far apart two paths are, on average."
