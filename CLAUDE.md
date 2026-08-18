@@ -39,7 +39,10 @@ Python 3.11+. The user's standing preferences, which apply here:
 - **Typed contracts everywhere.** Frozen `@dataclass(frozen=True, slots=True)` in `contracts.py`. Validate in `__post_init__`; raise, never warn. Full type hints on every public function.
 - **CSV for results.** Every experiment writes a flat CSV to `results/`. Parquet only for intermediate caches under `.cache/`.
 - **No hardcoded paths or secrets.** Dataset roots come from `.env` via `MIRN_DATA_ROOT`. `.env` is gitignored; `.env.example` is committed.
-- **Plots are dark-mode, minimal, high-end** (DeepMind / Anthropic register). All styling lives in `mirn.viz.theme` — never set colors or fonts inline in a plotting function.
+- **Plots are minimal and high-end** (DeepMind / Anthropic register). All styling lives in
+  `mirn.viz.theme`, which carries two palettes: `DARK_PALETTE` for matplotlib paper figures and
+  `LIGHT_PALETTE` for the browser page, which is mostly prose and reads better on cream. Never set
+  colours or fonts inline in a plotting function or a stylesheet.
 - **Determinism is a feature.** Every stochastic path takes an explicit `seed: int`. Global RNG state is banned. `RolloutPair` construction asserts both arms share a seed.
 
 ### Testing

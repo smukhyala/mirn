@@ -14,14 +14,16 @@
   <p class="eyebrow">A measurement instrument</p>
   <h1>How much did the robot disturb people?</h1>
   <p class="standfirst">
-    The field answers this by running a trajectory predictor with the robot's future zeroed and
-    subtracting what the human actually did. That number is partly prediction error wearing a
-    causal label. This page walks the argument, computing every figure live.
+    The field usually answers this by running a trajectory predictor with the robot's future
+    zeroed out, then subtracting what the person actually did. That number is partly the robot's
+    real effect and partly the predictor's own error, wearing a causal label. This page runs the
+    same crowd twice — once with a robot, once without — and shows what changes when the
+    comparison is honest.
   </p>
   <p class="synthetic-banner" id="data-note">All data on this page is synthetic.</p>
 </header>
 
-<section class="scene-panel">
+<section class="scene">
   <div class="scene-copy">
     <h2>The paired rollout</h2>
     <p>
@@ -30,20 +32,52 @@
       the difference between an agent's two paths <em>is</em> the robot's causal effect on it — no
       forecaster involved.
     </p>
-    <label class="control">
-      <span class="control-label">Robot influence <output id="influence-readout">1.00</output></span>
-      <input type="range" id="scene-influence" min="0" max="2" step="0.05" value="1">
-    </label>
+    <form class="scene-controls">
+      <label class="control">
+        <span class="control-label">Robot influence <output id="scene-influence-readout">1.00</output></span>
+        <input type="range" id="scene-influence" min="0" max="2" step="0.05" value="1">
+      </label>
+      <label class="control">
+        <span class="control-label">Robot position — x <output id="scene-robot-x-readout">10.0</output> m</span>
+        <input type="range" id="scene-robot-x" min="0" max="20" step="0.5" value="10">
+      </label>
+      <label class="control">
+        <span class="control-label">Robot position — y <output id="scene-robot-y-readout">6.0</output> m</span>
+        <input type="range" id="scene-robot-y" min="0" max="12" step="0.5" value="6">
+      </label>
+      <label class="control">
+        <span class="control-label">Displacement amplitude <output id="scene-amplitude-readout">1.50</output> m</span>
+        <input type="range" id="scene-amplitude" min="0" max="4" step="0.1" value="1.5">
+      </label>
+      <label class="control">
+        <span class="control-label">Displacement decay length <output id="scene-decay-readout">3.00</output> m</span>
+        <input type="range" id="scene-decay" min="0.5" max="8" step="0.1" value="3">
+      </label>
+      <label class="control">
+        <span class="control-label">Pedestrians <output id="scene-n-pedestrians-readout">12</output></span>
+        <input type="range" id="scene-n-pedestrians" min="2" max="40" step="1" value="12">
+      </label>
+    </form>
     <ul class="legend">
       <li><span class="swatch swatch-counterfactual"></span>robot absent</li>
       <li><span class="swatch swatch-factual"></span>robot present</li>
       <li><span class="swatch swatch-accent"></span>robot</li>
     </ul>
   </div>
-  <canvas id="scene-canvas" width="760" height="456" aria-label="Paired pedestrian trajectories"></canvas>
+  <div class="scene-stage">
+    <canvas id="scene-canvas" width="760" height="456" aria-label="Paired pedestrian trajectories"></canvas>
+    <div class="scene-readouts">
+      <span class="scene-readout">Elapsed <output id="scene-clock">0.0</output> s</span>
+      <span class="scene-readout">Widest gap <output id="scene-gap">0.00</output> m</span>
+    </div>
+    <label class="control scene-scrub-control">
+      <span class="control-label">Timeline</span>
+      <input type="range" id="scene-scrub" min="0" max="100" step="1" value="100">
+    </label>
+  </div>
 </section>
 
-<main id="sections"></main>
+<main id="beats"></main>
 
 <footer class="page-footer">
   <button id="export-button" type="button">Export every experiment to results/</button>
@@ -51,7 +85,7 @@
   <p class="seed-note">Seed <output id="seed-readout">0</output> — every figure here is reproducible from it.</p>
 </footer>
 
-<template id="section-template">
+<template id="beat-template">
   <section class="experiment">
     <p class="section-index"></p>
     <h2 class="section-title"></h2>
