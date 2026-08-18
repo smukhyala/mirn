@@ -13,6 +13,7 @@ is uninterpretable without it.
 from __future__ import annotations
 
 import functools
+import threading
 from collections.abc import Mapping
 
 import numpy as np
@@ -138,17 +139,51 @@ def cached_null_samples(
     return tuple(values)
 
 
+_NULL_SAMPLES_LOCK = threading.Lock()
+
+
+def null_samples_for(
+    divergence: str, n_scenes: int, seed: int, n_splits: int = FLOOR_N_SPLITS
+) -> tuple[float, ...]:
+    """`cached_null_samples`, serialised so concurrent cold-load misses compute once.
+
+    The page fires every section at boot, and three of them (this experiment's own request, plus
+    `estimator_comparison` and `confounding_sweep` via `cached_floor`) need the identical null at
+    declared defaults. `functools.lru_cache` alone does not prevent two threads from both missing
+    the same key at the same time and each running the ~49s computation to completion before
+    either writes back — measured directly: three concurrent misses on a cold server took 66.7s
+    wall (all three finishing within 0.1s of each other) versus 49.3s for one alone, i.e. they
+    were genuinely contending for CPU, not queued. This lock fixes that: the first caller computes
+    while the rest block on `_NULL_SAMPLES_LOCK`, then every blocked caller re-enters
+    `cached_null_samples` and gets the now-warm cache entry back immediately.
+
+    Deliberately one lock for every key, not a lock per `(divergence, n_scenes, seed, n_splits)`
+    combination. A per-key lock would need its own registry (itself a shared mutable structure
+    needing synchronised creation) to buy concurrency between *different* keys — and at this
+    project's scale there is exactly one key that ever matters at boot (the declared defaults),
+    so that machinery would add complexity for no measured benefit. Serialising everything through
+    one lock costs nothing once the cache is warm, since the critical section then only runs a
+    dict lookup.
+
+    Every caller that wants the null sample — `cached_floor` and `CalibrationFloor.run()` — goes
+    through this wrapper, never `cached_null_samples` directly, so the lock is never bypassed.
+    """
+    with _NULL_SAMPLES_LOCK:
+        return cached_null_samples(divergence, n_scenes, seed, n_splits)
+
+
 @functools.lru_cache(maxsize=128)
 def cached_floor(
     divergence: str, n_scenes: int, seed: int, n_splits: int = FLOOR_N_SPLITS
 ) -> float:
     """The detection floor for a synthetic population, memoised on its determining inputs.
 
-    Derives from `cached_null_samples` rather than recomputing the split-half null itself, so this
+    Derives from `null_samples_for` rather than recomputing the split-half null itself, so this
     function's cache and `CalibrationFloor.run()`'s own data source are backed by the identical
-    underlying computation — see `cached_null_samples`'s docstring for why that matters.
+    underlying (and now lock-serialised) computation — see `null_samples_for`'s docstring for why
+    that matters.
     """
-    samples = cached_null_samples(divergence, n_scenes, seed, n_splits)
+    samples = null_samples_for(divergence, n_scenes, seed, n_splits)
     null_array = np.array(samples, dtype=np.float64)
     return minimum_detectable_perturbation(null_array, alpha=0.05)
 
@@ -181,12 +216,13 @@ class CalibrationFloor(Experiment):
         n_scenes = int(resolved["n_scenes"])  # type: ignore[call-overload]
         n_splits = int(resolved["n_splits"])  # type: ignore[call-overload]
 
-        # Routed through the shared cache rather than calling split_half_null directly: this is
+        # Routed through null_samples_for (not cached_null_samples directly), which both shares
+        # the cache cached_floor reads from and serialises concurrent cold-load misses. This is
         # the identical (divergence, n_scenes, seed, n_splits) computation cached_floor derives
         # its scalar from, so at the declared defaults this section's own request is the same
         # cache entry estimator_comparison and confounding_sweep read from too. See
-        # cached_null_samples' docstring for why one shared cache matters here.
-        samples = cached_null_samples(divergence, n_scenes, seed, n_splits)
+        # null_samples_for's docstring for why the lock matters here.
+        samples = null_samples_for(divergence, n_scenes, seed, n_splits)
         null_array = np.array(samples, dtype=np.float64)
         mdp_95 = minimum_detectable_perturbation(null_array, alpha=0.05)
 

@@ -2,9 +2,13 @@
 // Nothing in this file estimates, calibrates, or sweeps anything.
 
 const DEBOUNCE_MS = 250;
-const SLOW_HINT_MS = 2000;
-const SLOW_HINT_TEXT =
-  "computing… the split-half null runs 200 draws on first load and is cached afterwards.";
+// Shown on every section's very first paint and on every refresh, before the request that will
+// fill it in has even been sent — never gated behind a delay. Nothing here names which experiment
+// is slow (none of this file branches on experiment.name); on a cold server this happens to be
+// true for whichever section needs the split-half null, and the fast sections simply replace it
+// within a couple hundred milliseconds.
+const PENDING_HINT_TEXT =
+  "computing the split-half null — 200 draws, about a minute on first load, instant afterwards.";
 
 const state = {
   theme: {},
@@ -386,10 +390,16 @@ function statBlock(label, value, ci, className) {
 }
 
 // A real placeholder, not just a dimmed empty container: a first-time visitor sees a labelled
-// "—" tile the instant a section starts computing, both on first render and on every refresh, so
-// an in-flight request never reads as a blank or broken page.
+// "—" tile AND the honest explanation of what is running and roughly how long it takes, the
+// instant a section starts computing — both on first render and on every refresh, and with no
+// delay before the explanation appears. A visitor should never stare at bare "—" wondering
+// whether the page is broken.
 function renderPendingReadout(target, title) {
-  target.replaceChildren(statBlock("Computing " + title.toLowerCase(), "—", null, "stat-floor"));
+  const stat = statBlock("Computing " + title.toLowerCase(), "—", null, "stat-floor");
+  const hint = document.createElement("p");
+  hint.className = "plot-note";
+  hint.textContent = PENDING_HINT_TEXT;
+  target.replaceChildren(stat, hint);
 }
 
 function formatCI(row) {
@@ -597,19 +607,10 @@ function buildSection(experiment, index) {
     output.classList.add("is-pending");
     const existingError = section.querySelector(".error");
     if (existingError) existingError.remove();
+    // The pending stat tile and its explanatory line render synchronously, before the fetch
+    // below is even issued — there is no delay to "shorten" because there is no timer here at
+    // all. A viewer never watches a bare "—" waiting for an explanation to catch up.
     renderPendingReadout(readout, experiment.title);
-
-    // A request that has been in flight for a while gets an explanatory line appended to the
-    // placeholder — not because this section is known to be slow (nothing here checks
-    // experiment.name), but because ANY section could be, on a cold cache, and a viewer staring
-    // at "—" past a couple of seconds needs to know the page is working rather than stuck.
-    let slowNote = null;
-    const slowTimer = window.setTimeout(() => {
-      slowNote = document.createElement("p");
-      slowNote.className = "plot-note";
-      slowNote.textContent = SLOW_HINT_TEXT;
-      readout.appendChild(slowNote);
-    }, SLOW_HINT_MS);
 
     try {
       const result = await postJSON("/api/experiment/" + experiment.name, {
@@ -626,15 +627,15 @@ function buildSection(experiment, index) {
         }
       }
     } catch (error) {
+      // The pending placeholder ("Computing …" / the split-half-null explanation) would be
+      // actively wrong to leave on screen next to an error, so it is cleared here rather than
+      // left to linger — the error message is the whole story for this refresh.
+      readout.replaceChildren();
       const message = document.createElement("p");
       message.className = "error";
       message.textContent = error.message;
       output.appendChild(message);
     } finally {
-      window.clearTimeout(slowTimer);
-      if (slowNote) {
-        slowNote.remove();
-      }
       output.classList.remove("is-pending");
     }
   }

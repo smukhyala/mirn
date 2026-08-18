@@ -17,6 +17,7 @@ from mirn.experiments.calibration_floor import (
     build_adapter,
     cached_floor,
     cached_null_samples,
+    null_samples_for,
 )
 from mirn.experiments.placebo import DEFAULT_EXCLUSION_RADIUS_M
 from mirn.method.catalog import CARDS
@@ -286,6 +287,22 @@ def test_calibration_floor_run_shares_the_cache_with_cached_floor() -> None:
         "recomputed it"
     )
     assert floor_from_shared_cache > 0.0
+
+
+def test_null_samples_for_matches_cached_null_samples() -> None:
+    """`null_samples_for` is a thin lock-serialising wrapper around `cached_null_samples`; prove
+    it returns the identical tuple for the same arguments rather than assuming the wrapper cannot
+    diverge from what it wraps."""
+    divergence = "ade"
+    n_scenes = 3
+    seed = 0
+    n_splits = FLOOR_N_SPLITS
+
+    cached_null_samples.cache_clear()
+    via_wrapper = null_samples_for(divergence, n_scenes, seed, n_splits)
+    direct = cached_null_samples(divergence, n_scenes, seed, n_splits)
+
+    assert via_wrapper == direct
 
 
 _COMPARISON_COLUMNS = [
