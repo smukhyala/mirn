@@ -51,3 +51,7 @@ htmlcov/
 
 # Subagent-driven-development scratch workspace (ledger, briefs, review packages)
 .superpowers/
+
+# Experiment outputs. Every experiment is seeded and deterministic and each CSV carries
+# its own seed column, so these are reproducible from `mirn run` rather than artifacts to version.
+/results/
