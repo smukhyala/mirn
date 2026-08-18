@@ -19,8 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from mirn.contracts import Scene
-from mirn.data.synthetic import SyntheticAdapter
-from mirn.experiments import EXPERIMENTS
+from mirn.data.synthetic import BOX_HEIGHT_M, BOX_WIDTH_M, SyntheticAdapter
+from mirn.experiments import EXPERIMENTS, ExperimentResult
 from mirn.experiments.calibration_floor import (
     DEFAULT_N_PEDESTRIANS,
     DEFAULT_N_STEPS,
@@ -152,13 +152,15 @@ def create_app() -> FastAPI:
         body["robot"] = robot_positions
         body["influence"] = influence
         body["seed"] = seed
-        body["extent"] = {"width": 20.0, "height": 12.0}
+        body["extent"] = {"width": BOX_WIDTH_M, "height": BOX_HEIGHT_M}
         return body
 
     @app.post("/api/export")
     def export(request: ExportRequest) -> dict[str, object]:
-        destination = results_dir()
-        written: list[str] = []
+        # Phase one: run every experiment and hold the results in memory. A ValueError here
+        # becomes HTTP 400 before anything has touched disk, so a bad parameter for the Nth
+        # experiment never leaves a stale CSV from the first N-1 behind.
+        computed: list[tuple[str, ExperimentResult]] = []
         for name in EXPERIMENTS.names():
             experiment = EXPERIMENTS.create(name)
             if name in request.params:
@@ -169,8 +171,24 @@ def create_app() -> FastAPI:
                 result = experiment.run(params, request.seed)
             except ValueError as error:
                 raise HTTPException(status_code=400, detail=f"{name}: {error}") from error
+            computed.append((name, result))
+
+        # Phase two: every experiment succeeded, so now write every CSV.
+        destination = results_dir()
+        written: list[str] = []
+        for name, result in computed:
             path = destination / f"{name}.csv"
-            result.frame.to_csv(path, index=False)
+            try:
+                result.frame.to_csv(path, index=False)
+            except OSError as error:
+                already_written = ", ".join(written)
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        f"failed writing '{path}': {error}; "
+                        f"already written before this failure: {already_written}"
+                    ),
+                ) from error
             written.append(str(path))
         return {"written": written, "seed": request.seed}
 

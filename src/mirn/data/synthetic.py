@@ -22,10 +22,10 @@ import pandas as pd
 from mirn.contracts import RolloutPair, Scene, Trajectory
 from mirn.data.base import CHARACTERIZE_COLUMNS, DATASETS, DatasetAdapter, summarize_condition
 
-_BOX_WIDTH_M = 20.0
-_BOX_HEIGHT_M = 12.0
+BOX_WIDTH_M = 20.0
+BOX_HEIGHT_M = 12.0
 _DT = 0.1
-_ROBOT_POSITION_M: tuple[float, float] = (_BOX_WIDTH_M / 2.0, _BOX_HEIGHT_M / 2.0)
+_ROBOT_POSITION_M: tuple[float, float] = (BOX_WIDTH_M / 2.0, BOX_HEIGHT_M / 2.0)
 _ROBOT_AGENT_ID = "robot"
 _BASE_SPEED_MS = 1.2
 _SPEED_NOISE_STD_MS = 0.15
@@ -108,7 +108,7 @@ class SyntheticAdapter(DatasetAdapter):
         scene_seed = self.seed + scene_index
         rng = np.random.default_rng(scene_seed)
 
-        start_y = rng.uniform(0.0, _BOX_HEIGHT_M, size=self.n_pedestrians)
+        start_y = rng.uniform(0.0, BOX_HEIGHT_M, size=self.n_pedestrians)
         speed_offsets = rng.normal(0.0, _SPEED_NOISE_STD_MS, size=self.n_pedestrians)
         speeds = np.empty(self.n_pedestrians, dtype=np.float64)
         for pedestrian_index in range(self.n_pedestrians):

@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from mirn.data.synthetic import BOX_HEIGHT_M, BOX_WIDTH_M
 from mirn.experiments import EXPERIMENTS
+from mirn.method.catalog import CARDS
 from mirn_app.server import create_app
 
 
@@ -112,6 +114,14 @@ def test_scene_endpoint_returns_both_arms(client: TestClient) -> None:
     assert body["extent"]["width"] > 0.0
 
 
+def test_scene_extent_matches_the_synthetic_fixture_geometry(client: TestClient) -> None:
+    """The canvas Task 14 draws into must track the fixture's actual box size, not a literal
+    that could silently drift out of sync with `mirn.data.synthetic`."""
+    body = client.get("/api/scene", params={"seed": 0}).json()
+    assert body["extent"]["width"] == BOX_WIDTH_M
+    assert body["extent"]["height"] == BOX_HEIGHT_M
+
+
 def test_scene_arms_are_identical_at_zero_influence(client: TestClient) -> None:
     body = client.get("/api/scene", params={"influence": 0.0, "seed": 0}).json()
     assert body["factual"][0]["positions"] == body["counterfactual"][0]["positions"]
@@ -133,3 +143,34 @@ def test_export_writes_every_experiment_csv(client: TestClient, tmp_path, monkey
     assert len(written) == len(EXPERIMENTS.names())
     for path in written:
         assert path.endswith(".csv")
+
+
+def test_export_bad_param_for_a_non_first_experiment_leaves_no_stale_csv(
+    client: TestClient, tmp_path, monkeypatch
+) -> None:
+    """`calibration_floor` sorts before `confounding_sweep` in `EXPERIMENTS.names()`, so a bad
+    parameter on `confounding_sweep` would previously leave `calibration_floor.csv` already
+    written on disk with no way for the caller to tell the run had failed. The two-phase design
+    must run every experiment (in memory) before writing anything, so this bad request must
+    leave `results_dir()` completely empty."""
+    monkeypatch.setenv("MIRN_RESULTS_DIR", str(tmp_path))
+    response = client.post(
+        "/api/export",
+        json={"seed": 0, "params": {"confounding_sweep": {"bogus": 1}}},
+    )
+    assert response.status_code == 400
+    assert "written" not in response.json()
+    remaining = list(tmp_path.iterdir())
+    assert remaining == []
+
+
+def test_methods_endpoint_returns_every_card(client: TestClient) -> None:
+    response = client.get("/api/methods")
+    assert response.status_code == 200
+    body = response.json()
+    cards = body["cards"]
+    assert sorted(cards.keys()) == sorted(CARDS.keys())
+    spot_checked = cards["paired"]
+    assert spot_checked["key"] == "paired"
+    assert spot_checked["kind"] == "estimator"
+    assert len(spot_checked["formula_tex"]) > 0
