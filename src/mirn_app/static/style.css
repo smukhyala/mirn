@@ -33,7 +33,7 @@ body {
   border-radius: 3px;
   font-family: var(--mirn-font-mono);
   font-size: 0.75rem;
-  color: var(--mirn-floor);
+  color: var(--mirn-ink-muted);
 }
 
 /* The hero scene panel is wider than the prose column below it: it is the one animated

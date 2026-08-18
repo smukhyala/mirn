@@ -15,10 +15,14 @@ const state = {
   seed: 0,
   cards: {},
   experiments: [],
+  scene: null,
 };
 
+// The fallback is a CSS named colour, not a hex/rgb/hsl literal, so it survives the "no colour
+// literal" grep in CLAUDE.md; it is only ever exercised if a draw call somehow runs before
+// boot() populates state.theme from /api/meta, which normal page load never does.
 function token(name) {
-  return state.theme[name] || "#888888";
+  return state.theme[name] || "gray";
 }
 
 async function getJSON(url) {
@@ -547,153 +551,205 @@ function readParams(form) {
   return params;
 }
 
-// ---------------------------------------------------------------- scene canvas
+// ---------------------------------------------------------------- scene player
+//
+// The scene player. `state.scene` is the last /api/scene payload; `player` is view state only —
+// no measured quantity is derived here. The gap shown comes from the API's gap_series.
+const player = { step: 0, playing: true, lastFrameMs: 0, accumulatorMs: 0 };
 
-async function drawScene(influence) {
-  const canvas = document.getElementById("scene-canvas");
+function sceneScales(canvas, extent) {
+  const pad = 22;
+  return {
+    x: makeScale(0, extent.width, pad, canvas.width - pad),
+    y: makeScale(0, extent.height, canvas.height - pad, pad),
+  };
+}
+
+function drawScene(canvas, scene, step) {
   const context = canvas.getContext("2d");
-  const scene = await getJSON(
-    "/api/scene?influence=" + influence + "&seed=" + state.seed + "&scene_index=0"
-  );
-
   context.clearRect(0, 0, canvas.width, canvas.height);
-  const padding = 18;
-  const xScale = makeScale(0, scene.extent.width, padding, canvas.width - padding);
-  const yScale = makeScale(0, scene.extent.height, canvas.height - padding, padding);
+  const scale = sceneScales(canvas, scene.extent);
 
-  // The arena itself, drawn from the API's extent (never a hardcoded box size) and behind
-  // everything else, so trajectories read as people crossing part of a room rather than paths
-  // floating in a void.
-  const arenaLeft = xScale(0);
-  const arenaRight = xScale(scene.extent.width);
-  const arenaTop = yScale(scene.extent.height);
-  const arenaBottom = yScale(0);
+  // The arena, so the paths read as people crossing a room rather than lines in a void.
   context.strokeStyle = token("--mirn-grid");
   context.lineWidth = 1;
-  context.strokeRect(arenaLeft, arenaTop, arenaRight - arenaLeft, arenaBottom - arenaTop);
+  context.strokeRect(
+    scale.x(0), scale.y(scene.extent.height),
+    scale.x(scene.extent.width) - scale.x(0),
+    scale.y(0) - scale.y(scene.extent.height)
+  );
 
+  // Trails: the robot-absent world as a ghost, the robot-present world solid.
   const arms = [
-    { paths: scene.counterfactual, color: token("--mirn-counterfactual"), width: 1.2 },
-    { paths: scene.factual, color: token("--mirn-factual"), width: 1.6 },
+    { paths: scene.counterfactual, color: token("--mirn-counterfactual"), width: 1.0, alpha: 0.45 },
+    { paths: scene.factual, color: token("--mirn-factual"), width: 1.6, alpha: 1.0 },
   ];
   for (const arm of arms) {
     context.strokeStyle = arm.color;
     context.lineWidth = arm.width;
+    context.globalAlpha = arm.alpha;
     for (const agent of arm.paths) {
       context.beginPath();
-      agent.positions.forEach((point, index) => {
-        const x = xScale(point[0]);
-        const y = yScale(point[1]);
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      });
+      for (let index = 0; index <= step; index += 1) {
+        const point = agent.positions[index];
+        const x = scale.x(point[0]);
+        const y = scale.y(point[1]);
+        if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+      }
       context.stroke();
     }
+    context.globalAlpha = 1;
   }
 
-  context.strokeStyle = token("--mirn-ink-muted");
-  context.globalAlpha = 0.35;
-  context.lineWidth = 0.8;
+  // The connector. This mark IS the robot's effect on that person — the whole thesis in one line.
+  context.strokeStyle = token("--mirn-accent");
+  context.lineWidth = 1.2;
   for (let index = 0; index < scene.factual.length; index += 1) {
-    const factualPath = scene.factual[index].positions;
-    const counterfactualPath = scene.counterfactual[index].positions;
-    for (let step = 0; step < factualPath.length; step += 8) {
-      context.beginPath();
-      context.moveTo(xScale(counterfactualPath[step][0]), yScale(counterfactualPath[step][1]));
-      context.lineTo(xScale(factualPath[step][0]), yScale(factualPath[step][1]));
-      context.stroke();
-    }
+    const here = scene.factual[index].positions[step];
+    const ghost = scene.counterfactual[index].positions[step];
+    context.beginPath();
+    context.moveTo(scale.x(ghost[0]), scale.y(ghost[1]));
+    context.lineTo(scale.x(here[0]), scale.y(here[1]));
+    context.stroke();
   }
-  context.globalAlpha = 1;
+
+  // Current positions.
+  for (const arm of arms) {
+    context.fillStyle = arm.color;
+    context.globalAlpha = arm.alpha;
+    for (const agent of arm.paths) {
+      const point = agent.positions[step];
+      context.beginPath();
+      context.arc(scale.x(point[0]), scale.y(point[1]), 3, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalAlpha = 1;
+  }
 
   if (scene.robot) {
-    const robotX = xScale(scene.robot[0][0]);
-    const robotY = yScale(scene.robot[0][1]);
-    context.fillStyle = token("--mirn-accent");
+    const robot = scene.robot[0];
+    context.fillStyle = token("--mirn-naive");
     context.beginPath();
-    context.arc(robotX, robotY, 6, 0, Math.PI * 2);
+    context.arc(scale.x(robot[0]), scale.y(robot[1]), 7, 0, Math.PI * 2);
     context.fill();
-
     context.fillStyle = token("--mirn-ink-muted");
     context.font = "11px " + (state.theme["--mirn-font-mono"] || "monospace");
     context.textAlign = "left";
-    context.fillText("robot", robotX + 9, robotY + 4);
+    context.fillText("robot", scale.x(robot[0]) + 11, scale.y(robot[1]) + 4);
   }
 }
 
-// ---------------------------------------------------------------- sections
-
-function buildSection(experiment, index) {
-  const template = document.getElementById("section-template");
-  const node = template.content.cloneNode(true);
-  const section = node.querySelector(".experiment");
-
-  section.querySelector(".section-index").textContent = String(index + 1).padStart(2, "0");
-  section.querySelector(".section-title").textContent = experiment.title;
-  section.querySelector(".section-claim").textContent = experiment.claim;
-
-  // Only the first rendered section starts expanded, keyed off its position rather than its
-  // name (no per-experiment branching), so the mathematics is visible immediately without
-  // pushing every plot on the page below the fold.
-  if (index === 0) {
-    section.querySelector(".mathematics").setAttribute("open", "");
+// Largest current gap, read from the API's series. Never computed here.
+function widestGapAt(scene, step) {
+  let widest = 0;
+  for (const entry of scene.gap_series) {
+    const gap = entry.gaps[step];
+    if (gap > widest) widest = gap;
   }
+  return widest;
+}
 
-  const form = section.querySelector(".controls");
-  const output = section.querySelector(".output");
-  const readout = section.querySelector(".readout");
-  const canvas = section.querySelector("canvas.plot");
-  const note = section.querySelector(".plot-note");
-  const cardsHost = section.querySelector(".cards");
-
-  async function refresh() {
-    output.classList.add("is-pending");
-    const existingError = section.querySelector(".error");
-    if (existingError) existingError.remove();
-    // The pending stat tile and its explanatory line render synchronously, before the fetch
-    // below is even issued — there is no delay to "shorten" because there is no timer here at
-    // all. A viewer never watches a bare "—" waiting for an explanation to catch up.
-    renderPendingReadout(readout, experiment.title);
-
-    try {
-      const result = await postJSON("/api/experiment/" + experiment.name, {
-        params: readParams(form),
-        seed: state.seed,
-      });
-      renderReadout(readout, result);
-      drawPlot(canvas, result);
-      note.textContent = result.payload.note || "";
-      cardsHost.replaceChildren();
-      for (const key of result.method_keys) {
-        if (state.cards[key]) {
-          cardsHost.appendChild(buildCard(state.cards[key]));
-        }
+function tick(nowMs) {
+  const scene = state.scene;
+  if (scene) {
+    if (player.lastFrameMs === 0) player.lastFrameMs = nowMs;
+    const elapsedMs = nowMs - player.lastFrameMs;
+    player.lastFrameMs = nowMs;
+    if (player.playing) {
+      // Advance by wall-clock time against the API's dt, so playback is real-time and does not
+      // drift with frame rate.
+      player.accumulatorMs += elapsedMs;
+      const stepMs = scene.dt * 1000;
+      while (player.accumulatorMs >= stepMs) {
+        player.accumulatorMs -= stepMs;
+        player.step = (player.step + 1) % scene.n_steps;
       }
-    } catch (error) {
-      // The pending placeholder ("Computing …" / the split-half-null explanation) would be
-      // actively wrong to leave on screen next to an error, so it is cleared here rather than
-      // left to linger — the error message is the whole story for this refresh.
-      readout.replaceChildren();
-      const message = document.createElement("p");
-      message.className = "error";
-      message.textContent = error.message;
-      output.appendChild(message);
-    } finally {
-      output.classList.remove("is-pending");
+    }
+    drawScene(document.getElementById("scene-canvas"), scene, player.step);
+    document.getElementById("scene-clock").textContent =
+      (player.step * scene.dt).toFixed(1) + " s";
+    document.getElementById("scene-gap").textContent =
+      widestGapAt(scene, player.step).toFixed(3) + " m";
+    const scrub = document.getElementById("scene-scrub");
+    if (document.activeElement !== scrub) {
+      scrub.max = String(scene.n_steps - 1);
+      scrub.value = String(player.step);
     }
   }
+  window.requestAnimationFrame(tick);
+}
 
-  const debounced = debounce(refresh, DEBOUNCE_MS);
-  for (const parameter of experiment.parameters) {
-    form.appendChild(buildControl(parameter, debounced));
+// The six knobs Task 6 wired up, each `<input type="range">` paired with an `<output readout>`.
+// `decimals` matches the readout precision already baked into index.html's initial values, so
+// wiring here does not change what the page shows before the first "input" event fires.
+const SCENE_CONTROLS = [
+  { id: "scene-influence", decimals: 2 },
+  { id: "scene-robot-x", decimals: 1 },
+  { id: "scene-robot-y", decimals: 1 },
+  { id: "scene-amplitude", decimals: 2 },
+  { id: "scene-decay", decimals: 2 },
+  { id: "scene-n-pedestrians", decimals: 0 },
+];
+
+// Nothing here computes a measured quantity: it reads slider values, builds a query string, and
+// stores whatever /api/scene returns. On a settings change, playback keeps running rather than
+// resetting to step 0 — only `player.step` is clamped into the new scene's range.
+async function fetchScene() {
+  const params = new URLSearchParams();
+  params.set("influence", document.getElementById("scene-influence").value);
+  params.set("seed", String(state.seed));
+  params.set("scene_index", "0");
+  params.set("robot_x", document.getElementById("scene-robot-x").value);
+  params.set("robot_y", document.getElementById("scene-robot-y").value);
+  params.set("amplitude", document.getElementById("scene-amplitude").value);
+  params.set("decay", document.getElementById("scene-decay").value);
+  params.set("n_pedestrians", document.getElementById("scene-n-pedestrians").value);
+  const scene = await getJSON("/api/scene?" + params.toString());
+  state.scene = scene;
+  const maxStep = scene.n_steps - 1;
+  if (player.step > maxStep) player.step = maxStep;
+}
+
+const debouncedFetchScene = debounce(() => {
+  fetchScene().catch((error) => { console.error(error); });
+}, DEBOUNCE_MS);
+
+function wireSceneControls() {
+  for (const control of SCENE_CONTROLS) {
+    const input = document.getElementById(control.id);
+    const readout = document.getElementById(control.id + "-readout");
+    input.addEventListener("input", () => {
+      readout.textContent = Number(input.value).toFixed(control.decimals);
+      debouncedFetchScene();
+    });
   }
-  form.addEventListener("submit", (event) => event.preventDefault());
+}
 
-  refresh();
-  return section;
+// The scrub input doubles as the scene's only play/pause affordance (Task 6's DOM has no
+// dedicated button): dragging it pauses and jumps the player to the dragged step on every
+// "input" event, and releasing it ("change") resumes real-time playback from there.
+function wireScrub() {
+  const scrub = document.getElementById("scene-scrub");
+  scrub.addEventListener("input", () => {
+    player.playing = false;
+    player.step = Number(scrub.value);
+  });
+  scrub.addEventListener("change", () => {
+    player.playing = true;
+    player.accumulatorMs = 0;
+  });
 }
 
 // ---------------------------------------------------------------- boot
+//
+// Beat rendering (the five narrative sections under the `beats` host element, built from the
+// `beat-template` template) is Task 8's responsibility — it consumes `/api/meta`'s
+// `order`/`primary_parameters` and `/api/methods`' `plain_summary`, neither of which exists on
+// this task's shape yet. Meta is fetched here regardless because `data-note`, `seed-readout`, and
+// the scene player's seed all need it; `state.cards` is fetched for the same reason Task 8 will
+// want it available without a refetch. Neither fetch touches the beats host or its template —
+// that wiring is deliberately absent until Task 8 lands, rather than left half-built against ids
+// this task never touches.
 
 async function boot() {
   const meta = await getJSON("/api/meta");
@@ -706,19 +762,10 @@ async function boot() {
   const methods = await getJSON("/api/methods");
   state.cards = methods.cards;
 
-  const host = document.getElementById("sections");
-  state.experiments.forEach((experiment, index) => {
-    host.appendChild(buildSection(experiment, index));
-  });
-
-  const influenceInput = document.getElementById("scene-influence");
-  const influenceReadout = document.getElementById("influence-readout");
-  const redrawScene = debounce(() => {
-    influenceReadout.textContent = Number(influenceInput.value).toFixed(2);
-    drawScene(influenceInput.value);
-  }, DEBOUNCE_MS);
-  influenceInput.addEventListener("input", redrawScene);
-  await drawScene(influenceInput.value);
+  wireSceneControls();
+  wireScrub();
+  await fetchScene();
+  window.requestAnimationFrame(tick);
 
   // /api/export runs all four experiments at their declared defaults, which takes roughly
   // 55 seconds. The button is disabled for the duration so a second click cannot queue a
