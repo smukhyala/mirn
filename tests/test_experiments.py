@@ -613,3 +613,28 @@ def test_placebo_succeeds_at_the_top_of_the_scene_range() -> None:
     experiment = EXPERIMENTS.create("placebo")
     result = experiment.run({"n_scenes": 32}, seed=0)
     assert len(result.frame) == 2
+
+
+def test_every_experiment_declares_primary_parameters() -> None:
+    for name in EXPERIMENTS.names():
+        experiment = EXPERIMENTS.create(name)
+        assert len(experiment.primary_parameters) > 0, f"{name} declares none"
+
+
+def test_primary_parameters_all_resolve_to_declared_parameters() -> None:
+    """A typo here would silently hide a control rather than fail."""
+    for name in EXPERIMENTS.names():
+        experiment = EXPERIMENTS.create(name)
+        declared: list[str] = []
+        for parameter in experiment.parameters():
+            declared.append(parameter.name)
+        for primary in experiment.primary_parameters:
+            assert primary in declared, f"{name}: '{primary}' is not a declared parameter"
+
+
+def test_describe_carries_primary_parameters() -> None:
+    for name in EXPERIMENTS.names():
+        described = EXPERIMENTS.create(name).describe()
+        assert list(described["primary_parameters"]) == list(
+            EXPERIMENTS.create(name).primary_parameters
+        )

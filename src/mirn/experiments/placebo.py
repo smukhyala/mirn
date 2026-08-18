@@ -211,6 +211,7 @@ class Placebo(Experiment):
         "zero change when there is no robot effect, and a bounded change otherwise."
     )
     order = 4
+    primary_parameters = ("influence", "exclusion_radius_m")
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         exclusion_radius = ExperimentParameter(

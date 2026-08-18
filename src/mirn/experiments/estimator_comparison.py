@@ -89,6 +89,7 @@ class EstimatorComparison(Experiment):
         "robot-absent arm."
     )
     order = 2
+    primary_parameters = ("influence", "horizon_steps")
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         horizon_steps = ExperimentParameter(

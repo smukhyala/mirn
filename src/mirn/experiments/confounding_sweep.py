@@ -118,6 +118,7 @@ class ConfoundingSweep(Experiment):
         "predictor error and crosses the detection floor."
     )
     order = 3
+    primary_parameters = ("influence", "axis", "noise_max")
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         axis = ExperimentParameter(

@@ -186,6 +186,7 @@ class CalibrationFloor(Experiment):
     title = "The detection floor"
     claim = "A divergence reports a non-zero number even when no robot is present."
     order = 1
+    primary_parameters = ("divergence", "n_splits")
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         n_splits = ExperimentParameter(
