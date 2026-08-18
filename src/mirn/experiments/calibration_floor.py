@@ -88,16 +88,6 @@ def build_adapter(n_scenes: int, seed: int) -> SyntheticAdapter:
     )
 
 
-def floor_from_scenes(scenes: tuple, divergence: str, seed: int) -> float:
-    """The detection floor for a robot-free scene collection.
-
-    Used by experiments 2 and 3 so each computes its own floor from its own data rather than
-    depending on experiment 1 having been run first — every CSV row stays self-contained.
-    """
-    null_samples = split_half_null(scenes, divergence, seed, n_splits=FLOOR_N_SPLITS)
-    return minimum_detectable_perturbation(null_samples, alpha=0.05)
-
-
 @functools.lru_cache(maxsize=128)
 def cached_null_samples(
     divergence: str, n_scenes: int, seed: int, n_splits: int = FLOOR_N_SPLITS

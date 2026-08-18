@@ -97,6 +97,14 @@ def test_confounding_sweep_figure_y_axis_label_contains_mdp() -> None:
     assert "MDP" in y_label
 
 
+def test_confounding_sweep_figure_rejects_an_unrecognised_axis() -> None:
+    frame = _sweep_frame().copy()
+    frame["axis"] = "unknown_axis"
+    with pytest.raises(ValueError) as excinfo:
+        figures.confounding_sweep_figure(frame)
+    assert "unknown_axis" in str(excinfo.value)
+
+
 def test_confounding_sweep_figure_normalizes_to_mdp_units() -> None:
     rows: list[dict[str, object]] = []
     reported_values = [0.0, 0.4, 0.2]

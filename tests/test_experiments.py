@@ -494,6 +494,7 @@ _PLACEBO_COLUMNS = [
     "value",
     "ci_low",
     "ci_high",
+    "units",
     "delta_vs_full",
     "influence",
     "seed",

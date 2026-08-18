@@ -86,6 +86,7 @@ PLACEBO_COLUMNS: tuple[str, ...] = (
     "value",
     "ci_low",
     "ci_high",
+    "units",
     "delta_vs_full",
     "influence",
     "seed",
@@ -286,6 +287,7 @@ class Placebo(Experiment):
         full_row["value"] = full_estimate.value
         full_row["ci_low"] = full_estimate.ci_low
         full_row["ci_high"] = full_estimate.ci_high
+        full_row["units"] = full_estimate.units
         full_row["delta_vs_full"] = 0.0
         full_row["influence"] = influence
         full_row["seed"] = seed
@@ -297,6 +299,7 @@ class Placebo(Experiment):
         reduced_row["value"] = reduced_estimate.value
         reduced_row["ci_low"] = reduced_estimate.ci_low
         reduced_row["ci_high"] = reduced_estimate.ci_high
+        reduced_row["units"] = reduced_estimate.units
         reduced_row["delta_vs_full"] = delta
         reduced_row["influence"] = influence
         reduced_row["seed"] = seed

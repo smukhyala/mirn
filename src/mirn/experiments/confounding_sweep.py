@@ -217,7 +217,11 @@ class ConfoundingSweep(Experiment):
         payload["note"] = (
             "Synthetic data. True perturbation is measured by the paired estimator on the same "
             "pairs and is exactly zero when influence is 0.0, so every metre the reported curve "
-            "climbs is predictor error wearing a causal label."
+            "climbs is predictor error wearing a causal label. On the forecast_horizon axis, the "
+            "'genuine' constant-velocity forecaster is only fighting i.i.d. per-step Gaussian "
+            "jitter — a best case for that model class — so its floor-crossing point is a "
+            "property of this toy noise model and does not transfer to real pedestrian curvature "
+            "or acceleration."
         )
 
         return ExperimentResult(

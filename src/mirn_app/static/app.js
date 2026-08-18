@@ -477,7 +477,12 @@ function renderReadout(target, result) {
       );
     } else if (row.variant !== undefined) {
       target.appendChild(
-        statBlock(row.variant, row.value.toFixed(4), formatCI(row), "stat-paired")
+        statBlock(
+          row.variant + " (" + row.units + ")",
+          row.value.toFixed(4),
+          formatCI(row),
+          "stat-paired"
+        )
       );
     }
   }

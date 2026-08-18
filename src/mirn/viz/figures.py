@@ -23,6 +23,15 @@ _SWEEP_COLUMNS: tuple[str, ...] = (
     "mdp_95",
 )
 
+# Duplicated (deliberately, in two short strings) from
+# `mirn.experiments.confounding_sweep._AXIS_LABELS` rather than imported from it: `viz` is the
+# lower-level module `experiments` depends on, and importing the other way would invert that
+# dependency. An unrecognised axis raises rather than falling through to a wrong label.
+_AXIS_LABELS: dict[str, str] = {
+    "predictor_noise": "predictor error $\\sigma$ (m)",
+    "forecast_horizon": "forecast horizon (steps)",
+}
+
 
 def _require_columns(frame: pd.DataFrame, required: tuple[str, ...]) -> None:
     missing: list[str] = []
@@ -134,10 +143,12 @@ def confounding_sweep_figure(sweep_frame: pd.DataFrame) -> Figure:
         label="true (paired)",
     )
 
-    if axis_name == "predictor_noise":
-        axis.set_xlabel("predictor error $\\sigma$ (m)")
-    else:
-        axis.set_xlabel("forecast horizon (steps)")
+    if axis_name not in _AXIS_LABELS:
+        known_axes = ", ".join(sorted(_AXIS_LABELS.keys()))
+        raise ValueError(
+            f"unrecognised sweep axis '{axis_name}'; known axes are: {known_axes}"
+        )
+    axis.set_xlabel(_AXIS_LABELS[axis_name])
     axis.set_ylabel("perturbation (MDP$_{95}$ units)")
     axis.set_title("Reported perturbation crosses the detection floor with no robot effect")
     axis.legend(loc="upper left")
