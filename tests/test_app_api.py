@@ -223,6 +223,19 @@ def test_scene_gap_series_matches_the_two_arms(client: TestClient) -> None:
             assert gaps[step] == pytest.approx(expected, abs=1e-12)
 
 
+def test_scene_gap_series_is_positionally_aligned_with_the_arms(client: TestClient) -> None:
+    """factual[i], counterfactual[i] and gap_series[i] must be the same pedestrian.
+
+    Agent ids are unpadded, so a string sort puts ped10 before ped2. Exercised at the default
+    pedestrian count, where that divergence actually bites.
+    """
+    body = client.get("/api/scene", params={"influence": 1.0, "seed": 0}).json()
+    assert len(body["gap_series"]) == len(body["factual"])
+    for index in range(len(body["factual"])):
+        assert body["gap_series"][index]["agent_id"] == body["factual"][index]["agent_id"]
+        assert body["gap_series"][index]["agent_id"] == body["counterfactual"][index]["agent_id"]
+
+
 def test_scene_gaps_are_all_zero_at_zero_influence(client: TestClient) -> None:
     body = client.get("/api/scene", params={"influence": 0.0, "seed": 0}).json()
     for entry in body["gap_series"]:

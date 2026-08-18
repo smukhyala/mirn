@@ -81,9 +81,16 @@ def _gap_series(pair: RolloutPair) -> list[dict[str, object]]:
 
     Computed here rather than in the browser: the page displays these numbers, and the standing
     rule is that JavaScript renders numbers the API supplies and never derives them.
+
+    Iterates `pair.factual.pedestrians` directly rather than `pair.paired_agents()`: the latter
+    sorts agent ids as strings ("ped10" before "ped2"), which diverges from the scene-construction
+    order `_trajectories_as_json` uses for `factual`/`counterfactual` as soon as ids reach two
+    digits. Looking each counterfactual trajectory up by id keeps this array positionally aligned
+    with the other two by construction, not by convention.
     """
     series: list[dict[str, object]] = []
-    for factual_traj, counterfactual_traj in pair.paired_agents():
+    for factual_traj in pair.factual.pedestrians:
+        counterfactual_traj = pair.counterfactual.pedestrian_by_id(factual_traj.agent_id)
         offsets = factual_traj.positions - counterfactual_traj.positions
         distances = np.sqrt(np.sum(offsets * offsets, axis=1))
         gaps: list[float] = []
