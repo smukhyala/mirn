@@ -40,7 +40,9 @@ So as a person walks toward the robot, the viewer sees **one person separate int
 
 That image is the project's thesis. It is also exactly what `PairedCounterfactual` computes, so the picture and the number are the same claim.
 
-**Controls:** play, pause, scrub, and a step clock. **Readout:** the widening gap for the person currently nearest the robot.
+**Controls:** play, pause, scrub, and a step clock. **Readout:** the **widest** current gap across all agents — i.e. whoever the robot is displacing most at that instant.
+
+Not "the person nearest the robot", which an earlier draft said: selecting by distance would require the browser to derive a per-agent distance from raw positions, which §4's no-computation rule forbids without a new API field. Widest gap is also the better number — it always foregrounds whoever is most affected, which is exactly the "one person separates into two paths" image this section describes, whereas nearest-to-robot reads near zero for someone spatially close but not yet displaced.
 
 **That gap number is computed server-side**, not in JavaScript. `/api/scene` returns a per-agent `gap_series` (the per-timestep distance between an agent's two arms) alongside the trajectories; the page indexes into it. This preserves the existing rule that the browser renders numbers and never derives them.
 
