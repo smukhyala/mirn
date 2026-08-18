@@ -85,6 +85,13 @@ function buildCard(card) {
   title.textContent = card.title;
   wrapper.appendChild(title);
 
+  // plain_summary leads, in prose, before any notation: a reader meets English before
+  // mathematics. one_liner stays underneath as the terser technical caption.
+  const plainSummary = document.createElement("p");
+  plainSummary.className = "card-plain-summary";
+  plainSummary.textContent = card.plain_summary;
+  wrapper.appendChild(plainSummary);
+
   const oneLiner = document.createElement("p");
   oneLiner.className = "card-one-liner";
   oneLiner.textContent = card.one_liner;
@@ -778,16 +785,204 @@ function wirePlayPause() {
   });
 }
 
-// ---------------------------------------------------------------- boot
+// ---------------------------------------------------------------- beat copy
 //
-// Beat rendering (the five narrative sections under the `beats` host element, built from the
-// `beat-template` template) is Task 8's responsibility — it consumes `/api/meta`'s
-// `order`/`primary_parameters` and `/api/methods`' `plain_summary`, neither of which exists on
-// this task's shape yet. Meta is fetched here regardless because `data-note`, `seed-readout`, and
-// the scene player's seed all need it; `state.cards` is fetched for the same reason Task 8 will
-// want it available without a refetch. Neither fetch touches the beats host or its template —
-// that wiring is deliberately absent until Task 8 lands, rather than left half-built against ids
-// this task never touches.
+// The plain-English claim for each experiment's beat, written for a reader who has never read a
+// robotics paper. Keyed by experiment NAME, not by reading position: where a beat lands on the
+// page is decided entirely by the `order` field `/api/meta` supplies (see renderBeats below),
+// never by this table, and never by an `===` comparison against these names anywhere else in this
+// file. A fifth, uncopy-written experiment falls back to its own `claim` field from the API
+// instead of breaking.
+const BEAT_CLAIMS = {
+  calibration_floor:
+    "Every figure on this page compares a real run against its counterfactual — the exact same " +
+    "crowd and paths, with the robot simply deleted from the scene, nothing steered and nothing " +
+    "reacting to anything. This experiment takes that robot-absent crowd, splits it into two " +
+    "random halves, and measures how different the halves look using a divergence: a single " +
+    "number for how far apart two sets of paths are. Even though nothing here could be " +
+    "responding to a robot that isn't there, the number is not zero — that gap is the null, " +
+    "ordinary variation between two halves of one population, and its upper edge is the " +
+    "detection floor: the smallest effect this measurement could ever tell apart from plain " +
+    "noise. No published perturbation study reports this number, which means every number they " +
+    "do report has nothing to be judged against.",
+  estimator_comparison:
+    "In the real world you only ever observe one version of events, so most published work " +
+    "estimates the missing “no robot” version with a forecaster instead: predict where a " +
+    "pedestrian was already heading, then measure how far off that guess turned out to be. That " +
+    "prediction-error number is what most published measurements report as the robot's effect " +
+    "— it comes from an estimator, a formula that turns raw paths into one number claiming " +
+    "to size up the robot's disturbance. Set the robot's influence to zero here and the honest " +
+    "answer becomes exactly zero, since the two arms are then identical paths end to end; the " +
+    "paired estimator, which actually looks at the counterfactual run, reports that correctly, " +
+    "while the standard forecaster-based one still reports on the order of half a metre of " +
+    "disturbance from a robot that did nothing at all.",
+  confounding_sweep:
+    "Here the true perturbation is pinned at exactly zero for the whole sweep — robot " +
+    "influence back to zero, the same trick as the last section — while the forecaster " +
+    "behind the standard estimator is made progressively worse, either by feeding it more noise " +
+    "or asking it to predict further ahead. There is nothing for it to be measuring here, so the " +
+    "reported number is tracking only how bad the guess is, and it climbs straight through the " +
+    "detection floor established earlier even though the true effect never leaves zero. A policy " +
+    "trained to make that number small would only be trained to move in a way that is easy to " +
+    "predict — not to disturb people less.",
+  placebo:
+    "As a last check, this experiment finds one pedestrian who never comes anywhere near the " +
+    "robot during the run, deletes them from both versions of the world, and re-measures. That " +
+    "pedestrian's path carries no trace of the robot's displacement, so a trustworthy measurement " +
+    "should not move when they disappear — no twitch, no phantom signal from someone who was " +
+    "never part of the story. If the number moves anyway, that is a sign the measurement is " +
+    "picking up something other than what the robot actually did.",
+};
+
+// ---------------------------------------------------------------- beat rendering
+
+// paired_debiased's plain_summary presupposes "a measurement has its own error even with no
+// robot" — the idea the detection-floor cards establish. If a future panel ever renders
+// paired_debiased's card ahead of one of these two within the SAME panel, this reorders only
+// those two floor cards to precede it; every other card in the panel keeps its declared position.
+// Keyed by card key, never by experiment name, so it applies to any panel a fifth experiment
+// might introduce.
+const FLOOR_CARD_KEYS = ["split_half_null", "minimum_detectable_perturbation"];
+
+function orderCardKeysForPanel(methodKeys) {
+  const debiasedIndex = methodKeys.indexOf("paired_debiased");
+  if (debiasedIndex === -1) {
+    return methodKeys.slice();
+  }
+  const beforeDebiased = [];
+  const floorCardsAfterDebiased = [];
+  const restAfterDebiased = [];
+  methodKeys.forEach((key, index) => {
+    if (index === debiasedIndex) {
+      return;
+    }
+    if (index < debiasedIndex) {
+      beforeDebiased.push(key);
+      return;
+    }
+    if (FLOOR_CARD_KEYS.indexOf(key) !== -1) {
+      floorCardsAfterDebiased.push(key);
+    } else {
+      restAfterDebiased.push(key);
+    }
+  });
+  return beforeDebiased.concat(floorCardsAfterDebiased, ["paired_debiased"], restAfterDebiased);
+}
+
+function renderCards(container, methodKeys) {
+  container.replaceChildren();
+  const orderedKeys = orderCardKeysForPanel(methodKeys);
+  for (const key of orderedKeys) {
+    const card = state.cards[key];
+    if (card) {
+      container.appendChild(buildCard(card));
+    }
+  }
+}
+
+// Splits one experiment's declared parameters into inline controls (named in its
+// `primary_parameters`) and a "more settings" disclosure for the rest. Reads that field off the
+// experiment descriptor the API supplied — never matches a parameter or experiment name.
+function populateControls(form, experiment, onChange) {
+  form.replaceChildren();
+  const primaryNames = new Set(experiment.primary_parameters);
+  const secondary = [];
+  for (const parameter of experiment.parameters) {
+    if (primaryNames.has(parameter.name)) {
+      form.appendChild(buildControl(parameter, onChange));
+    } else {
+      secondary.push(parameter);
+    }
+  }
+  if (secondary.length > 0) {
+    const details = document.createElement("details");
+    details.className = "more-settings";
+    const summary = document.createElement("summary");
+    summary.textContent = "more settings";
+    details.appendChild(summary);
+    for (const parameter of secondary) {
+      details.appendChild(buildControl(parameter, onChange));
+    }
+    form.appendChild(details);
+  }
+}
+
+function showBeatError(elements, message) {
+  elements.error.textContent = message;
+  elements.error.hidden = false;
+}
+
+function clearBeatError(elements) {
+  elements.error.hidden = true;
+  elements.error.textContent = "";
+}
+
+// Runs one beat's experiment at its form's current parameters and the page seed, then fills in
+// its readout, plot, plot note, and mathematics cards. Shows the shared pending state the instant
+// it starts (never gated behind a delay) and the shared error pattern on failure, matching the
+// scene player's own honesty conventions.
+async function runBeat(experiment, elements) {
+  const params = readParams(elements.form);
+  elements.output.classList.add("is-pending");
+  renderPendingReadout(elements.readout, experiment.title);
+  elements.plot.getContext("2d").clearRect(0, 0, elements.plot.width, elements.plot.height);
+  elements.note.textContent = "";
+  clearBeatError(elements);
+  try {
+    const result = await postJSON("/api/experiment/" + experiment.name, {
+      params,
+      seed: state.seed,
+    });
+    renderReadout(elements.readout, result);
+    drawPlot(elements.plot, result);
+    elements.note.textContent = result.payload.note || "";
+    renderCards(elements.cards, result.method_keys);
+  } catch (error) {
+    showBeatError(elements, error.message);
+  } finally {
+    elements.output.classList.remove("is-pending");
+  }
+}
+
+// Builds all four beats from `beat-template`, in the order `/api/meta` declared — sorted here
+// explicitly rather than assumed pre-sorted, so this file's own ordering guarantee does not
+// silently depend on the server's. No experiment-name branching anywhere in this function: the
+// beat number, the open/closed mathematics disclosure, and the primary/secondary control split
+// all come from fields on `experiment`, never from comparing `experiment.name` to a literal.
+function renderBeats() {
+  const host = document.getElementById("beats");
+  const template = document.getElementById("beat-template");
+  const experiments = state.experiments.slice().sort((a, b) => a.order - b.order);
+
+  for (const experiment of experiments) {
+    const fragment = template.content.cloneNode(true);
+    const indexNode = fragment.querySelector(".section-index");
+    const titleNode = fragment.querySelector(".section-title");
+    const claimNode = fragment.querySelector(".section-claim");
+    const form = fragment.querySelector(".controls");
+    const output = fragment.querySelector(".output");
+    const readout = fragment.querySelector(".readout");
+    const plot = fragment.querySelector(".plot");
+    const note = fragment.querySelector(".plot-note");
+    const error = fragment.querySelector(".error");
+    const mathDetails = fragment.querySelector(".mathematics");
+    const cards = fragment.querySelector(".cards");
+
+    indexNode.textContent = "Beat " + experiment.order;
+    titleNode.textContent = experiment.title;
+    claimNode.textContent = BEAT_CLAIMS[experiment.name] || experiment.claim;
+    mathDetails.open = experiment.order === 1;
+
+    const elements = { form, output, readout, plot, note, error, cards };
+    const debouncedRun = debounce(() => runBeat(experiment, elements), DEBOUNCE_MS);
+    populateControls(form, experiment, debouncedRun);
+
+    host.appendChild(fragment);
+    runBeat(experiment, elements);
+  }
+}
+
+// ---------------------------------------------------------------- boot
 
 async function boot() {
   const meta = await getJSON("/api/meta");
@@ -805,6 +1000,8 @@ async function boot() {
   wirePlayPause();
   await fetchScene();
   window.requestAnimationFrame(tick);
+
+  renderBeats();
 
   // /api/export runs all four experiments at their declared defaults, which takes roughly
   // 55 seconds. The button is disabled for the duration so a second click cannot queue a

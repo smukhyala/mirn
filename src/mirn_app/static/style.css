@@ -116,6 +116,16 @@ main { max-width: 42rem; margin: 0 auto; padding: 0 2rem; }
 .control-label output { font-family: var(--mirn-font-mono); color: var(--mirn-ink); }
 .control-help { margin: 0; font-size: 0.75rem; color: var(--mirn-floor); line-height: 1.5; }
 
+.more-settings { margin-top: 0.25rem; border-top: 1px dashed var(--mirn-grid); padding-top: 0.9rem; }
+.more-settings summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--mirn-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.more-settings .control { margin-top: 1rem; }
+
 input[type="range"] { width: 100%; accent-color: var(--mirn-accent); }
 select {
   background: var(--mirn-background);
@@ -169,7 +179,8 @@ canvas.plot {
   letter-spacing: 0.1em;
   color: var(--mirn-accent);
 }
-.card-one-liner { margin: 0.5rem 0 1rem; color: var(--mirn-ink-muted); font-size: 0.9rem; line-height: 1.6; }
+.card-plain-summary { margin: 0.5rem 0 0.75rem; color: var(--mirn-ink); font-size: 0.98rem; line-height: 1.6; }
+.card-one-liner { margin: 0 0 1rem; color: var(--mirn-ink-muted); font-size: 0.82rem; line-height: 1.6; font-style: italic; }
 .math-label {
   margin: 1rem 0 0.35rem;
   font-size: 0.7rem;
