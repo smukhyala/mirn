@@ -478,6 +478,16 @@ def test_axis_choices_are_exactly_the_two_documented_axes() -> None:
             assert parameter.choices == ("predictor_noise", "forecast_horizon")
 
 
+def test_payload_carries_a_human_readable_axis_label_for_both_axes() -> None:
+    """app.js reads axis_label straight out of the payload rather than re-deriving it from the
+    axis value; a stale or shared label here would silently mislabel the sweep plot's x-axis."""
+    noise_label = str(_sweep_result(axis="predictor_noise").payload["axis_label"])
+    horizon_label = str(_sweep_result(axis="forecast_horizon").payload["axis_label"])
+    assert len(noise_label) > 0
+    assert len(horizon_label) > 0
+    assert noise_label != horizon_label
+
+
 _PLACEBO_COLUMNS = [
     "variant",
     "n_pedestrians",

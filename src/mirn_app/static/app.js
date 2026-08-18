@@ -301,10 +301,41 @@ function drawSweep(canvas, rows, payload) {
     context.setLineDash([]);
   }
 
-  const xLabel = payload.axis === "predictor_noise"
-    ? "predictor error sigma (m)"
-    : "forecast horizon (steps)";
-  drawAxes(frame, xLabel, "perturbation (MDP95 units)", xLow, xHigh, 0, yHigh);
+  drawAxes(frame, payload.axis_label, "perturbation (MDP95 units)", xLow, xHigh, 0, yHigh);
+  drawSweepLegend(frame);
+}
+
+// A legend anchored to the plot itself, not just to the stat tiles below it: this section's row
+// schema (axis_value / reported_value / true_value) never matches renderReadout's per-estimator
+// stat branch, so no stat tile here carries the paired colour and the dashed green "true" line
+// would otherwise be unanchored to anything else on the page. Placed top-left, which the curve
+// (rising left-to-right) never occupies.
+function drawSweepLegend(frame) {
+  const { context, left, top } = frame;
+  const swatchWidth = 14;
+  const swatchGap = 6;
+  const rowHeight = 14;
+  const entries = [
+    { label: "reported", color: token("--mirn-naive"), dash: [] },
+    { label: "true (paired)", color: token("--mirn-paired"), dash: [5, 4] },
+  ];
+
+  context.font = "11px " + (state.theme["--mirn-font-mono"] || "monospace");
+  context.textAlign = "left";
+  entries.forEach((entry, index) => {
+    const y = top + 6 + index * rowHeight;
+    context.strokeStyle = entry.color;
+    context.lineWidth = 2;
+    context.setLineDash(entry.dash);
+    context.beginPath();
+    context.moveTo(left + 4, y);
+    context.lineTo(left + 4 + swatchWidth, y);
+    context.stroke();
+    context.setLineDash([]);
+
+    context.fillStyle = token("--mirn-ink-muted");
+    context.fillText(entry.label, left + 4 + swatchWidth + swatchGap, y + 4);
+  });
 }
 
 function drawBars(canvas, rows) {
@@ -595,6 +626,13 @@ function buildSection(experiment, index) {
   section.querySelector(".section-index").textContent = String(index + 1).padStart(2, "0");
   section.querySelector(".section-title").textContent = experiment.title;
   section.querySelector(".section-claim").textContent = experiment.claim;
+
+  // Only the first rendered section starts expanded, keyed off its position rather than its
+  // name (no per-experiment branching), so the mathematics is visible immediately without
+  // pushing every plot on the page below the fold.
+  if (index === 0) {
+    section.querySelector(".mathematics").setAttribute("open", "");
+  }
 
   const form = section.querySelector(".controls");
   const output = section.querySelector(".output");

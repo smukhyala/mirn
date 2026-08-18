@@ -52,6 +52,14 @@ _AXES: tuple[str, ...] = ("predictor_noise", "forecast_horizon")
 _HORIZON_MIN = 2
 _HORIZON_MAX = 40
 
+# The human-readable axis label lives here, next to the grid each axis produces, so the two
+# cannot drift apart. The UI reads this string out of the payload rather than re-deriving it
+# from the axis value — see CLAUDE.md's ban on value-branching in app.js.
+_AXIS_LABELS: dict[str, str] = {
+    "predictor_noise": "predictor error sigma (m)",
+    "forecast_horizon": "forecast horizon (steps)",
+}
+
 
 def _axis_values(axis: str, n_points: int, noise_max: float) -> np.ndarray:
     """The grid to sweep over. Horizon values are rounded to distinct integers; see the plan note
@@ -200,6 +208,7 @@ class ConfoundingSweep(Experiment):
 
         payload: dict[str, object] = {}
         payload["axis"] = axis
+        payload["axis_label"] = _AXIS_LABELS[axis]
         payload["mdp_95"] = mdp_95
         payload["true_value"] = true_value
         payload["floor_crossing_axis_value"] = crossing
