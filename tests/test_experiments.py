@@ -413,10 +413,16 @@ def test_placebo_removes_exactly_one_pedestrian() -> None:
 
 
 def test_placebo_payload_names_the_removed_agent() -> None:
+    """Selection is per pair now, so the payload names one removed agent per scene."""
     result = _placebo_result()
-    removed = result.payload["removed_agent_id"]
-    assert type(removed) is str
-    assert len(removed) > 0
+    removed_agent_ids = result.payload["removed_agent_ids"]
+    assert type(removed_agent_ids) is dict
+    assert len(removed_agent_ids) > 0
+    for scene_id in removed_agent_ids:
+        assert type(scene_id) is str
+        agent_id = removed_agent_ids[scene_id]
+        assert type(agent_id) is str
+        assert len(agent_id) > 0
 
 
 def test_placebo_delta_is_exactly_zero_at_zero_influence() -> None:
@@ -448,15 +454,38 @@ def test_placebo_residual_displacement_is_zero_only_at_zero_influence() -> None:
 
 def test_placebo_removed_agent_is_influence_independent() -> None:
     """Eligibility is measured on the counterfactual (undisplaced) arm, which never depends on
-    `influence`, so the same agent must be removed at every influence level for a fixed seed and
-    scene count. A regression guard: if a future change moves eligibility back onto the factual
-    (displaced) arm, this is the test that catches it."""
+    `influence`, so the same *set* of per-scene removed agents must result at every influence
+    level for a fixed seed and scene count. A regression guard: if a future change moves
+    eligibility back onto the factual (displaced) arm, this is the test that catches it."""
     influences = (0.0, 0.5, 1.0, 2.0)
-    removed_agent_ids: list[str] = []
+    removed_id_sets: list[set[str]] = []
     for influence in influences:
         result = _placebo_result(influence=influence)
-        removed_agent_ids.append(str(result.payload["removed_agent_id"]))
+        removed_agent_ids = result.payload["removed_agent_ids"]
+        id_set: set[str] = set()
+        for scene_id in removed_agent_ids:
+            id_set.add(removed_agent_ids[scene_id])
+        removed_id_sets.append(id_set)
 
-    first_agent_id = removed_agent_ids[0]
-    for agent_id in removed_agent_ids:
-        assert agent_id == first_agent_id
+    first_id_set = removed_id_sets[0]
+    for id_set in removed_id_sets:
+        assert id_set == first_id_set
+
+
+def test_placebo_succeeds_at_declared_defaults_across_many_seeds() -> None:
+    """The test that would have caught the n_scenes=8 defaults bug: every other placebo test in
+    this file runs against `_fast_params` (n_scenes=3). This runs with zero parameter overrides —
+    the exact call a UI form pre-filled with defaults would submit — across enough seeds to catch
+    a rare per-scene selection failure, rather than the one seed most tests happen to use."""
+    experiment = EXPERIMENTS.create("placebo")
+    for seed in range(10):
+        result = experiment.run({}, seed=seed)
+        assert len(result.frame) == 2
+
+
+def test_placebo_succeeds_at_the_top_of_the_scene_range() -> None:
+    """The declared parameter range allows n_scenes up to 32; per-pair selection must still
+    succeed there, not just at the small scene counts the rest of the suite exercises."""
+    experiment = EXPERIMENTS.create("placebo")
+    result = experiment.run({"n_scenes": 32}, seed=0)
+    assert len(result.frame) == 2

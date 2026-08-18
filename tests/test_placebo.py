@@ -59,8 +59,12 @@ def test_deleting_a_noninteracting_agent_does_not_move_the_paired_estimate() -> 
     removed_agent_id = select_non_interacting_agent(pair, _INTERACTION_RADIUS_M)
     assert removed_agent_id is not None
 
+    # Selection is judged on the counterfactual (undisplaced) arm — see
+    # mirn.experiments.placebo's module docstring for why — so this check must recompute the
+    # distance on that same arm, not the factual (displaced) one, to actually test the function's
+    # contract.
     robot_positions = pair.factual.robot.positions
-    removed_trajectory = pair.factual.pedestrian_by_id(removed_agent_id)
+    removed_trajectory = pair.counterfactual.pedestrian_by_id(removed_agent_id)
     diff = removed_trajectory.positions - robot_positions
     min_distance = float(np.min(np.sqrt(np.sum(diff * diff, axis=1))))
     assert min_distance > _INTERACTION_RADIUS_M
