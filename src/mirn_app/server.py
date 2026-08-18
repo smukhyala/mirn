@@ -13,13 +13,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from mirn.contracts import Scene
-from mirn.data.synthetic import BOX_HEIGHT_M, BOX_WIDTH_M, SyntheticAdapter
+from mirn.contracts import RolloutPair, Scene
+from mirn.data.synthetic import (
+    BOX_HEIGHT_M,
+    BOX_WIDTH_M,
+    DISPLACEMENT_AMPLITUDE_M,
+    DISPLACEMENT_DECAY_LENGTH_M,
+    SyntheticAdapter,
+)
 from mirn.experiments import EXPERIMENTS, ExperimentResult
 from mirn.experiments.calibration_floor import (
     DEFAULT_N_PEDESTRIANS,
@@ -67,6 +74,23 @@ def _trajectories_as_json(scene: Scene) -> list[dict[str, object]]:
             positions.append([float(point[0]), float(point[1])])
         agents.append({"agent_id": pedestrian.agent_id, "positions": positions})
     return agents
+
+
+def _gap_series(pair: RolloutPair) -> list[dict[str, object]]:
+    """Per-agent distance between the two arms at each timestep.
+
+    Computed here rather than in the browser: the page displays these numbers, and the standing
+    rule is that JavaScript renders numbers the API supplies and never derives them.
+    """
+    series: list[dict[str, object]] = []
+    for factual_traj, counterfactual_traj in pair.paired_agents():
+        offsets = factual_traj.positions - counterfactual_traj.positions
+        distances = np.sqrt(np.sum(offsets * offsets, axis=1))
+        gaps: list[float] = []
+        for step_index in range(distances.shape[0]):
+            gaps.append(float(distances[step_index]))
+        series.append({"agent_id": factual_traj.agent_id, "gaps": gaps})
+    return series
 
 
 def create_app() -> FastAPI:
@@ -132,17 +156,37 @@ def create_app() -> FastAPI:
         return {"cards": cards}
 
     @app.get("/api/scene")
-    def scene(influence: float = 1.0, seed: int = 0, scene_index: int = 0) -> dict[str, object]:
+    def scene(
+        influence: float = 1.0,
+        seed: int = 0,
+        scene_index: int = 0,
+        robot_x: float | None = None,
+        robot_y: float | None = None,
+        amplitude: float | None = None,
+        decay: float | None = None,
+        n_pedestrians: int | None = None,
+    ) -> dict[str, object]:
         if influence < 0.0 or influence > 2.0:
             raise HTTPException(
                 status_code=400, detail=f"influence must be between 0.0 and 2.0, got {influence}"
             )
-        adapter = SyntheticAdapter(
-            n_scenes=int(n_scenes_parameter().default),  # type: ignore[arg-type]
-            n_pedestrians=DEFAULT_N_PEDESTRIANS,
-            n_steps=DEFAULT_N_STEPS,
-            seed=seed,
-        )
+        resolved_robot_x = BOX_WIDTH_M / 2.0 if robot_x is None else robot_x
+        resolved_robot_y = BOX_HEIGHT_M / 2.0 if robot_y is None else robot_y
+        resolved_amplitude = DISPLACEMENT_AMPLITUDE_M if amplitude is None else amplitude
+        resolved_decay = DISPLACEMENT_DECAY_LENGTH_M if decay is None else decay
+        resolved_n_pedestrians = DEFAULT_N_PEDESTRIANS if n_pedestrians is None else n_pedestrians
+        try:
+            adapter = SyntheticAdapter(
+                n_scenes=int(n_scenes_parameter().default),  # type: ignore[arg-type]
+                n_pedestrians=resolved_n_pedestrians,
+                n_steps=DEFAULT_N_STEPS,
+                seed=seed,
+                robot_position=(resolved_robot_x, resolved_robot_y),
+                displacement_amplitude_m=resolved_amplitude,
+                displacement_decay_length_m=resolved_decay,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
         pairs = adapter.rollout_pairs_with_influence(influence)
         if scene_index < 0 or scene_index >= len(pairs):
             raise HTTPException(
@@ -158,6 +202,8 @@ def create_app() -> FastAPI:
                 point = pair.factual.robot.positions[step_index]
                 robot_positions.append([float(point[0]), float(point[1])])
 
+        reference_trajectory = pair.factual.pedestrians[0]
+
         body: dict[str, object] = {}
         body["factual"] = _trajectories_as_json(pair.factual)
         body["counterfactual"] = _trajectories_as_json(pair.counterfactual)
@@ -165,6 +211,9 @@ def create_app() -> FastAPI:
         body["influence"] = influence
         body["seed"] = seed
         body["extent"] = {"width": BOX_WIDTH_M, "height": BOX_HEIGHT_M}
+        body["dt"] = reference_trajectory.dt
+        body["n_steps"] = reference_trajectory.positions.shape[0]
+        body["gap_series"] = _gap_series(pair)
         return body
 
     @app.post("/api/export")

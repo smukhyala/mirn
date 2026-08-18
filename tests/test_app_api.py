@@ -194,3 +194,58 @@ def test_methods_endpoint_returns_every_card(client: TestClient) -> None:
     assert spot_checked["key"] == "paired"
     assert spot_checked["kind"] == "estimator"
     assert len(spot_checked["formula_tex"]) > 0
+
+
+def test_scene_returns_playback_metadata(client: TestClient) -> None:
+    body = client.get("/api/scene", params={"influence": 1.0, "seed": 0}).json()
+    assert body["dt"] > 0.0
+    assert body["n_steps"] == len(body["factual"][0]["positions"])
+
+
+def test_scene_gap_series_matches_the_two_arms(client: TestClient) -> None:
+    """The page displays these numbers, so they must be the server's, not the browser's."""
+    import math
+
+    body = client.get("/api/scene", params={"influence": 1.0, "seed": 0}).json()
+    by_agent: dict[str, list[float]] = {}
+    for entry in body["gap_series"]:
+        by_agent[entry["agent_id"]] = entry["gaps"]
+    for index in range(len(body["factual"])):
+        agent_id = body["factual"][index]["agent_id"]
+        factual_positions = body["factual"][index]["positions"]
+        counterfactual_positions = body["counterfactual"][index]["positions"]
+        gaps = by_agent[agent_id]
+        assert len(gaps) == len(factual_positions)
+        for step in range(len(factual_positions)):
+            delta_x = factual_positions[step][0] - counterfactual_positions[step][0]
+            delta_y = factual_positions[step][1] - counterfactual_positions[step][1]
+            expected = math.sqrt(delta_x * delta_x + delta_y * delta_y)
+            assert gaps[step] == pytest.approx(expected, abs=1e-12)
+
+
+def test_scene_gaps_are_all_zero_at_zero_influence(client: TestClient) -> None:
+    body = client.get("/api/scene", params={"influence": 0.0, "seed": 0}).json()
+    for entry in body["gap_series"]:
+        for gap in entry["gaps"]:
+            assert gap == 0.0
+
+
+def test_scene_accepts_robot_settings(client: TestClient) -> None:
+    body = client.get(
+        "/api/scene",
+        params={"influence": 1.0, "seed": 0, "robot_x": 6.0, "robot_y": 3.0,
+                "amplitude": 2.0, "decay": 5.0, "n_pedestrians": 8},
+    ).json()
+    assert body["robot"][0] == [6.0, 3.0]
+    assert len(body["factual"]) == 8
+
+
+def test_scene_rejects_a_robot_outside_the_box(client: TestClient) -> None:
+    response = client.get("/api/scene", params={"robot_x": 999.0, "seed": 0})
+    assert response.status_code == 400
+    assert "robot" in response.json()["detail"].lower()
+
+
+def test_scene_rejects_a_non_positive_decay(client: TestClient) -> None:
+    response = client.get("/api/scene", params={"decay": 0.0, "seed": 0})
+    assert response.status_code == 400
