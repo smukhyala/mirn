@@ -106,7 +106,21 @@ main { max-width: 42rem; margin: 0 auto; padding: 0 2rem; }
   color: var(--mirn-accent);
 }
 .experiment h2 { margin: 0 0 0.5rem; font-size: 1.6rem; font-weight: 600; line-height: 1.25; }
-.section-claim { margin: 0 0 1.75rem; max-width: 38rem; color: var(--mirn-ink-muted); }
+/* The lay claim is several short paragraphs rather than one long one — a reader meeting "null"
+   and "detection floor" for the first time should meet one definition per breath. */
+.section-claim { margin: 0 0 0.75rem; max-width: 38rem; color: var(--mirn-ink-muted); }
+.section-claim p { margin: 0 0 0.9rem; }
+.section-claim p:last-child { margin-bottom: 0; }
+/* The terse technical restatement each Experiment declares in Python, demoted underneath the
+   plain-English version — the same prose-first, notation-second ordering the cards use. */
+.section-claim-technical {
+  margin: 0 0 1.75rem;
+  max-width: 38rem;
+  color: var(--mirn-ink-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.6;
+}
 
 .experiment-body { display: grid; grid-template-columns: 1fr; gap: 1.75rem; }
 
@@ -114,7 +128,7 @@ main { max-width: 42rem; margin: 0 auto; padding: 0 2rem; }
 .control { display: flex; flex-direction: column; gap: 0.35rem; }
 .control-label { font-size: 0.8rem; color: var(--mirn-ink-muted); display: flex; justify-content: space-between; }
 .control-label output { font-family: var(--mirn-font-mono); color: var(--mirn-ink); }
-.control-help { margin: 0; font-size: 0.75rem; color: var(--mirn-floor); line-height: 1.5; }
+.control-help { margin: 0; font-size: 0.75rem; color: var(--mirn-ink-muted); line-height: 1.5; }
 
 .more-settings { margin-top: 0.25rem; border-top: 1px dashed var(--mirn-grid); padding-top: 0.9rem; }
 .more-settings summary {
@@ -138,13 +152,15 @@ select {
 }
 
 .readout { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-bottom: 1.25rem; }
-.stat { min-width: 8rem; }
+/* Labels now carry the method's display name and its unit spelled out, so they need room to wrap
+   inside their own tile rather than stretching one tile across the whole row. */
+.stat { min-width: 8rem; max-width: 15rem; }
 .stat-label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mirn-ink-muted); }
 .stat-value { display: block; font-family: var(--mirn-font-mono); font-size: 1.5rem; line-height: 1.3; }
-.stat-ci { display: block; font-family: var(--mirn-font-mono); font-size: 0.75rem; color: var(--mirn-floor); }
+.stat-ci { display: block; font-family: var(--mirn-font-mono); font-size: 0.75rem; color: var(--mirn-ink-muted); }
 .stat-naive .stat-value { color: var(--mirn-naive); }
 .stat-paired .stat-value { color: var(--mirn-paired); }
-.stat-floor .stat-value { color: var(--mirn-floor); }
+.stat-floor .stat-value { color: var(--mirn-ink-muted); }
 
 canvas.plot {
   width: 100%;
@@ -154,7 +170,7 @@ canvas.plot {
   border: 1px solid var(--mirn-grid);
   border-radius: 4px;
 }
-.plot-note { margin: 0.75rem 0 0; font-size: 0.82rem; color: var(--mirn-floor); max-width: 38rem; line-height: 1.6; }
+.plot-note { margin: 0.75rem 0 0; font-size: 0.82rem; color: var(--mirn-ink-muted); max-width: 38rem; line-height: 1.6; }
 
 .is-pending { opacity: 0.55; transition: opacity 120ms ease-out; }
 .error {
@@ -193,7 +209,7 @@ canvas.plot {
 .card ul { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.88rem; color: var(--mirn-ink-muted); line-height: 1.6; }
 .card li { margin-bottom: 0.4rem; }
 .breaks-when li { color: var(--mirn-naive); }
-.card-citation { margin: 1rem 0 0; font-size: 0.78rem; color: var(--mirn-floor); }
+.card-citation { margin: 1rem 0 0; font-size: 0.78rem; color: var(--mirn-ink-muted); }
 
 .page-footer { max-width: 42rem; margin: 0 auto; padding: 3rem 2rem 0; border-top: 1px solid var(--mirn-grid); }
 #export-button {
@@ -208,7 +224,7 @@ canvas.plot {
 }
 #export-button:hover { background: var(--mirn-surface); }
 #export-button:disabled { cursor: progress; opacity: 0.55; }
-.export-status, .seed-note { font-size: 0.8rem; color: var(--mirn-floor); font-family: var(--mirn-font-mono); }
+.export-status, .seed-note { font-size: 0.8rem; color: var(--mirn-ink-muted); font-family: var(--mirn-font-mono); }
 
 @media (max-width: 900px) {
   .scene { grid-template-columns: 1fr; }

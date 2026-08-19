@@ -83,7 +83,7 @@ class EstimatorComparison(Experiment):
     """Three estimators, one dataset, side by side."""
 
     name = "estimator_comparison"
-    title = "What the two estimators report"
+    title = "What the different methods report"
     claim = (
         "On identical data the naive and paired estimators disagree, and only one consults the "
         "robot-absent arm."

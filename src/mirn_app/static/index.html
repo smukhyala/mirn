@@ -28,10 +28,18 @@
     <p class="section-index">Beat 0</p>
     <h2>The paired rollout</h2>
     <p>
-      One crowd, run twice from the same seed and the same exogenous noise: once with a robot in
-      the middle of the box, once with no robot at all. Because everything else is held identical,
-      the difference between an agent's two paths <em>is</em> the robot's causal effect on it — no
-      forecaster involved.
+      One crowd, run twice from the same starting positions and the same random wobble: once with
+      a robot standing in the middle of the room, once with no robot at all. The robot pushes
+      people aside as they pass; nobody in this crowd is deciding to move, and the robot never
+      moves either. Because everything else is held identical, the difference between a person's
+      two paths <em>is</em> the robot's effect on them, with nothing predicted or guessed at.
+    </p>
+    <p>
+      Nothing here is a real robot or a real corridor. That is the point. This crowd is invented,
+      so we know exactly what the robot did to it — which makes it the one place where a way of
+      measuring disturbance can be handed a question whose answer is already known, and caught
+      getting it wrong. Every method on this page is graded that way before anyone trusts it on
+      real data.
     </p>
     <form class="scene-controls">
       <label class="control">
@@ -93,14 +101,15 @@
   <section class="experiment">
     <p class="section-index"></p>
     <h2 class="section-title"></h2>
-    <p class="section-claim"></p>
+    <div class="section-claim"></div>
+    <p class="section-claim-technical"></p>
     <div class="experiment-body">
       <form class="controls"></form>
       <div class="output">
-        <div class="readout"></div>
+        <div class="readout" aria-live="polite"></div>
         <canvas class="plot" width="520" height="300"></canvas>
         <p class="plot-note"></p>
-        <p class="error" hidden></p>
+        <p class="error" aria-live="assertive" hidden></p>
       </div>
     </div>
     <details class="mathematics">

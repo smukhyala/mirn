@@ -25,6 +25,14 @@ def _require_text(value: str, field_name: str) -> None:
 def _require_text_tuple(
     values: tuple[str, ...], field_name: str
 ) -> None:
+    """Every entry must be non-empty prose, with no notation in it.
+
+    The notation check is the same rule `plain_summary` already carries, applied to the two
+    fields the interface also renders as plain text. `assumptions` and `breaks_when` are inserted
+    into the page as text nodes and never passed through KaTeX, so a `\\(...\\)` delimiter in one
+    of them reaches the reader verbatim — which is exactly what happened to the split-half null
+    card. Making it a construction error means it cannot come back silently.
+    """
     if len(values) == 0:
         raise ValueError(
             f"MethodCard.{field_name} must contain at least one entry"
@@ -34,6 +42,12 @@ def _require_text_tuple(
             raise ValueError(
                 f"MethodCard.{field_name}[{index}] must be non-empty "
                 "after strip"
+            )
+        if "\\" in values[index] or "$" in values[index]:
+            raise ValueError(
+                f"MethodCard.{field_name}[{index}] must be plain English, not notation; it is "
+                "rendered as text and never passed through a maths renderer, so a LaTeX "
+                "delimiter would reach the reader verbatim. Move the maths to formula_tex."
             )
 
 

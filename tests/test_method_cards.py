@@ -75,6 +75,18 @@ def test_blank_entry_inside_breaks_when_raises() -> None:
         _valid_card(breaks_when=("fine", "  "))
 
 
+def test_latex_inside_assumptions_raises() -> None:
+    """Assumptions are rendered as plain text, never through KaTeX, so a delimiter left in one
+    reaches the reader verbatim. Caught at construction rather than on screen."""
+    with pytest.raises(ValueError, match="assumptions"):
+        _valid_card(assumptions=("\\(\\mathcal{P}\\) is a pedestrian population.",))
+
+
+def test_latex_inside_breaks_when_raises() -> None:
+    with pytest.raises(ValueError, match="breaks_when"):
+        _valid_card(breaks_when=("Its expectation is $\\sigma$.",))
+
+
 def test_card_is_frozen() -> None:
     card = _valid_card()
     with pytest.raises(dataclasses.FrozenInstanceError):

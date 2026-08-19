@@ -2,13 +2,12 @@
 // Nothing in this file estimates, calibrates, or sweeps anything.
 
 const DEBOUNCE_MS = 250;
-// Shown on every section's very first paint and on every refresh, before the request that will
-// fill it in has even been sent — never gated behind a delay. Nothing here names which experiment
-// is slow (none of this file branches on experiment.name); on a cold server this happens to be
-// true for whichever section needs the split-half null, and the fast sections simply replace it
-// within a couple hundred milliseconds.
-const PENDING_HINT_TEXT =
-  "computing the split-half null — 200 draws, about a minute on first load, instant afterwards.";
+// Shown on every beat's very first paint and on every refresh, before the request that will fill
+// it in has even been sent — never gated behind a delay. It is deliberately generic: this string
+// appears under all four beats at once on first load, so it can neither name a computation only
+// one of them runs nor quote a count a rendered control can change. It also cannot use a term the
+// page has not defined yet, since it is on screen before any beat's copy has been read.
+const PENDING_HINT_TEXT = "working this out — the first one takes about a minute, then it is instant.";
 
 const state = {
   theme: {},

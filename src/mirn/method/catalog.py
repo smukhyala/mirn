@@ -109,10 +109,10 @@ def _build_cards() -> dict[str, MethodCard]:
                 "\\max_{(i,j) \\in \\sigma} \\; \\lVert a_i - b_j \\rVert_2"
             ),
             assumptions=(
-                "Order along each path is meaningful; \\(\\mathcal{M}\\) ranges over monotone "
-                "couplings of the two index sequences.",
-                "Computed by an iterative dynamic program over an explicit \\(T \\times T\\) "
-                "table.",
+                "Order along each path is meaningful: the two paths may only ever be paired up "
+                "moving forward, never by backtracking along either one.",
+                "Computed by an iterative dynamic program over an explicit table of every "
+                "timestep on one path against every timestep on the other.",
             ),
             breaks_when=(
                 "It reports a maximum, so one outlier sample dominates the whole statistic.",
@@ -148,12 +148,12 @@ def _build_cards() -> dict[str, MethodCard]:
             ),
             assumptions=(
                 "Both clouds are treated as empirical measures with uniform marginals.",
-                "Solved by log-domain Sinkhorn iterations for numerical stability at small "
-                "\\(\\varepsilon\\).",
+                "Solved by log-domain Sinkhorn iterations, which stay numerically stable when "
+                "the smoothing strength is small.",
             ),
             breaks_when=(
-                "The entropic regulariser biases the value upward; the bias grows with "
-                "\\(\\varepsilon\\) and does not vanish at finite iteration counts.",
+                "The entropic smoothing biases the value upward; the bias grows with the "
+                "smoothing strength and does not vanish at finite iteration counts.",
                 "It is the slowest divergence here by a wide margin, which makes large "
                 "split-half calibrations expensive.",
             ),
@@ -229,7 +229,10 @@ def _build_cards() -> dict[str, MethodCard]:
         MethodCard(
             key="paired_debiased",
             kind="estimator",
-            title="Paired counterfactual, in MDP units",
+            # The title doubles as the readout tile's label in the page, where the unit is
+            # already spelled out next to it — so it names what the estimator does rather than
+            # repeating "in MDP units" and reading the same thing twice on screen.
+            title="Paired counterfactual, noise-subtracted",
             one_liner="The paired estimate, floor-subtracted and rescaled into detection units.",
             plain_summary=(
                 "Take the paired measurement and subtract the amount the measurement would "
@@ -275,9 +278,10 @@ def _build_cards() -> dict[str, MethodCard]:
             ),
             assumptions=(_identification_of("noisy_oracle_residual"),),
             breaks_when=(
-                "Always, by construction. When the true perturbation is zero and \\(d\\) is ADE, "
-                "its expectation is \\(\\sigma\\sqrt{\\pi/2}\\) — a straight line through the "
-                "origin in predictor error, with no dependence on the robot whatsoever.",
+                "Always, by construction. When the true perturbation is zero and the divergence "
+                "is average displacement, the number it reports is directly proportional to the "
+                "injected error — a straight line through the origin in predictor error, with no "
+                "dependence on the robot whatsoever.",
                 "It is a diagnostic instrument for exhibiting that failure, and reporting a "
                 "number from it as a measurement of perturbation would be a category error.",
                 "The counterfactual arm is consulted, but only to be corrupted with noise "
@@ -308,8 +312,8 @@ def _build_cards() -> dict[str, MethodCard]:
                 " A_s \\sim \\mathrm{Unif}\\big(\\text{balanced partitions of } \\mathcal{P}\\big)"
             ),
             assumptions=(
-                "\\(\\mathcal{P}\\) is a pedestrian population carrying no robot effect, so any "
-                "divergence between two of its halves is pure measurement noise.",
+                "The pedestrian pool carries no robot effect, so any divergence between two of "
+                "its halves is pure measurement noise.",
                 "Halves are disjoint and drawn afresh on every split from a seeded generator.",
             ),
             breaks_when=(
@@ -372,7 +376,7 @@ def _build_cards() -> dict[str, MethodCard]:
             assumptions=(
                 "The per-pair values are exchangeable, so resampling pairs with replacement "
                 "approximates the sampling distribution of their mean.",
-                "B = 1000 resamples at \\(\\alpha = 0.05\\), from a seeded generator.",
+                "1000 resamples at the 5% level, drawn from a seeded generator.",
             ),
             breaks_when=(
                 "N is small, where the percentile bootstrap undercovers.",
