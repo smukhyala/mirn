@@ -183,7 +183,7 @@ because of how this crowd happens to be written.
 ## What reporting deviation decides
 
 Deviation is a gap in space, and so is nearly everything else that is easy to measure about a
-crossing: displacement, clearance, how far off the shortest path somebody ended up. All of them
+crossing: deviation, clearance, how far off the shortest path somebody ended up. All of them
 are quantities that can return to where they started. The one this page measured did: most of the
 way back, and not all of it.
 

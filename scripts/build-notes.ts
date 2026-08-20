@@ -25,6 +25,7 @@ import {
   lintBareNumbers,
   lintComparatives,
   lintForwardTerms,
+  lintUndefinedSynonyms,
   proseOf,
 } from "../web/build/lints.js";
 import { cssTokens } from "../web/ui/theme.js";
@@ -175,6 +176,7 @@ function runLints(page: Page): void {
     ...lintBareNumbers(prose),
     ...lintComparatives(prose),
     ...lintForwardTerms(prose, page.front.page, page.front.introduces ?? [], VOCABULARY),
+    ...lintUndefinedSynonyms(prose),
   ];
   for (const problem of problems) {
     fail(page.file, problem.message);
@@ -505,7 +507,10 @@ function formatQuantity(column: string, value: number): string {
     return `${value.toFixed(2)} s`;
   }
   if (column.startsWith("n") || column.includes("Episodes")) {
-    return value.toFixed(1);
+    // A count of people is a whole number and reads wrong with a decimal point on it ("224.0
+    // people"). A count averaged over seeds is not, and rounding it to 224 would overstate the
+    // precision. Let the value decide.
+    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
   }
   return value.toFixed(3);
 }

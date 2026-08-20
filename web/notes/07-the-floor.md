@@ -19,12 +19,11 @@ answer comes from a divergence: a single number for how far apart two sets of pa
 Nothing in this crowd could be responding to a robot, because there is no robot. And yet the
 number is not zero.
 
-That leftover has a name. It is the null — the ordinary variation you get between any two halves
-of the same population, measured with no robot anywhere. Its upper edge is the detection floor:
-the smallest effect this measurement could ever tell apart from plain noise. An effect below that
-line is not absent. It is simply invisible at this sample size.
+That leftover has a name.
 
 :::term{id=the-null}
+
+The null is a range, not a single number. Its top edge has a name of its own.
 
 :::term{id=detection-floor}
 
@@ -116,8 +115,8 @@ the world had rolled differently. The floor is how small an answer can get befor
 stops being able to see it at all. Both are built out of the same restlessness in the room, and
 they answer different questions.
 
-One last thing, about the state of the field rather than about this room. We have not found a
-published study of robot-induced perturbation — how far a robot pushes people off the path they
-would otherwise have walked — that reports this floor. If that holds, the numbers those studies do
-report have nothing to be judged against. There is no way to tell a real effect from the
-measurement's own wobble.
+One last thing, about the field rather than about this room. We have not found a published study
+of robot-induced perturbation — how far a robot pushes people off the path they would otherwise
+have walked — that reports this floor. If that holds, the numbers those studies do report have
+nothing to be judged against. There is no way to tell a real effect from the measurement's own
+wobble.

@@ -19,10 +19,12 @@ the robot ever got to them.
 
 That number comes out of the pair, one person at a time. Take the path the person walked in the
 run with no robot in it, take the robot's path from the run it was in, and at every tick of the
-clock measure the distance between the two. Keep the smallest value the whole run produced. Call
-it their closest approach. Somebody whose robot-free path ran down the middle, straight into the
-robot's lane, has a small one. Somebody who would have crossed along the far wall, never broken
-stride, and could not have told you afterwards what colour the robot was has a large one.
+clock measure from the person's centre to the robot's centre. Keep the smallest value the whole
+run produced. Call it their closest approach: centre to centre, with the person's path taken from
+the run that had no robot in it, and never below zero, because nobody's width is subtracted from
+it. Somebody whose robot-free path ran down the middle, straight into the robot's lane, has a
+small one. Somebody who would have crossed along the far wall, never broken stride, and could not
+have told you afterwards what colour the robot was has a large one.
 
 Filing people by a path they did not walk looks like a mistake and is the only defensible choice
 here. File them by where they actually went and the filing is decided partly by the shove being
@@ -110,8 +112,8 @@ This is also why a reading out at the far wall is not the room's own churn. Both
 pair share a seed, so nobody's random wobble differs between them: a person alone in an empty room
 would trace the same two paths exactly. If somebody at the far wall ends up off their nominal
 trajectory, the difference reached them through the crowd. There is nowhere else in this room it
-could have come from. That is an argument about where one person's displacement came from. It is
-not an argument that the average of a thin group is pinned down.
+could have come from. That is an argument about where one person's deviation came from. It is not
+an argument that the average of a thin group is pinned down.
 
 ## How much of this to believe
 
@@ -158,7 +160,7 @@ down.
 In this crowd, how far a push travels is a property of a social-force model in which everybody
 reacts to whoever is nearest, with no thought and no manners. Change the personal space in that
 model and the reach of the chain changes with it; take away people's reaction to each other and
-there is no chain at all, by construction. The reach is invented. The mechanism is not:
-displacement has to go somewhere, and in a full room the somewhere is already occupied. The ruler
+there is no chain at all, by construction. The reach is invented. The mechanism is not: a person
+pushed aside has to go somewhere, and in a full room the somewhere is already occupied. The ruler
 is real. The room is invented.
 :::

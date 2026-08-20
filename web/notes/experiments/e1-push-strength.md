@@ -73,7 +73,7 @@ experiment: e1_push_strength
 x: repulsionScale
 series:
   - key: meanDeviationM
-    label: average displacement per person
+    label: average deviation per person
     accent: true
   - key: maxDeviationM
     label: the crowd's worst moment in the run

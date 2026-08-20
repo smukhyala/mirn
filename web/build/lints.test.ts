@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { lintBareNumbers, lintComparatives, lintForwardTerms, proseOf } from "./lints.js";
+import {
+  lintBareNumbers,
+  lintComparatives,
+  lintForwardTerms,
+  lintUndefinedSynonyms,
+  proseOf,
+} from "./lints.js";
 
 describe("proseOf", () => {
   it("removes front matter, so declared page numbers are not read as prose", () => {
@@ -123,5 +129,27 @@ describe("the jargon gate", () => {
 
   it("is case-insensitive, because a sentence may open with the term", () => {
     expect(lintForwardTerms("Deviation is what we measure.", 1, [], LADDER)).toHaveLength(1);
+  });
+});
+
+describe("the undefined-synonym lint", () => {
+  it("catches the synonym that got past a whole authoring pass", () => {
+    // Nineteen uses across five pages, one of them exclusive, before an audit found it by hand.
+    const problems = lintUndefinedSynonyms("The crowd's displacement holds steady.");
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.rule).toBe("undefined-synonym");
+    expect(problems[0]?.message).toContain("deviation");
+  });
+
+  it("catches it capitalised at the start of a sentence", () => {
+    expect(lintUndefinedSynonyms("Displacement did not move.")).toHaveLength(1);
+  });
+
+  it("permits the defined term itself", () => {
+    expect(lintUndefinedSynonyms("The deviation holds steady.")).toEqual([]);
+  });
+
+  it("matches whole words, so it does not fire inside a longer one", () => {
+    expect(lintUndefinedSynonyms("undisplacedness is not a word")).toEqual([]);
   });
 });

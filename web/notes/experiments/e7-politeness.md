@@ -42,8 +42,8 @@ options:
   - id: free
     label: Politeness is free. Getting out of the way does not slow the robot down at all.
 caption: >
-  Commit before you scroll. One of the three above is the shape I expected. What the room handed
-  back is not on the list.
+  Commit before you scroll. One of the three above is the shape this experiment was set up to
+  find. What the room handed back is not on the list.
 ```
 
 ## The dial
@@ -74,7 +74,7 @@ experiment: e7_politeness
 x: deflectionWeight
 series:
   - key: meanDeviationM
-    label: displacement per person
+    label: deviation per person
     accent: true
 caption: >
   Eight seeds per setting. The band on each point is the spread across those eight.
@@ -85,8 +85,8 @@ the dial, with a couple of settings along the way that step back up before it ca
 
 How far it leans is the part to be careful about. The whole descent, from the zero setting to the
 far end of the dial, is about the size of the spread across eight seeds at a single setting. The
-direction is what this sweep has; the size is not. So the dial did not displace people further,
-and that is the whole of what the curve establishes — considerably weaker than a dial called
+direction is what this sweep has; the size is not. So the dial did not move people further from
+where they would have been, and that is the whole of what the curve establishes — considerably weaker than a dial called
 politeness was supposed to earn.
 
 :::caveat
@@ -118,7 +118,7 @@ spread by {{q:e7[deflectionWeight=6].robotPathM.sd}}.
 
 That is the part of the prediction that held. Going around is extra ground and the robot covers
 it. If the page stopped here, politeness would cost what everybody assumes it costs, and the only
-question left would be whether the displacement it buys is worth the detour.
+question left would be whether the deviation it saves is worth the detour.
 
 ## The other half of the bill
 
@@ -154,30 +154,27 @@ that halts once in the middle of a corridor and then carries on is indistinguish
 that has arrived and parked. Turning this dial up is asking the robot to yield. A yield is a
 standstill.
 
-The figure stays on the page. Deleting it would leave no trace that this happened, and a curve
-that reads like a result and is not one is the thing this whole site is about.
+The figure stays on the page. A curve that reads like a result and is not one is the thing this
+whole site is about.
 
 ## The trade-off that did not turn up
 
-I picked the middle option on the box above, and this room cannot tell me whether I was right.
+The middle option on the box above is that shape. This room cannot say whether it is there.
 
-What I expected was a bending curve: politeness nearly free at the first notch, the two costs
-crossing somewhere around the middle of the dial, and a far end where the robot was so busy
-deferring to everybody that it barely got anywhere. Diminishing returns, then a wall.
+The option is a bending curve. Politeness nearly free at the first notch, the two costs crossing
+near the middle of the dial, and a far end where the robot defers to everybody and barely gets
+anywhere. Diminishing returns, then a wall.
 
 Neither half of that shape is here, and not because the room refuted it. The distance curve climbs
 and then stops climbing, which is the first half of the shape and is equally what eight seeds look
-like when they cannot resolve a slow climb. The displacement curve leans down by about its own
+like when they cannot resolve a slow climb. The deviation curve leans down by about its own
 spread. The clock was counting standstills. Three columns, and not one of them prices the thing
 the guess was about.
 
-The experiment is still on the site, and the reason has moved. It was going to be here because a
-prediction failed, which is the useful kind of sweep: one that agrees with you teaches you about
-the room, one that does not teaches you which of your beliefs was carrying weight, and this one
-was carrying a lot of it — the assumption that getting out of the way is something a robot pays
-for is exactly why a dial like this ships at zero. It is here now because the sweep that was going
-to settle the question turned out to be measuring its own apparatus, and that is worth showing at
-full size rather than quietly re-running.
+A failed prediction is worth a page. The belief behind this one — that getting out of the way is
+something a robot pays for — is why a dial like this ships at zero. This sweep did not weigh that
+belief. It measured its own apparatus instead, and a sweep that does that is worth showing at full
+size rather than quietly re-running.
 
 ## What this room is not charging for
 
@@ -207,12 +204,11 @@ The obvious reassurance is that the clock curve has a point drawn at every setti
 must have gone on reaching the far side. That reassurance is worth nothing. The point is an
 average over whichever seeds produced a number at all, the number is the first instant the robot's
 motion stopped, and a robot that stopped short of where it was going produces exactly such a
-number. A
-displacement curve that leans down and a clock that falls are also what a robot quietly giving up
-looks like, and no column on this page tells the two apart. If you build this dial, go and look at
+number. A deviation curve that leans down and a clock that falls are also what a robot quietly
+giving up looks like, and no column on this page tells the two apart. If you build this dial, go and look at
 where the robot actually ended up before you believe anything a curve says about it.
 
-And this page counts no near misses. Displacement says where people ended up. It says nothing
+And this page counts no near misses. Deviation says where people ended up. It says nothing
 about how close the robot came to any of them, and a dial that lowers one of those can raise the
 other.
 
@@ -221,7 +217,7 @@ In this crowd the size of the distance bill belongs to a social-force model that
 down. People here yield smoothly, never step the wrong way, and never wait for the robot to go
 first, so what a detour is worth in this room is a property of that model rather than a fact about
 corridors. Half the ruler is sound: the same crowd ran twice from the same seed, once with the
-robot and once without, so the displacement is measured rather than guessed. The other half was
+robot and once without, so the deviation is measured rather than guessed. The other half was
 not, and the section above says which half and why. What survives the trip out of here
 is not a price for politeness. It is that the cost side of this trade-off has to be measured
 before it is assumed, and that a column can carry the right units on its axis and still be

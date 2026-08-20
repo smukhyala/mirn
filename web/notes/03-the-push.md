@@ -124,7 +124,7 @@ The second series does not give even that. What is left at the last tick does no
 and the run-to-run scatter is wide enough that I would not read a trend into it either way.
 
 :::caveat
-In this crowd, the pace at which steering wins a displaced walker back is one invented number — a
+In this crowd, the pace at which steering wins a pushed-aside walker back is one invented number — a
 {{lit:0.5 s}} relaxation time, chosen because it produces something that looks like people. Change
 it and the curve gets steeper or slacker. What does not depend on it is that the curve has a top
 and comes down at all: that follows from the robot leaving, which every robot does. The ruler is

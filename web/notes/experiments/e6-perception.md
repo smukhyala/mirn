@@ -36,7 +36,7 @@ options:
   - id: same
     label: Nothing much. The planner has margin to spare and the errors average out.
   - id: elsewhere
-    label: Displacement holds still, and something else gets worse instead.
+    label: Deviation holds still, and something else gets worse instead.
 caption: >
   Commit before you scroll. Being wrong here is free. Skipping the guess is what costs you.
 ```
@@ -68,16 +68,17 @@ experiment: e6_perception
 x: positionSigmaM
 series:
   - key: meanDeviationM
-    label: displacement per person
+    label: deviation per person
     accent: true
 caption: >
   Eight seeds per setting. The band on each point is the spread across those eight crowds.
 ```
 
-With a perfect picture of the room, the average person is displaced
-{{q:e6_perception[positionSigmaM=0].meanDeviationM}}. At the blurriest setting the reading is
-{{q:e6_perception[positionSigmaM=0.8].meanDeviationM}}. The spread across the eight crowds at the
-sharp end of the dial is {{q:e6_perception[positionSigmaM=0].meanDeviationM_sd}}.
+With a perfect picture of the room, the average person ends up
+{{q:e6_perception[positionSigmaM=0].meanDeviationM}} from where they would have been. At the
+blurriest setting the reading is {{q:e6_perception[positionSigmaM=0.8].meanDeviationM}}. The spread
+across the eight crowds at the sharp end of the dial is
+{{q:e6_perception[positionSigmaM=0].meanDeviationM_sd}}.
 
 That spread covers the whole range this curve travels across the dial, so read the curve as flat
 and do not read anything into which end sits marginally where.
@@ -87,32 +88,33 @@ The robot's own journey held still too. Its path length with a perfect picture a
 {{q:e6_perception[positionSigmaM=0.8].robotPathM}}.
 
 Bad information did not make this robot clumsier with people, and it did not send it wandering. If
-displacement is what you came to measure, the honest report is that the dial does nothing — and
-that report would be missing something the report itself has no way to see.
+deviation is what you came to measure, the honest report is that the dial does nothing — and that
+report would be missing something the report itself has no way to see.
 
 ## The number nobody was watching
 
-Clearance is the gap between the robot's outside edge and the nearest person's outside edge. Edge
-to edge, not centre to centre, so zero means the two of them are touching. The smallest clearance
-in a run is the closest the robot ever came to anybody during it, and it is a different question
-from displacement: displacement asks how far the robot moved somebody, clearance asks how near it
-got.
+Clearance is the gap between the robot's outside edge and the nearest person's outside edge.
+Surface to surface, not centre to centre, so zero means the two of them are touching. A negative
+figure means they overlapped, which the soft bodies in this model are allowed to do. The smallest
+clearance in a run is the closest the robot ever came to anybody during it, and it is a different
+question from deviation: deviation asks how far the robot moved somebody, clearance asks how near
+it got.
 
 ```mirn:sweep
 experiment: e6_perception
 x: positionSigmaM
 series:
   - key: minClearanceM
-    label: closest the robot came to anybody
+    label: smallest clearance in a run
     accent: true
   - key: meanDeviationM
-    label: displacement per person
+    label: deviation per person
 caption: >
   The same runs, measured two ways, both in metres. One of these curves is the one from the
   previous figure, drawn again so the two can be read against each other.
 ```
 
-With a perfect picture of the room the closest approach in a run averages
+With a perfect picture of the room the smallest clearance in a run averages
 {{q:e6_perception[positionSigmaM=0].minClearanceM}}. At the blurriest setting it averages
 {{q:e6_perception[positionSigmaM=0.8].minClearanceM}}. The spread across the eight crowds at that
 setting is {{q:e6_perception[positionSigmaM=0.8].minClearanceM_sd}}.
@@ -124,35 +126,35 @@ of the dial to the other: the spread covers it, with room left over. Where the w
 run falls depends mostly on which crowd the robot drew, and eight crowds cannot lift a step this
 size out from under that.
 
-There is a comparison that would settle it, and this page has not run it. Every setting used the
+Deviation did not move. The ordering that did appear, appeared somewhere else entirely, on a
+quantity no deviation figure can see. A robot can hold its deviation steady while giving up its
+margins, and these six points are the shape that would make. Calling a robot robust to a blurred
+picture is therefore not one claim: the deviation figure and the clearance figure answer it
+differently, on the same eight crowds.
+
+One mechanism fits these curves. The planner steers to hold a distance from where it believes
+people are. Blur the belief and it is sometimes nearer than the truth and sometimes further; the
+planner leaves a little too much room and then a little too little, over and over, across a whole
+crossing. Averaged over the crossing those errors cancel, which is why the path length and the
+deviation stay put. A minimum does not average. The smallest clearance in a run is the single
+worst instant in it, and giving the error more chances to fall the wrong way makes the worst
+instant worse without touching the mean of anything.
+
+There is a comparison that would settle this, and this page has not run it. Every setting used the
 same eight crowds, so the two ends of the dial can be subtracted crowd by crowd, and the
 crowd-to-crowd spread cancels in the subtraction instead of swamping what is left. Until that is
-done, the ordering is a direction to go looking in and not a measured effect.
-
-So say it as weakly as the evidence allows. Displacement did not move. The ordering that did
-appear, appeared somewhere else entirely, on a quantity no displacement figure can see. A robot
-can hold its displacement steady while giving up its margins, and these six points are the shape
-that would make. Naming which respect a system is robust in is the whole of the work.
-
-Here is a mechanism that would fit these curves, if the ordering is real. The planner steers to
-hold a distance from where it believes people are. Blur the belief and it is sometimes nearer than
-the truth and sometimes further; the planner leaves a little too much room and then a little too
-little, over and over, across a whole crossing. Averaged over the crossing those errors cancel,
-which is why the path length and the displacement stay put. A minimum does not average. The
-smallest clearance in a run is the single worst instant in it, and giving the error more chances
-to fall the wrong way makes the worst instant worse without touching the mean of anything.
-
-That is a story consistent with the numbers above. This page did not test it either.
+done, the ordering is a direction to go looking in, and the mechanism above is a story that fits
+it.
 
 ## Below zero
 
 Every clearance figure on this page is negative, at every setting, including the one where the
 robot sees perfectly.
 
-A negative clearance means the robot's disc and a person's disc overlapped. In this model that is
-allowed. A person here is a soft disc and so is the robot; they do not stop when they meet, they
-push each other apart with a force that grows as they close, and nothing in the model forbids them
-from occupying the same patch of floor for a moment while that force does its work. Real bodies do
+The overlap comes from the bodies. A person here is a soft disc and so is the robot; they do not
+stop when they meet, they push each other apart with a force that grows as they close, and nothing
+in the model forbids them from occupying the same patch of floor for a moment while that force does
+its work. Real bodies do
 not do this. Discs in a force model do.
 
 So do not read these numbers as collisions. Read a negative clearance as *uncomfortably close*, and

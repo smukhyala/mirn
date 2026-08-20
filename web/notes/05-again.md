@@ -66,7 +66,7 @@ experiment: e2_density
 x: nPedestrians
 series:
   - key: meanDeviationM
-    label: displacement per person
+    label: deviation per person
     accent: true
   - key: runToRunBandM
     label: how much two robot-free runs differ
@@ -95,8 +95,8 @@ and keeping them apart is most of what this page is for.
 Uncertainty is about you. It is a statement about your evidence, and more runs shrink it. Robustness
 is about the robot. It is a statement about the machine, and it does not care how many runs you did.
 
-Picture two robots whose effect you have pinned down equally well. Under one of them the crowd's
-displacement holds steady as the corridor fills. Under the other it climbs with every person added.
+Picture two robots whose effect you have pinned down equally well. Under one of them the deviation
+per person holds steady as the corridor fills. Under the other it climbs with every person added.
 Your knowledge of the two numbers is identical. What the two machines will do at rush hour is not.
 
 Now look again at the robot-free line on that plot. The room's disagreement with itself gets worse

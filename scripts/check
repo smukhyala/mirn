@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Everything, in fast-fail-first order.
+#
+# The JavaScript chain runs in seconds; pytest takes about six minutes, dominated by the
+# split-half nulls and the Sinkhorn solver. Putting the cheap checks first means a typo fails in
+# five seconds rather than after the slow suite has finished being right about everything else.
+set -euo pipefail
+
+PY=".venv/bin/python"
+if [ ! -x "$PY" ]; then
+  echo "error: $PY not found. Bare 'python' is not on PATH in this project; create the venv first." >&2
+  exit 1
+fi
+
+echo "==> ruff"
+"$PY" -m ruff check src tests
+
+echo "==> typecheck"
+npm run typecheck
+
+echo "==> vitest"
+npx vitest run
+
+echo "==> notes (lints, vocabulary ladder, quantity references)"
+npm run notes
+
+echo "==> vite build"
+npx vite build
+
+echo "==> pytest"
+"$PY" -m pytest -q
+
+echo "==> parity fixtures are current"
+FRESH="$(mktemp -d)"
+"$PY" -m mirn.cli fixtures --out "$FRESH" > /dev/null
+if ! diff -r tests/golden/parity "$FRESH" > /dev/null; then
+  echo "error: committed parity fixtures are stale. The oracle's answers have changed and the" >&2
+  echo "       fixtures were not regenerated. Run:" >&2
+  echo "         .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity" >&2
+  diff -r tests/golden/parity "$FRESH" || true
+  rm -rf "$FRESH"
+  exit 1
+fi
+rm -rf "$FRESH"
+
+echo
+echo "all checks passed"

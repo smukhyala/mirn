@@ -40,7 +40,7 @@ export const COMPARATIVES =
   /\b(more than|less than|greater than|fewer than|larger than|smaller than|bigger than|higher than|lower than|about (?:half|twice|three times)|twice|half of|roughly \w+ times|times (?:the|as))\b/i;
 
 export interface LintProblem {
-  readonly rule: "bare-number" | "comparative" | "forward-term";
+  readonly rule: "bare-number" | "comparative" | "forward-term" | "undefined-synonym";
   readonly found: string;
   readonly message: string;
 }
@@ -131,6 +131,44 @@ export function lintForwardTerms(
           `page ${pageNumber} uses "${found[0]}", but the vocabulary ladder does not define ` +
           `'${entry.id}' until page ${entry.page}. Either move the term later, define it earlier ` +
           `in web/vocab.ts, or say it in plain words here`,
+      });
+    }
+  }
+  return problems;
+}
+
+/**
+ * Words that mean a defined term but are not it.
+ *
+ * A cross-page audit found "displacement" used nineteen times across five pages for the quantity
+ * the ladder calls `deviation` — and one page used the synonym exclusively while declaring the
+ * real term in its front matter, so its entire argument rode on a word defined nowhere on the
+ * site. Nothing would have caught that: the ladder check only knows about terms it has heard of.
+ *
+ * This is the cheap half of the fix. It cannot find a synonym nobody has thought of yet, but each
+ * one found by hand gets added here so it is found by build next time.
+ */
+export const UNDEFINED_SYNONYMS: readonly (readonly [string, string])[] = Object.freeze([
+  ["displacement", "deviation"],
+  ["displaced", "deviation (or recast the sentence)"],
+  ["perturbed", "perturbation (or recast the sentence)"],
+  ["nominal path", "nominal trajectory"],
+  ["ground truth", "the run with no robot in it"],
+  ["baseline run", "the run with no robot in it"],
+]);
+
+export function lintUndefinedSynonyms(prose: string): LintProblem[] {
+  const problems: LintProblem[] = [];
+  for (const [synonym, instead] of UNDEFINED_SYNONYMS) {
+    const pattern = new RegExp(`\\b${synonym}\\b`, "i");
+    const found = prose.match(pattern);
+    if (found !== null) {
+      problems.push({
+        rule: "undefined-synonym",
+        found: found[0],
+        message:
+          `"${found[0]}" is not a defined term on this site. Use ${instead}. A synonym the reader ` +
+          `has never been given is jargon however ordinary it sounds`,
       });
     }
   }

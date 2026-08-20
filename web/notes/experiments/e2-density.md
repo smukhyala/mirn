@@ -85,7 +85,7 @@ caption: >
 ```
 
 Now divide one curve by the other. The metres cancel and what is left is a plain count: how much
-effect there is per unit of ordinary variation. It is the only form in which a displacement figure
+effect there is per unit of ordinary variation. It is the only form in which a deviation figure
 means anything by itself, and this page is where that stops being a pedantic remark.
 
 At {{lit:4 people}} the effect, counted in bands, is {{q:e2_density[nPedestrians=4].signalToBand}}.
@@ -118,7 +118,7 @@ reaching more people, and in the fuller rooms it is harder to catch doing it. Th
 do not contradict each other, and neither one has to give way.
 
 In a nearly empty corridor the robot is the only thing that happens. Nobody has anybody else to
-dodge, so two runs of that room look almost identical, and whatever displacement you find is the
+dodge, so two runs of that room look almost identical, and whatever deviation you find is the
 robot's doing by elimination. Fill the corridor and people spend the entire crossing shoving each
 other. Two runs of the packed room already look quite different from one another before you put a
 robot anywhere near them.
@@ -155,7 +155,7 @@ You have already met the band once, as a second line on a plot with no robot beh
 is where it stops being a curiosity. The same deviation figure means one thing in an empty room and
 something else in a packed one, and nothing in the figure tells you which room it came from.
 
-So the figure needs a companion, and the companion is the band. From here on, a displacement
+So the figure needs a companion, and the companion is the band. From here on, a deviation
 reported without one is not a result. It is a number.
 
 Which raises the obvious question, and Part IV is about nothing else. If everything now rests on

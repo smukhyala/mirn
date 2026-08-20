@@ -70,19 +70,10 @@ ask of an afternoon of footage from a real building, and the footage would leave
 exactly this place.
 :::
 
-## You are already answering this
+## Answer it anyway
 
-If you build things that move among people, you answer this question already, and there is a good
-chance you answer it like this: take what a person was doing before the robot mattered, work out
-where they were heading, and measure how far off that turned out to be.
+The question again, then. How much did the robot change what these people did? Pick a number and
+write it down before you move on.
 
-That number is real. It is cheap to compute, it goes in a table, and it has a unit on it. What it
-is not is the robot's effect. It is the robot's effect and the wrongness of your guess about the
-person, tangled together, with no line drawn between them. One run cannot tell you the split,
-because the split is a fact about a version of events the run does not contain.
-
-This is not a complaint about anybody's method. It is a description of what a single pass of a
-room can hold up.
-
-So write your answer down. How much did the robot change what these people did? You cannot check
-it against anything, and neither can I. Everything after this page is a response to that.
+You cannot check that number against anything, and neither can I. Everything after this page is a
+response to that.
