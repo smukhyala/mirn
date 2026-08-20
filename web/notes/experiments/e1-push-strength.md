@@ -64,7 +64,6 @@ options:
     label: It rises, then levels off.
   - id: no-effect
     label: Nothing much happens.
-reveals: e1-sweep
 ```
 
 ```mirn:sweep

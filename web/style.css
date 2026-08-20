@@ -380,3 +380,106 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 .contents a { color: var(--mirn-ink); text-decoration: none; font-weight: 500; }
 .contents a:hover { text-decoration: underline; }
 .contents .contents-subtitle { display: block; color: var(--mirn-ink-faint); font-size: 0.82rem; font-weight: 400; }
+
+/* ---------------------------------------------------------------- interactions */
+
+/* The working is closed until asked for. Page 2 promises "click the number and the working opens
+   underneath it", which was untrue while the panel rendered permanently open. */
+.quantity-trigger {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--mirn-perturbation);
+  background: none;
+  border: none;
+  border-bottom: 1px dotted var(--mirn-perturbation);
+  border-radius: 0;
+  padding: 0.1rem 0;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.quantity-trigger:hover { background: var(--mirn-surface); }
+.quantity-panel { margin-top: 0.9rem; }
+
+/* A cited number opens its provenance rather than its arithmetic: it has no working of its own,
+   but it does have a source, and "where did this come from" is the promise. */
+.provenance {
+  display: block;
+  margin: 0.35rem 0 0.6rem;
+  padding-left: 0.8rem;
+  border-left: 2px solid var(--mirn-rule);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--mirn-ink-muted);
+}
+.quantity:focus-visible,
+.quantity-trigger:focus-visible,
+.predict-option:focus-visible {
+  outline: 2px solid var(--mirn-ink);
+  outline-offset: 2px;
+}
+
+.widget-knob {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 11rem;
+  flex: 1 1 11rem;
+}
+.widget-knob input { width: 100%; }
+
+/* Commit before you look. */
+.predict {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--mirn-rule);
+  background: var(--mirn-surface);
+}
+.predict-legend {
+  padding: 0 0.4rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.62rem;
+  color: var(--mirn-ink-faint);
+}
+.predict-options { display: flex; flex-direction: column; gap: 0.5rem; }
+.predict-option {
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--mirn-font-sans);
+  font-size: 0.88rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--mirn-paper);
+}
+.predict-option[aria-pressed="true"] {
+  border-width: 2px;
+  font-weight: 600;
+}
+.predict-answered {
+  margin: 0.8rem 0 0;
+  font-size: 0.82rem;
+  color: var(--mirn-ink-muted);
+}
+.predict-answered:empty { display: none; }
+.widget-prediction-echo {
+  margin: 0.5rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.74rem;
+  color: var(--mirn-ink-muted);
+}
+
+/* Below this the figures still break out of the prose column, which on a phone means they run off
+   the side of the screen. Pin them to the viewport instead. */
+@media (max-width: 700px) {
+  .widget {
+    width: auto;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .prose, .page-nav, .contents { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .masthead { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .widget-transport { font-size: 0.68rem; gap: 0.6rem; }
+}

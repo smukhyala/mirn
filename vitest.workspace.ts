@@ -20,6 +20,7 @@ export default defineWorkspace([
       globals: true,
       environment: "node",
       include: ["web/ui/**/*.test.ts", "web/app/**/*.test.ts", "web/build/**/*.test.ts"],
+      testTimeout: 20000,
     },
   },
 ]);

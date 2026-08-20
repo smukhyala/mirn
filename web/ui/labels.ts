@@ -43,6 +43,35 @@ export function variantLabel(variant: string): string {
   return label;
 }
 
+/**
+ * A metre means nothing until it is a body-scale comparison.
+ *
+ * This is guardrail 7 in one function: a length may appear, but never alone. It lives here rather
+ * than beside its first caller because two things need the identical wording — the derivation
+ * panel in `web/notes.ts`, which shows it under a live number, and the `{{q:…anchor}}` token in
+ * `web/build/quantities.ts`, which is the sanctioned escape from the comparative lint. Two copies
+ * of these five phrases would drift, and the drift would be a page whose prose disagreed with the
+ * panel directly below it.
+ *
+ * The bands are ordinary human distances, not round numbers: below the wobble of a normal
+ * walking gait, a part-stride, a stride, a doorway.
+ */
+export function anchorFor(metres: number): string {
+  if (metres < 0.15) {
+    return "less than the wobble of ordinary walking";
+  }
+  if (metres < 0.5) {
+    return "half a stride";
+  }
+  if (metres < 1.0) {
+    return "one stride";
+  }
+  if (metres < 2.0) {
+    return "the width of a doorway";
+  }
+  return "several strides";
+}
+
 /** Estimator and metric names come from their card's title, so the prose lives in one place. */
 export function titleFromCard(
   cards: Readonly<Record<string, { readonly title?: string }>>,

@@ -74,19 +74,19 @@ comparable to the time lost itself.
 
 ## The seven questions
 
-1. [Does pushing harder move people further?](/experiments/push-strength) — corridor-11, except
+1. [Does pushing harder move people further?](./e1-push-strength.html) — corridor-11, except
    the robot demands more space, or less.
-2. [A fuller room: bigger effect, or harder to see?](/experiments/density) — corridor-11, except
+2. [A fuller room: bigger effect, or harder to see?](./e2-density.html) — corridor-11, except
    the number of people in it changes.
-3. [Should it hurry, or should it slow down?](/experiments/robot-speed) — corridor-11, except the
+3. [Should it hurry, or should it slow down?](./e3-robot-speed.html) — corridor-11, except the
    robot's top speed changes.
-4. [Once it has gone past, is everything back to normal?](/experiments/recovery) — corridor-11,
+4. [Once it has gone past, is everything back to normal?](./e4-recovery.html) — corridor-11,
    except the robot's lane shifts away from the middle of the room.
-5. [Can it affect somebody it never went near?](/experiments/propagation) — corridor-11, except
+5. [Can it affect somebody it never went near?](./e5-propagation.html) — corridor-11, except
    the room is fuller and each person is filed by how close the robot ever got to them.
-6. [What if it cannot see properly?](/experiments/perception) — corridor-11, except the robot's
+6. [What if it cannot see properly?](./e6-perception.html) — corridor-11, except the robot's
    picture of where people are is blurred.
-7. [It could go around. Is that worth it?](/experiments/politeness) — corridor-11, except the
+7. [It could go around. Is that worth it?](./e7-politeness.html) — corridor-11, except the
    robot is asked to weigh other people's space against its own arrival.
 
 Most points on those plots are eight runs of corridor-11 at eight different seeds, drawn with the

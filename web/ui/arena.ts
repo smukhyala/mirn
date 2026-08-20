@@ -5,6 +5,20 @@ import { PALETTE, SERIES } from "./theme.js";
  * draw function to a control, which is the specific defect this file exists not to reproduce
  * (the demo's `drawArena` read `ui.ghost.checked` directly).
  */
+/**
+ * The two points a derivation is talking about, drawn on top of everything else.
+ *
+ * Page 2 tells the reader "the two points it came from light up on the canvas", which was not true
+ * of anything until this existed. The pair of glyphs used here — filled for the treated run, hollow
+ * for the control — is the same pair the derivation panel prints in its operand column, so the
+ * equation and the picture stay tied together.
+ */
+export interface ArenaHighlight {
+  readonly agentIndex: number;
+  readonly labelP: string;
+  readonly labelQ: string;
+}
+
 export interface ArenaView {
   readonly widthM: number;
   readonly heightM: number;
@@ -18,6 +32,7 @@ export interface ArenaView {
   readonly trailSamples: number;
   readonly pedRadiusM: number;
   readonly robotRadiusM: number;
+  readonly highlight: ArenaHighlight | null;
 }
 
 interface Transform {
@@ -185,6 +200,10 @@ export function drawArena(
     dot(context, buffer, view.sample, view.pedRadiusM, t, true, PALETTE.ink);
   }
 
+  if (view.highlight !== null) {
+    drawHighlight(context, view, view.highlight, t);
+  }
+
   if (view.robot !== null) {
     const x = t.offsetX + (view.robot[2 * view.sample] as number) * t.scale;
     const y = t.offsetY + (view.robot[2 * view.sample + 1] as number) * t.scale;
@@ -198,3 +217,66 @@ export function drawArena(
     context.strokeRect(x - r, y - r, r * 2, r * 2);
   }
 }
+
+function drawHighlight(
+  context: CanvasRenderingContext2D,
+  view: ArenaView,
+  highlight: ArenaHighlight,
+  t: Transform,
+): void {
+  const a = view.treated[highlight.agentIndex];
+  const b = view.control[highlight.agentIndex];
+  if (a === undefined || b === undefined) {
+    return;
+  }
+
+  // Everything else is dimmed by drawing paper over it at low alpha, rather than by re-rendering
+  // the scene in grey: the reader keeps their bearings, and the two points are unmistakable.
+  context.save();
+  context.globalAlpha = 0.72;
+  context.fillStyle = PALETTE.paper;
+  context.fillRect(
+    t.offsetX,
+    t.offsetY,
+    view.widthM * t.scale,
+    view.heightM * t.scale,
+  );
+  context.restore();
+
+  const px = t.offsetX + (a[2 * view.sample] as number) * t.scale;
+  const py = t.offsetY + (a[2 * view.sample + 1] as number) * t.scale;
+  const qx = t.offsetX + (b[2 * view.sample] as number) * t.scale;
+  const qy = t.offsetY + (b[2 * view.sample + 1] as number) * t.scale;
+
+  context.strokeStyle = PALETTE.perturbation;
+  context.lineWidth = 2;
+  context.setLineDash([]);
+  context.beginPath();
+  context.moveTo(px, py);
+  context.lineTo(qx, qy);
+  context.stroke();
+
+  const radius = Math.max(5, view.pedRadiusM * t.scale);
+  context.beginPath();
+  context.arc(px, py, radius, 0, Math.PI * 2);
+  context.fillStyle = PALETTE.ink;
+  context.fill();
+
+  context.beginPath();
+  context.arc(qx, qy, radius, 0, Math.PI * 2);
+  context.fillStyle = PALETTE.paper;
+  context.fill();
+  context.strokeStyle = PALETTE.inkMuted;
+  context.lineWidth = 1.75;
+  context.stroke();
+
+  context.font = `600 12px ${FALLBACK_MONO}`;
+  context.fillStyle = PALETTE.ink;
+  context.textBaseline = "middle";
+  context.textAlign = "left";
+  context.fillText(highlight.labelP, px + radius + 5, py);
+  context.fillStyle = PALETTE.inkMuted;
+  context.fillText(highlight.labelQ, qx + radius + 5, qy);
+}
+
+const FALLBACK_MONO = 'ui-monospace, "SF Mono", Menlo, monospace';

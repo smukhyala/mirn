@@ -194,6 +194,7 @@ function render(): void {
     trailSamples: 90,
     pedRadiusM: SIM_CONSTANTS.pedRadiusM,
     robotRadiusM: SIM_CONSTANTS.robotRadiusM,
+    highlight: null,
   };
   drawArena(context as CanvasRenderingContext2D, view, box.width, box.height);
 

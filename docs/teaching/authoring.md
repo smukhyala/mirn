@@ -77,6 +77,26 @@ In this crowd, [the model-dependent part]. [What is not model-dependent, and why
 :::
 ```
 
+## Quantity references
+
+Every number in the prose is a reference, resolved at build time against
+`web/data/experiment-facts.json` or against a live widget on the same page. An unresolvable one is
+a build error, and the error names what was available instead.
+
+| Spelling | Means |
+|---|---|
+| `{{q:table[axis=value].column}}` | the row whose axis column equals that value |
+| `{{q:table.column@value}}` | the same thing, in the order a sentence wants it |
+| `{{q:table@3.column}}` | the row at that index; `@first` and `@last` also work |
+| `{{q:table.column}}` | only legal when the table has exactly one row |
+| `{{q:table[…].column.sd}}` | the spread of that column across seeds |
+| `{{q:table.column.min}}` / `.max` | reduce the whole column, for a claim about a whole sweep |
+| `{{q:widget-id}}` | the build-time value of a `mirn:quantity` block on this page |
+| `{{q:widget-id.anchor}}` | the body-scale phrase for that value — "half a stride" |
+
+`e2` is accepted as short for `e2_density`. A reference that resolves to a censored measurement is
+rejected rather than printed, so `NaN` cannot reach a reader.
+
 ## Two lints you must write around
 
 **The comparative lint.** Sentences may quote live figures, but may not assert *relations* a

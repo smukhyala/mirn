@@ -144,6 +144,64 @@ def select_non_interacting_agent(pair: RolloutPair, exclusion_radius_m: float) -
     return candidate_ids[0]
 
 
+def select_closest_approaching_agent(pair: RolloutPair) -> str | None:
+    """The id of the pedestrian that comes nearest the robot at any point in the rollout.
+
+    The deliberate counterpart to `select_non_interacting_agent`, and the reason both exist:
+    that function finds an agent whose removal must *not* move the estimate, this one finds the
+    agent whose removal *must*. A placebo gate built only from the first half passes for an
+    estimator that ignores its inputs entirely, so the negative control needs this selector.
+
+    Distance is measured on the **counterfactual** arm's (undisplaced) pedestrian path against
+    the robot position read from the factual arm, for exactly the reason its sibling above
+    gives: `_generate_pair` only ever displaces a pedestrian *away* from the robot, so a
+    factual-arm closest approach is always `>=` the same pedestrian's counterfactual-arm value.
+    Ranking on the factual arm would therefore rank partly on the displacement the caller is
+    about to measure — selection on the outcome, and here the direction of that bias is exactly
+    the direction that would manufacture a passing negative control. Ranking on the
+    counterfactual arm depends only on the undisturbed path, so the same agent is selected at
+    every influence level for a fixed seed.
+
+    Unlike `select_non_interacting_agent` this takes no radius, which is a real asymmetry and not
+    an oversight: "the nearest pedestrian" is well defined on its own, whereas "non-interacting"
+    means nothing until an exclusion distance is stated. A caller that needs *nearest and
+    genuinely close* asserts the returned agent's approach distance itself.
+
+    Ties are broken toward the lowest `agent_id` so the choice is deterministic. Returns None
+    only when the pair has no pedestrians at all.
+    """
+    robot = pair.factual.robot
+    if robot is None:
+        raise ValueError(
+            "select_closest_approaching_agent requires a factual arm with a robot; got "
+            f"robot_present={pair.factual.robot_present}"
+        )
+    robot_positions = robot.positions
+
+    nearest_agent_id: str | None = None
+    nearest_approach = 0.0
+    for pedestrian in pair.counterfactual.pedestrians:
+        offsets = pedestrian.positions - robot_positions
+        distances = np.sqrt(np.sum(offsets * offsets, axis=1))
+        closest_approach = float(np.min(distances))
+
+        if nearest_agent_id is None:
+            nearest_agent_id = pedestrian.agent_id
+            nearest_approach = closest_approach
+        elif closest_approach < nearest_approach:
+            nearest_agent_id = pedestrian.agent_id
+            nearest_approach = closest_approach
+        elif closest_approach == nearest_approach:
+            # Exact float equality is intended. Two pedestrians tying to the last bit is
+            # vanishingly rare, but "vanishingly rare" is not "deterministic", and a gate that
+            # silently depends on tuple order is a gate that changes answer under a fixture
+            # reshuffle. Lowest agent_id wins, matching select_non_interacting_agent's sort.
+            if pedestrian.agent_id < nearest_agent_id:
+                nearest_agent_id = pedestrian.agent_id
+
+    return nearest_agent_id
+
+
 def _scene_without(scene: Scene, agent_id: str) -> Scene:
     kept: list[object] = []
     for pedestrian in scene.pedestrians:

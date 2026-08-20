@@ -5,22 +5,23 @@
  * with JavaScript disabled the prose and the mathematics must still appear. A reader with a slow
  * connection, a locked-down browser or a screen reader gets the notes; only the widgets need JS.
  *
- * Two lints run here and fail the build, because they are the mechanical form of promises the
- * site makes in prose:
+ * What is left in this file is the part that touches the disk: find the pages, run the checks
+ * over them, write the HTML out, and exit non-zero if anything complained. Everything that is a
+ * function of its inputs lives under web/build/ instead, where it has tests:
  *
- *   - the bare-number lint enforces "never display a number without explaining where it came from"
- *   - the comparative lint stops a sentence asserting a relation a slider could falsify
+ *   lints.ts        the bare-number, comparative, jargon and synonym lints
+ *   vocabulary.ts   front-matter closure against the ladder in web/vocab.ts
+ *   quantities.ts   the {{q:…}} reference resolver, and the wording of its failures
+ *   render.ts       body → HTML, including the maths-before-markdown ordering guarantee
  *
- * A third check enforces the vocabulary ladder: no page may use a term before the page that
- * defines it.
+ * That split is not tidying. Those four are the parts that have actually broken — forty silently
+ * unresolved references and a whole class of vocabulary bug — and a check nobody has watched fire
+ * is a check nobody has.
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join } from "node:path";
 import matter from "gray-matter";
-import MarkdownIt from "markdown-it";
-import katex from "katex";
-import { load as loadYaml } from "js-yaml";
-import { VOCABULARY, type Term } from "../web/vocab.js";
+import { VOCABULARY } from "../web/vocab.js";
 import {
   lintBareNumbers,
   lintComparatives,
@@ -28,12 +29,23 @@ import {
   lintUndefinedSynonyms,
   proseOf,
 } from "../web/build/lints.js";
+import { checkVocabulary, type PageVocabulary } from "../web/build/vocabulary.js";
+import { escapeHtml, renderBody } from "../web/build/render.js";
+import type { FactTable, LiveMetric, QuantityData } from "../web/build/quantities.js";
 import { cssTokens } from "../web/ui/theme.js";
+import {
+  isKnownControl,
+  isKnownMetric,
+  isKnownWidgetKind,
+  WIDGET_KINDS,
+} from "../web/build/widgets.js";
 import FACTS from "../web/data/experiment-facts.json";
 import { makeRunConfig } from "../web/engine/contracts/config.js";
 import { runPair } from "../web/engine/sim/run.js";
 import { deviation } from "../web/engine/measure/metrics.js";
 import { seededPermutations, splitHalfNull } from "../web/engine/measure/null/splitHalf.js";
+import { clearance, robotCost } from "../web/engine/measure/metrics.js";
+import { SIM_CONSTANTS } from "../web/engine/contracts/config.js";
 
 const NOTES_DIRS = ["web/notes", "web/notes/experiments"];
 const OUT_DIR = "web/generated";
@@ -101,67 +113,22 @@ function collect(): Page[] {
 
 // ---------------------------------------------------------------- vocabulary
 
-const BY_ID = new Map<string, Term>(VOCABULARY.map((t) => [t.id, t]));
+// The check is in web/build/vocabulary.ts, with tests. This end only adapts parsed front matter
+// into the records it reads, and turns its problems back into build errors.
 
-function checkVocabulary(pages: readonly Page[]): void {
-  const introducedBy = new Map<string, string[]>();
+function checkFrontMatterClosure(pages: readonly Page[]): void {
+  const declarations: PageVocabulary[] = [];
   for (const page of pages) {
-    for (const id of page.front.introduces ?? []) {
-      if (typeof id !== "string") {
-        fail(
-          page.file,
-          `'introduces' contains ${JSON.stringify(id)}, which is not a string. YAML turns bare ` +
-            `words like null, yes, no and on into literals — quote the id if it looks like one`,
-        );
-        continue;
-      }
-      const term = BY_ID.get(id);
-      if (term === undefined) {
-        fail(page.file, `introduces unknown term '${id}'`);
-        continue;
-      }
-      if (term.page !== page.front.page) {
-        fail(
-          page.file,
-          `introduces '${id}', but vocab.ts says that term belongs on page ${term.page}`,
-        );
-      }
-      const list = introducedBy.get(id) ?? [];
-      list.push(page.file);
-      introducedBy.set(id, list);
-    }
-    for (const id of page.front.uses ?? []) {
-      if (typeof id !== "string") {
-        fail(
-          page.file,
-          `'uses' contains ${JSON.stringify(id)}, which is not a string. YAML turns bare words ` +
-            `like null, yes, no and on into literals — quote the id if it looks like one`,
-        );
-        continue;
-      }
-      const term = BY_ID.get(id);
-      if (term === undefined) {
-        fail(page.file, `uses unknown term '${id}'`);
-        continue;
-      }
-      if (term.page > page.front.page) {
-        fail(
-          page.file,
-          `uses '${id}' on page ${page.front.page}, but it is not defined until page ${term.page}`,
-        );
-      }
-    }
+    declarations.push({
+      file: page.file,
+      page: page.front.page,
+      introduces: page.front.introduces ?? [],
+      uses: page.front.uses ?? [],
+    });
   }
-  for (const [id, files] of introducedBy) {
-    if (files.length > 1) {
-      fail(files.join(" and "), `both introduce '${id}'; a term may be introduced exactly once`);
-    }
-  }
-  // Experiment pages live under page 6, so a term never introduced by a numbered page is a real gap.
-  for (const term of VOCABULARY) {
-    if (!introducedBy.has(term.id)) {
-      errors.push(`vocab.ts: '${term.id}' is never introduced by any page`);
-    }
+  const problems = checkVocabulary(declarations, VOCABULARY);
+  for (const problem of problems) {
+    fail(problem.file, problem.message);
   }
 }
 
@@ -183,9 +150,7 @@ function runLints(page: Page): void {
   }
 }
 
-// ---------------------------------------------------------------- directives
-
-let widgetCounter = 0;
+// ---------------------------------------------------------------- live values
 
 /**
  * Values for the live quantity widgets, computed at build time from the default configuration.
@@ -195,341 +160,53 @@ let widgetCounter = 0;
  * reader with JavaScript off sees "comes to 0.317 m" rather than "comes to —". Half the point of
  * compiling these pages ahead of time was that the argument survives without scripts, and a
  * sentence with a hole in it does not.
+ *
+ * These are metres, not formatted strings, because `{{q:id.anchor}}` has to be able to say which
+ * body-scale band the number falls in. A pre-formatted "0.317 m" cannot be asked that, and the
+ * anchor is the one phrase on the page whose whole promise is that it moves with the number.
  */
-const LIVE_VALUES: Readonly<Record<string, Readonly<Record<string, string>>>> = (() => {
+const LIVE_VALUES: Readonly<Record<string, LiveMetric>> = (() => {
   const result = runPair(makeRunConfig({ nTicks: 800 }));
   const dev = deviation(result.pair);
   const floor = splitHalfNull(result.control.positions, 40, seededPermutations(20260816));
+  const cost = robotCost(result.treated, result.control, result.config.dt);
+  const near = clearance(
+    result.treated.robotPositions,
+    result.treated.positions,
+    SIM_CONSTANTS.robotRadiusM,
+    SIM_CONSTANTS.pedRadiusM,
+    0.5,
+  );
+  // Every metric the runtime can build needs a build-time value too, or a page citing it renders
+  // a hole with JavaScript off. The set is asserted against web/build/widgets.ts by a test, so a
+  // metric added to one and not the other fails rather than silently degrading.
   return {
-    deviation: {
-      default: `${dev.meanM.toFixed(3)} m`,
-      mean: `${dev.meanM.toFixed(3)} m`,
-      max: `${dev.maxM.toFixed(3)} m`,
-    },
-    perturbation: {
-      default: `${dev.meanM.toFixed(3)} m`,
-      mean: `${dev.meanM.toFixed(3)} m`,
-    },
+    deviation: { headlineM: dev.meanM, fieldsM: { mean: dev.meanM, max: dev.maxM } },
+    "deviation-summary": { headlineM: dev.meanM, fieldsM: { mean: dev.meanM, max: dev.maxM } },
+    perturbation: { headlineM: dev.meanM, fieldsM: { mean: dev.meanM, max: dev.maxM } },
     "detection-floor": {
-      default: `${floor.floor.toFixed(3)} m`,
-      floor: `${floor.floor.toFixed(3)} m`,
-      mean: `${floor.mean.toFixed(3)} m`,
+      headlineM: floor.floor,
+      fieldsM: { floor: floor.floor, mean: floor.mean },
+    },
+    timeLost: {
+      headlineM: cost.treatedArrivalS,
+      fieldsM: { path: cost.treatedPathM },
+      unit: "s",
+    },
+    nearMiss: {
+      headlineM: near.nearMissEpisodes,
+      fieldsM: { clearance: near.minM },
+      unit: "count",
     },
   };
 })();
 
-/** widget id -> the metric it renders, collected per page from its mirn:quantity blocks. */
-let quantityWidgets: Map<string, string> = new Map();
-
-function collectQuantityWidgets(body: string): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const match of body.matchAll(/```mirn:quantity\n([\s\S]*?)```/g)) {
-    let config: unknown;
-    try {
-      config = loadYaml(match[1] as string);
-    } catch {
-      continue;
-    }
-    const typed = config as { id?: string; metric?: string };
-    if (typeof typed.id === "string" && typeof typed.metric === "string") {
-      map.set(typed.id, typed.metric);
-    }
-  }
-  return map;
-}
-
-function renderWidget(page: Page, kind: string, yamlish: string): string {
-  const id = `mirn-widget-${widgetCounter++}`;
-  // The block body is parsed HERE, at build time, and embedded as JSON. Handing the client raw
-  // YAML would mean shipping a parser and discovering a typo in the browser; this way a malformed
-  // block fails the build, next to the page that contains it.
-  let config: unknown;
-  try {
-    config = loadYaml(yamlish) ?? {};
-  } catch (error) {
-    fail(page.file, `mirn:${kind} block is not valid YAML: ${(error as Error).message}`);
-    config = {};
-  }
-  const payload = JSON.stringify({ kind, config });
-  return `<div class="widget" id="${id}" data-mirn-widget='${escapeAttribute(payload)}'><noscript><p class="widget-fallback">This is an interactive figure. It needs JavaScript; the argument around it does not.</p></noscript></div>`;
-}
-
-function escapeAttribute(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;");
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-/** Pull out the block constructs before markdown sees them, leaving opaque placeholders. */
-function extractBlocks(page: Page, body: string): { text: string; blocks: string[] } {
-  const blocks: string[] = [];
-  const stash = (html: string): string => {
-    blocks.push(html);
-    return `\n\nMIRNBLOCK${blocks.length - 1}ENDBLOCK\n\n`;
-  };
-
-  let text = body.replace(/```mirn:([a-z]+)\n([\s\S]*?)```/g, (_all, kind: string, inner: string) =>
-    stash(renderWidget(page, kind, inner)),
-  );
-
-  // Maths is stashed here, before markdown-it sees it, and restored already rendered. Rendering it
-  // on the OUTPUT of markdown looks equivalent and is not: markdown treats a backslash as an
-  // escape, so `\;` arrives at KaTeX as `;` and every spacing command in every equation renders
-  // as a stray semicolon. That was visible on the page and invisible in the source.
-  text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_all, tex: string) => {
-    try {
-      return stash(katex.renderToString(tex.trim(), { displayMode: true, throwOnError: true }));
-    } catch (error) {
-      fail(page.file, `display maths failed to render: ${(error as Error).message}`);
-      return stash("");
-    }
-  });
-  text = text.replace(/(?<!\\)\$([^$\n]+?)\$/g, (_all, tex: string) => {
-    try {
-      return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: true });
-    } catch (error) {
-      fail(page.file, `inline maths failed to render: ${(error as Error).message}`);
-      return "";
-    }
-  });
-
-  text = text.replace(/^:::term\{id=([a-z0-9-]+)\}\s*$/gm, (_all, id: string) => {
-    const term = BY_ID.get(id);
-    if (term === undefined) {
-      fail(page.file, `:::term names unknown id '${id}'`);
-      return stash("");
-    }
-    // Rendering a definition and OWNING a term are different things. `introduces` declares
-    // canonical ownership and must be unique across the site, because that is what fixes the
-    // ladder. But a page may usefully restate a definition where the term is being used — the
-    // seven experiment pages all sit on page 6 and each wants the definitions it leans on. So a
-    // :::term is legal on any page at or after the term's own, and illegal before it.
-    if (term.page > page.front.page) {
-      fail(
-        page.file,
-        `:::term{id=${id}} appears on page ${page.front.page}, but that term belongs to page ` +
-          `${term.page} and must not be defined earlier than the ladder says`,
-      );
-    }
-    return stash(
-      `<aside class="term"><p class="term-name">${escapeHtml(term.term)}</p>` +
-        `<p class="term-definition">${escapeHtml(term.definition)}</p></aside>`,
-    );
-  });
-
-  text = text.replace(/^:::caveat\s*$([\s\S]*?)^:::\s*$/gm, (_all, inner: string) =>
-    stash(`<aside class="caveat">${md.render(inner.trim())}</aside>`),
-  );
-
-  return { text, blocks };
-}
-
-// ---------------------------------------------------------------- tokens
-
-interface FactTable {
-  readonly axis: string;
-  readonly nSeeds: number;
-  readonly rows: readonly Record<string, number>[];
-}
-const TABLES = FACTS as unknown as Record<string, FactTable>;
-
-/** Short aliases so a page can write e2 rather than e2_density. */
-const TABLE_ALIASES: Readonly<Record<string, string>> = (() => {
-  const map: Record<string, string> = {};
-  for (const key of Object.keys(TABLES)) {
-    map[key] = key;
-    const short = /^(e\d)_/.exec(key);
-    if (short !== null) {
-      map[short[1] as string] = key;
-    }
-  }
-  return map;
-})();
-
-/**
- * Quantity references are resolved HERE, at build time, against the measured facts.
- *
- * Two reasons, and the second is the one that matters. First, the number then lives in the static
- * HTML, so it survives with JavaScript off like the rest of the prose. Second, an unresolvable
- * reference becomes a BUILD ERROR rather than a silent ellipsis: the first version resolved these
- * in the browser and a page whose references were all wrong rendered as "the average deviation is
- * …" and looked, from the build's point of view, perfectly fine.
- *
- * Syntax, and it is now pinned in docs/teaching/authoring.md because leaving it vague produced
- * three different invented spellings across sixteen pages:
- *
- *   {{q:table[axis=value].column}}   select the row whose axis column equals value
- *   {{q:table@index.column}}         select by row index
- *   {{q:table.column}}               only legal when the table has exactly one row
- *
- * A trailing `.sd` or `_sd` reads the standard deviation across seeds for that column.
- */
-function resolveQuantity(page: Page, raw: string): string | null {
-  // A token may name a live widget on this page rather than a row of the facts table. That is
-  // checked first, because a widget id can look exactly like a table name.
-  const liveMatch = /^([A-Za-z0-9-]+)(?:\.([A-Za-z0-9-]+))?$/.exec(raw.trim());
-  if (liveMatch !== null) {
-    const widgetId = liveMatch[1] as string;
-    const metric = quantityWidgets.get(widgetId);
-    if (metric !== undefined) {
-      const values = LIVE_VALUES[metric];
-      if (values === undefined) {
-        fail(
-          page.file,
-          `{{q:${raw.trim()}}} names widget '${widgetId}', whose metric '${metric}' has no ` +
-            `build-time value. Known metrics: ${Object.keys(LIVE_VALUES).join(", ")}`,
-        );
-        return null;
-      }
-      const field = liveMatch[2] ?? "default";
-      const value = values[field];
-      if (value === undefined) {
-        fail(
-          page.file,
-          `{{q:${raw.trim()}}} asks widget '${widgetId}' for '${field}', which metric '${metric}' ` +
-            `does not provide. Available: ${Object.keys(values).join(", ")}`,
-        );
-        return null;
-      }
-      return value;
-    }
-  }
-
-  // Three spellings the page authors reached for independently, kept because each is the natural
-  // way to say a different thing: pick a row by its axis value, pick one by position, or reduce
-  // the whole column. The `column@value` ordering is normalised into the bracket form rather than
-  // rejected — it reads better in prose and there is no ambiguity in it.
-  let ref = raw.trim();
-  ref = ref.replace(/^([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)@(-?[\d.]+)$/, "$1[@axis=$3].$2");
-
-  const match =
-    /^([A-Za-z0-9_]+)(?:\[(@?[A-Za-z0-9_]+)=(-?[\d.]+)\]|@(\d+|first|last))?\.([A-Za-z0-9_]+)(?:\.(sd|min|max))?$/.exec(
-      ref,
-    );
-  if (match === null) {
-    fail(page.file, `{{q:${ref}}} is not a valid reference. See docs/teaching/authoring.md`);
-    return null;
-  }
-  const [, tableRef, axisKey, axisValue, rowIndex, columnRaw, sdSuffix] = match;
-
-  const tableName = TABLE_ALIASES[tableRef as string];
-  if (tableName === undefined) {
-    fail(
-      page.file,
-      `{{q:${ref}}} names table '${tableRef}', which is not in web/data/experiment-facts.json. ` +
-        `Available: ${Object.keys(TABLES).join(", ")}`,
-    );
-    return null;
-  }
-  const table = TABLES[tableName] as FactTable;
-
-  // `.min` / `.max` reduce the column instead of selecting a row: "between 0.90x and 1.23x" is a
-  // claim about the whole sweep, and spelling it as two hand-picked rows would rot the moment the
-  // sweep changed.
-  if (sdSuffix === "min" || sdSuffix === "max") {
-    const values = table.rows
-      .map((r) => r[columnRaw as string])
-      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-    if (values.length === 0) {
-      fail(page.file, `{{q:${ref}}} has no finite values in column '${columnRaw}'`);
-      return null;
-    }
-    const reduced = sdSuffix === "min" ? Math.min(...values) : Math.max(...values);
-    return formatQuantity(columnRaw as string, reduced);
-  }
-
-  let row: Record<string, number> | undefined;
-  if (axisKey !== undefined && axisValue !== undefined) {
-    const key = axisKey === "@axis" ? table.axis : axisKey;
-    row = table.rows.find((r) => Math.abs((r[key] as number) - Number(axisValue)) < 1e-9);
-    if (row === undefined) {
-      const available = table.rows.map((r) => r[key]).join(", ");
-      fail(page.file, `{{q:${ref}}} found no row with ${key}=${axisValue}. Available: ${available}`);
-      return null;
-    }
-  } else if (rowIndex !== undefined) {
-    if (rowIndex === "first") {
-      row = table.rows[0];
-    } else if (rowIndex === "last") {
-      row = table.rows[table.rows.length - 1];
-    } else {
-      row = table.rows[Number(rowIndex)];
-    }
-    if (row === undefined) {
-      fail(page.file, `{{q:${ref}}} row index ${rowIndex} is out of range (${table.rows.length} rows)`);
-      return null;
-    }
-  } else {
-    if (table.rows.length !== 1) {
-      fail(
-        page.file,
-        `{{q:${ref}}} has no row selector, but '${tableName}' has ${table.rows.length} rows. ` +
-          `Use ${tableRef}[${table.axis}=…] or ${tableRef}@index`,
-      );
-      return null;
-    }
-    row = table.rows[0];
-  }
-
-  let column = columnRaw as string;
-  if (sdSuffix !== undefined) {
-    column = `${column}_sd`;
-  }
-  const value = (row as Record<string, number>)[column];
-  if (value === undefined) {
-    const available = Object.keys(row as Record<string, number>).filter((k) => !k.endsWith("_sd")).join(", ");
-    fail(page.file, `{{q:${ref}}} has no column '${column}' in '${tableName}'. Available: ${available}`);
-    return null;
-  }
-  if (!Number.isFinite(value)) {
-    fail(
-      page.file,
-      `{{q:${ref}}} resolves to ${value}, which is not a number the page can show. That usually ` +
-        `means the measurement was censored for this row — say so in words instead`,
-    );
-    return null;
-  }
-  return formatQuantity(column, value);
-}
-
-/** The unit is carried by the column-name suffix, which is why those suffixes exist. */
-function formatQuantity(column: string, value: number): string {
-  if (column.endsWith("M") || column.endsWith("M_sd")) {
-    return `${value.toFixed(3)} m`;
-  }
-  if (column.endsWith("S") || column.endsWith("S_sd")) {
-    return `${value.toFixed(2)} s`;
-  }
-  if (column.startsWith("n") || column.includes("Episodes")) {
-    // A count of people is a whole number and reads wrong with a decimal point on it ("224.0
-    // people"). A count averaged over seeds is not, and rounding it to 224 would overstate the
-    // precision. Let the value decide.
-    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
-  }
-  return value.toFixed(3);
-}
-
-function renderTokens(page: Page, html: string): string {
-  let out = html.replace(/\{\{lit:([^}]*)\}\}/g, (_all, literal: string) => escapeHtml(literal));
-  out = out.replace(/\{\{q:([^}]*)\}\}/g, (_all, ref: string) => {
-    const resolved = resolveQuantity(page, ref);
-    if (resolved === null) {
-      return `<span class="quantity quantity-broken">?</span>`;
-    }
-    return `<span class="quantity" data-quantity="${escapeHtml(ref.trim())}">${escapeHtml(resolved)}</span>`;
-  });
-  return out;
-}
+const QUANTITIES: QuantityData = {
+  tables: FACTS as unknown as Record<string, FactTable>,
+  live: LIVE_VALUES,
+};
 
 // ---------------------------------------------------------------- shell
-
-const md: MarkdownIt = new MarkdownIt({ html: true, typographer: true });
 
 function shell(page: Page, contentHtml: string, nav: string): string {
   const subtitle =
@@ -662,14 +339,23 @@ ${sections.join("\n")}
 // ---------------------------------------------------------------- main
 
 const pages = collect();
-checkVocabulary(pages);
+checkFrontMatterClosure(pages);
 
+/**
+ * Reading order: 1-6, then the seven experiments, then 7-9, then the colophon.
+ *
+ * Sorting experiments to the end put them AFTER the closing page, so the "previous" link on the
+ * first experiment pointed at the colophon and the last thing before them was the site signing
+ * off. The experiments belong where page 6 introduces them, which is what their `page: 6` already
+ * says — they just have to sort after the page that shares the number rather than after
+ * everything.
+ */
 const ordered = [...pages].sort((a, b) => {
-  if (a.isExperiment !== b.isExperiment) {
-    return a.isExperiment ? 1 : -1;
-  }
   if (a.front.page !== b.front.page) {
     return a.front.page - b.front.page;
+  }
+  if (a.isExperiment !== b.isExperiment) {
+    return a.isExperiment ? 1 : -1;
   }
   return a.front.id < b.front.id ? -1 : 1;
 });
@@ -684,16 +370,26 @@ mkdirSync(OUT_DIR, { recursive: true });
 // guarantee, and this was invisible until the pages were opened.
 writeFileSync("web/theme.gen.css", `/* Generated from web/ui/theme.ts. Do not edit. */\n${cssTokens()}\n`);
 
+// The widget-id counter lives out here rather than inside the renderer so that renderBody holds
+// no state between pages and can be called from a test with a known starting index. Ids only have
+// to be unique within one document; running the counter across the whole build costs nothing and
+// keeps them stable.
+let widgetIndex = 0;
+
 for (let i = 0; i < ordered.length; i++) {
   const page = ordered[i] as Page;
   runLints(page);
 
-  quantityWidgets = collectQuantityWidgets(page.body);
-  const { text, blocks } = extractBlocks(page, page.body);
-  let html = md.render(text);
-  html = renderTokens(page, html);
-  html = html.replace(/<p>MIRNBLOCK(\d+)ENDBLOCK<\/p>/g, (_all, index: string) => blocks[Number(index)] as string);
-  html = html.replace(/MIRNBLOCK(\d+)ENDBLOCK/g, (_all, index: string) => blocks[Number(index)] as string);
+  const rendered = renderBody(page.body, {
+    pageNumber: page.front.page,
+    terms: VOCABULARY,
+    quantities: QUANTITIES,
+    startWidgetIndex: widgetIndex,
+  });
+  widgetIndex = rendered.nextWidgetIndex;
+  for (const problem of rendered.problems) {
+    fail(page.file, problem.message);
+  }
 
   const previous = ordered[i - 1];
   const next = ordered[i + 1];
@@ -706,7 +402,10 @@ for (let i = 0; i < ordered.length; i++) {
     navParts.push(`<a class="nav-next" href="./${next.front.id}.html">${escapeHtml(next.front.title)} →</a>`);
   }
 
-  writeFileSync(join(OUT_DIR, `${page.front.id}.html`), shell(page, html, navParts.join("")));
+  writeFileSync(
+    join(OUT_DIR, `${page.front.id}.html`),
+    shell(page, rendered.html, navParts.join("")),
+  );
 }
 
 // The contents page is written to web/index.html rather than into web/generated/, because Vite

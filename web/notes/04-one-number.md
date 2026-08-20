@@ -40,7 +40,7 @@ a divergence. Pick the other rule and you get another number about the very same
 
 ```mirn:quantity
 id: both-summaries
-metric: deviation
+metric: deviation-summary
 caption: >
   One run of the room, squeezed twice. Click either number and the working opens underneath it:
   the average over the whole curve, and the single tick where that curve tops out.
