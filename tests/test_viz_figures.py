@@ -33,7 +33,7 @@ def test_null_distribution_figure_builds_with_theme_background() -> None:
     rng = np.random.default_rng(0)
     null_samples = rng.gamma(2.0, 0.05, size=200)
     figure = figures.null_distribution_figure(null_samples, 0.2, "ade")
-    assert figure.get_facecolor() == matplotlib.colors.to_rgba(theme.PALETTE.background)
+    assert figure.get_facecolor() == matplotlib.colors.to_rgba(theme.DARK_PALETTE.background)
     assert len(figure.axes) == 1
 
 
@@ -65,7 +65,7 @@ def test_confounding_sweep_figure_plots_reported_and_true() -> None:
     figure = figures.confounding_sweep_figure(_sweep_frame())
     axis = figure.axes[0]
     assert len(axis.lines) >= 2
-    assert figure.get_facecolor() == matplotlib.colors.to_rgba(theme.PALETTE.background)
+    assert figure.get_facecolor() == matplotlib.colors.to_rgba(theme.DARK_PALETTE.background)
 
 
 def test_confounding_sweep_figure_rejects_a_frame_missing_columns() -> None:

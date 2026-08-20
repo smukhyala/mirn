@@ -83,3 +83,20 @@ def test_cards_of_kind_filters() -> None:
 def test_cards_of_kind_rejects_an_unknown_kind() -> None:
     with pytest.raises(ValueError, match="divergence, estimator, calibration"):
         cards_of_kind("metric")
+
+
+def test_every_card_has_a_plain_english_summary() -> None:
+    """The page must be readable by someone with no robotics background, so every card owes a
+    sentence of English before any notation. This makes that a build error."""
+    for key in CARDS:
+        summary = CARDS[key].plain_summary
+        assert len(summary.strip()) > 0, f"{key} has no plain_summary"
+        assert "\\" not in summary, f"{key}'s plain_summary contains LaTeX"
+        assert "$" not in summary, f"{key}'s plain_summary contains LaTeX"
+
+
+def test_plain_summaries_are_actually_sentences_not_labels() -> None:
+    """A three-word fragment is a label, not an explanation. Twenty-five characters is a low bar
+    deliberately — it catches 'The ADE.' without dictating style."""
+    for key in CARDS:
+        assert len(CARDS[key].plain_summary.strip()) >= 25, f"{key}'s plain_summary is too terse"

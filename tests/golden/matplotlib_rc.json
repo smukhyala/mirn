@@ -1,0 +1,14 @@
+{
+  "axes.edgecolor": "#242a31",
+  "axes.facecolor": "#0b0d10",
+  "axes.labelcolor": "#8b949e",
+  "axes.titlecolor": "#e8eaed",
+  "figure.edgecolor": "#0b0d10",
+  "figure.facecolor": "#0b0d10",
+  "grid.color": "#242a31",
+  "legend.labelcolor": "#e8eaed",
+  "savefig.facecolor": "#0b0d10",
+  "text.color": "#e8eaed",
+  "xtick.color": "#8b949e",
+  "ytick.color": "#8b949e"
+}

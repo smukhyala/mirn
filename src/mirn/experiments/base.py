@@ -143,6 +143,9 @@ class Experiment(ABC):
     lookup convenience, not the reading order — so `/api/meta` sorts on this field instead before
     handing the list to the page. Every concrete experiment must declare a unique value; see
     `test_every_registered_experiment_declares_a_unique_order` in `tests/test_experiments.py`."""
+    primary_parameters: tuple[str, ...]
+    """Names the knobs the interface should foreground prominently in the page. Every other
+    parameter is shown under a "more settings" disclosure."""
 
     @abstractmethod
     def parameters(self) -> tuple[ExperimentParameter, ...]:
@@ -199,6 +202,7 @@ class Experiment(ABC):
         described["title"] = self.title
         described["claim"] = self.claim
         described["order"] = self.order
+        described["primary_parameters"] = list(self.primary_parameters)
         described["parameters"] = parameter_rows
         return described
 

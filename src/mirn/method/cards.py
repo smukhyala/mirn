@@ -25,6 +25,14 @@ def _require_text(value: str, field_name: str) -> None:
 def _require_text_tuple(
     values: tuple[str, ...], field_name: str
 ) -> None:
+    """Every entry must be non-empty prose, with no notation in it.
+
+    The notation check is the same rule `plain_summary` already carries, applied to the two
+    fields the interface also renders as plain text. `assumptions` and `breaks_when` are inserted
+    into the page as text nodes and never passed through KaTeX, so a `\\(...\\)` delimiter in one
+    of them reaches the reader verbatim — which is exactly what happened to the split-half null
+    card. Making it a construction error means it cannot come back silently.
+    """
     if len(values) == 0:
         raise ValueError(
             f"MethodCard.{field_name} must contain at least one entry"
@@ -34,6 +42,12 @@ def _require_text_tuple(
             raise ValueError(
                 f"MethodCard.{field_name}[{index}] must be non-empty "
                 "after strip"
+            )
+        if "\\" in values[index] or "$" in values[index]:
+            raise ValueError(
+                f"MethodCard.{field_name}[{index}] must be plain English, not notation; it is "
+                "rendered as text and never passed through a maths renderer, so a LaTeX "
+                "delimiter would reach the reader verbatim. Move the maths to formula_tex."
             )
 
 
@@ -45,6 +59,7 @@ class MethodCard:
     kind: str
     title: str
     one_liner: str
+    plain_summary: str
     estimand_tex: str
     formula_tex: str
     assumptions: tuple[str, ...]
@@ -57,6 +72,12 @@ class MethodCard:
         _require_text(self.key, "key")
         _require_text(self.title, "title")
         _require_text(self.one_liner, "one_liner")
+        _require_text(self.plain_summary, "plain_summary")
+        if "\\" in self.plain_summary or "$" in self.plain_summary:
+            raise ValueError(
+                "MethodCard.plain_summary must be plain English, not notation; it is what a "
+                "reader meets before any formula. Move the maths to formula_tex."
+            )
         _require_text(self.estimand_tex, "estimand_tex")
         _require_text(self.formula_tex, "formula_tex")
         if self.kind not in _KINDS:
@@ -76,6 +97,7 @@ class MethodCard:
         row["kind"] = self.kind
         row["title"] = self.title
         row["one_liner"] = self.one_liner
+        row["plain_summary"] = self.plain_summary
         row["estimand_tex"] = self.estimand_tex
         row["formula_tex"] = self.formula_tex
         row["assumptions"] = list(self.assumptions)

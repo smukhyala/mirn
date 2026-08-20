@@ -211,6 +211,7 @@ class Placebo(Experiment):
         "zero change when there is no robot effect, and a bounded change otherwise."
     )
     order = 4
+    primary_parameters = ("influence", "exclusion_radius_m")
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         exclusion_radius = ExperimentParameter(
@@ -258,7 +259,7 @@ class Placebo(Experiment):
             if agent_id is None:
                 raise ValueError(
                     f"scene '{scene_id}' has no pedestrian farther than {exclusion_radius_m} m "
-                    "from the robot; lower exclusion_radius_m and try again"
+                    "from the robot; lower the exclusion radius and try again"
                 )
             removed_agent_ids[scene_id] = agent_id
             closest_approaches[scene_id] = _closest_approach(pair, agent_id)
@@ -325,7 +326,8 @@ class Placebo(Experiment):
             f"worst case across all removed agents (scene '{worst_scene_id}'), the honest upper "
             "bound on contamination: at this influence level the fixture still applies that "
             f"agent roughly {residual_displacement_m:.3f} m of peak lateral displacement. Exact "
-            "invariance holds only at influence 0.0, where both arms are bitwise identical; at "
+            "invariance holds only at influence 0.0, where the robot-present and robot-absent "
+            "runs follow identical paths step for step; at "
             "influence > 0 this is a bounded sensitivity check, not a proof of zero effect."
         )
 

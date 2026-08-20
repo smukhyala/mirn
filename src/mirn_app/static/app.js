@@ -2,23 +2,26 @@
 // Nothing in this file estimates, calibrates, or sweeps anything.
 
 const DEBOUNCE_MS = 250;
-// Shown on every section's very first paint and on every refresh, before the request that will
-// fill it in has even been sent — never gated behind a delay. Nothing here names which experiment
-// is slow (none of this file branches on experiment.name); on a cold server this happens to be
-// true for whichever section needs the split-half null, and the fast sections simply replace it
-// within a couple hundred milliseconds.
-const PENDING_HINT_TEXT =
-  "computing the split-half null — 200 draws, about a minute on first load, instant afterwards.";
+// Shown on every beat's very first paint and on every refresh, before the request that will fill
+// it in has even been sent — never gated behind a delay. It is deliberately generic: this string
+// appears under all four beats at once on first load, so it can neither name a computation only
+// one of them runs nor quote a count a rendered control can change. It also cannot use a term the
+// page has not defined yet, since it is on screen before any beat's copy has been read.
+const PENDING_HINT_TEXT = "working this out — the first one takes about a minute, then it is instant.";
 
 const state = {
   theme: {},
   seed: 0,
   cards: {},
   experiments: [],
+  scene: null,
 };
 
+// The fallback is a CSS named colour, not a hex/rgb/hsl literal, so it survives the "no colour
+// literal" grep in CLAUDE.md; it is only ever exercised if a draw call somehow runs before
+// boot() populates state.theme from /api/meta, which normal page load never does.
 function token(name) {
-  return state.theme[name] || "#888888";
+  return state.theme[name] || "gray";
 }
 
 async function getJSON(url) {
@@ -81,6 +84,13 @@ function buildCard(card) {
   title.textContent = card.title;
   wrapper.appendChild(title);
 
+  // plain_summary leads, in prose, before any notation: a reader meets English before
+  // mathematics. one_liner stays underneath as the terser technical caption.
+  const plainSummary = document.createElement("p");
+  plainSummary.className = "card-plain-summary";
+  plainSummary.textContent = card.plain_summary;
+  wrapper.appendChild(plainSummary);
+
   const oneLiner = document.createElement("p");
   oneLiner.className = "card-one-liner";
   oneLiner.textContent = card.one_liner;
@@ -133,15 +143,41 @@ function buildCard(card) {
 
 // ---------------------------------------------------------------- canvas plotting
 
-function plotFrame(canvas) {
+// Matches a canvas's backing store to the CSS box it is actually laid out in, times the display's
+// device-pixel ratio, and scales the drawing context so every call site keeps working in CSS
+// pixels. Without this the markup's fixed width/height attributes are stretched or squashed into
+// whatever the responsive layout gives them — soft paths at 1x and softer on a HiDPI screen.
+//
+// The backing store is only reassigned when it actually changes, because assigning to
+// canvas.width clears the bitmap and resets the transform; drawScene calls this every animation
+// frame. Returns the CSS-pixel dimensions to draw against, falling back to the attribute size if
+// the element is not laid out yet (zero-size rect).
+function fitCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const cssWidth = rect.width || canvas.width;
+  const cssHeight = rect.height || canvas.height;
+  const ratio = window.devicePixelRatio || 1;
+  const backingWidth = Math.round(cssWidth * ratio);
+  const backingHeight = Math.round(cssHeight * ratio);
+  if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
+    canvas.width = backingWidth;
+    canvas.height = backingHeight;
+  }
   const context = canvas.getContext("2d");
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  return { context, width: cssWidth, height: cssHeight };
+}
+
+function plotFrame(canvas) {
+  const fitted = fitCanvas(canvas);
+  const context = fitted.context;
+  context.clearRect(0, 0, fitted.width, fitted.height);
   return {
     context,
     left: 54,
-    right: canvas.width - 16,
+    right: fitted.width - 16,
     top: 16,
-    bottom: canvas.height - 34,
+    bottom: fitted.height - 34,
   };
 }
 
@@ -444,6 +480,40 @@ const STAT_CLASS = {
   paired_debiased: "stat-paired",
 };
 
+// The readout sits three centimetres under prose written for someone who has never read a
+// robotics paper, so it must not print code identifiers at them. An estimator's display name is
+// the `title` its own MethodCard already declares in Python — looked up, never duplicated here —
+// and the raw key survives only as a fallback if a card is ever missing.
+function estimatorLabel(key) {
+  const card = state.cards[key];
+  if (card && card.title) {
+    return card.title;
+  }
+  return key;
+}
+
+// "mdp" is an abbreviation whose only expansion lives inside a card in a disclosure that is
+// closed by default, so it is spelled out at the point of use instead.
+const UNIT_LABEL = {
+  metres: "metres",
+  mdp: "× the detection floor",
+};
+
+function unitLabel(units) {
+  return UNIT_LABEL[units] || units;
+}
+
+// The placebo experiment labels its two rows by variant rather than by estimator; neither value
+// is a card key, so they get plain-English names of their own.
+const VARIANT_LABEL = {
+  full: "Everyone present",
+  pedestrian_removed: "One bystander removed",
+};
+
+function variantLabel(variant) {
+  return VARIANT_LABEL[variant] || variant;
+}
+
 function renderReadout(target, result) {
   target.replaceChildren();
   const rows = result.rows;
@@ -469,7 +539,7 @@ function renderReadout(target, result) {
     if (row.estimator !== undefined) {
       target.appendChild(
         statBlock(
-          row.estimator + " (" + row.units + ")",
+          estimatorLabel(row.estimator) + " (" + unitLabel(row.units) + ")",
           row.value.toFixed(3),
           formatCI(row),
           STAT_CLASS[row.estimator] || ""
@@ -478,7 +548,7 @@ function renderReadout(target, result) {
     } else if (row.variant !== undefined) {
       target.appendChild(
         statBlock(
-          row.variant + " (" + row.units + ")",
+          variantLabel(row.variant) + " (" + unitLabel(row.units) + ")",
           row.value.toFixed(4),
           formatCI(row),
           "stat-paired"
@@ -506,7 +576,14 @@ function buildControl(parameter, onChange) {
     for (const choice of parameter.choices) {
       const option = document.createElement("option");
       option.value = choice;
-      option.textContent = choice;
+      // Divergence choices are card keys, so they carry a declared title; choices that are not
+      // (the sweep's axis) at least lose their underscores rather than reading as code.
+      const card = state.cards[choice];
+      if (card && card.title) {
+        option.textContent = card.title;
+      } else {
+        option.textContent = choice.split("_").join(" ");
+      }
       input.appendChild(option);
     }
     input.value = parameter.default;
@@ -547,150 +624,453 @@ function readParams(form) {
   return params;
 }
 
-// ---------------------------------------------------------------- scene canvas
+// ---------------------------------------------------------------- scene player
+//
+// The scene player. `state.scene` is the last /api/scene payload; `player` is view state only —
+// no measured quantity is derived here. The gap shown comes from the API's gap_series.
+const player = { step: 0, playing: true, lastFrameMs: 0, accumulatorMs: 0 };
 
-async function drawScene(influence) {
-  const canvas = document.getElementById("scene-canvas");
-  const context = canvas.getContext("2d");
-  const scene = await getJSON(
-    "/api/scene?influence=" + influence + "&seed=" + state.seed + "&scene_index=0"
-  );
+function sceneScales(width, height, extent) {
+  const pad = 22;
+  return {
+    x: makeScale(0, extent.width, pad, width - pad),
+    y: makeScale(0, extent.height, height - pad, pad),
+  };
+}
 
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  const padding = 18;
-  const xScale = makeScale(0, scene.extent.width, padding, canvas.width - padding);
-  const yScale = makeScale(0, scene.extent.height, canvas.height - padding, padding);
+function drawScene(canvas, scene, step) {
+  const fitted = fitCanvas(canvas);
+  const context = fitted.context;
+  context.clearRect(0, 0, fitted.width, fitted.height);
+  const scale = sceneScales(fitted.width, fitted.height, scene.extent);
 
-  // The arena itself, drawn from the API's extent (never a hardcoded box size) and behind
-  // everything else, so trajectories read as people crossing part of a room rather than paths
-  // floating in a void.
-  const arenaLeft = xScale(0);
-  const arenaRight = xScale(scene.extent.width);
-  const arenaTop = yScale(scene.extent.height);
-  const arenaBottom = yScale(0);
+  // The arena, so the paths read as people crossing a room rather than lines in a void.
   context.strokeStyle = token("--mirn-grid");
   context.lineWidth = 1;
-  context.strokeRect(arenaLeft, arenaTop, arenaRight - arenaLeft, arenaBottom - arenaTop);
+  context.strokeRect(
+    scale.x(0), scale.y(scene.extent.height),
+    scale.x(scene.extent.width) - scale.x(0),
+    scale.y(0) - scale.y(scene.extent.height)
+  );
 
+  // Trails: the robot-absent world as a ghost, the robot-present world solid.
   const arms = [
-    { paths: scene.counterfactual, color: token("--mirn-counterfactual"), width: 1.2 },
-    { paths: scene.factual, color: token("--mirn-factual"), width: 1.6 },
+    { paths: scene.counterfactual, color: token("--mirn-counterfactual"), width: 1.0, alpha: 0.45 },
+    { paths: scene.factual, color: token("--mirn-factual"), width: 1.6, alpha: 1.0 },
   ];
   for (const arm of arms) {
     context.strokeStyle = arm.color;
     context.lineWidth = arm.width;
+    context.globalAlpha = arm.alpha;
     for (const agent of arm.paths) {
       context.beginPath();
-      agent.positions.forEach((point, index) => {
-        const x = xScale(point[0]);
-        const y = yScale(point[1]);
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      });
+      for (let index = 0; index <= step; index += 1) {
+        const point = agent.positions[index];
+        const x = scale.x(point[0]);
+        const y = scale.y(point[1]);
+        if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+      }
       context.stroke();
     }
+    context.globalAlpha = 1;
   }
 
-  context.strokeStyle = token("--mirn-ink-muted");
-  context.globalAlpha = 0.35;
-  context.lineWidth = 0.8;
+  // The connector. This mark IS the robot's effect on that person — the whole thesis in one line
+  // — so it wears the paired estimator's colour: the quantity this line traces out is exactly
+  // what the paired estimator reports below, and the legend's "robot" swatch already claims
+  // --mirn-accent.
+  context.strokeStyle = token("--mirn-paired");
+  context.lineWidth = 1.2;
   for (let index = 0; index < scene.factual.length; index += 1) {
-    const factualPath = scene.factual[index].positions;
-    const counterfactualPath = scene.counterfactual[index].positions;
-    for (let step = 0; step < factualPath.length; step += 8) {
-      context.beginPath();
-      context.moveTo(xScale(counterfactualPath[step][0]), yScale(counterfactualPath[step][1]));
-      context.lineTo(xScale(factualPath[step][0]), yScale(factualPath[step][1]));
-      context.stroke();
-    }
+    const here = scene.factual[index].positions[step];
+    const ghost = scene.counterfactual[index].positions[step];
+    context.beginPath();
+    context.moveTo(scale.x(ghost[0]), scale.y(ghost[1]));
+    context.lineTo(scale.x(here[0]), scale.y(here[1]));
+    context.stroke();
   }
-  context.globalAlpha = 1;
+
+  // Current positions.
+  for (const arm of arms) {
+    context.fillStyle = arm.color;
+    context.globalAlpha = arm.alpha;
+    for (const agent of arm.paths) {
+      const point = agent.positions[step];
+      context.beginPath();
+      context.arc(scale.x(point[0]), scale.y(point[1]), 3, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalAlpha = 1;
+  }
 
   if (scene.robot) {
-    const robotX = xScale(scene.robot[0][0]);
-    const robotY = yScale(scene.robot[0][1]);
+    const robot = scene.robot[0];
+    // Matches the legend's "robot" swatch (--mirn-accent). --mirn-naive is the page's colour for
+    // the flawed naive estimator (.stat-naive, .breaks-when) and must not double as the robot.
     context.fillStyle = token("--mirn-accent");
     context.beginPath();
-    context.arc(robotX, robotY, 6, 0, Math.PI * 2);
+    context.arc(scale.x(robot[0]), scale.y(robot[1]), 7, 0, Math.PI * 2);
     context.fill();
-
     context.fillStyle = token("--mirn-ink-muted");
     context.font = "11px " + (state.theme["--mirn-font-mono"] || "monospace");
     context.textAlign = "left";
-    context.fillText("robot", robotX + 9, robotY + 4);
+    context.fillText("robot", scale.x(robot[0]) + 11, scale.y(robot[1]) + 4);
   }
 }
 
-// ---------------------------------------------------------------- sections
-
-function buildSection(experiment, index) {
-  const template = document.getElementById("section-template");
-  const node = template.content.cloneNode(true);
-  const section = node.querySelector(".experiment");
-
-  section.querySelector(".section-index").textContent = String(index + 1).padStart(2, "0");
-  section.querySelector(".section-title").textContent = experiment.title;
-  section.querySelector(".section-claim").textContent = experiment.claim;
-
-  // Only the first rendered section starts expanded, keyed off its position rather than its
-  // name (no per-experiment branching), so the mathematics is visible immediately without
-  // pushing every plot on the page below the fold.
-  if (index === 0) {
-    section.querySelector(".mathematics").setAttribute("open", "");
+// Largest current gap, read from the API's series. Never computed here.
+function widestGapAt(scene, step) {
+  let widest = 0;
+  for (const entry of scene.gap_series) {
+    const gap = entry.gaps[step];
+    if (gap > widest) widest = gap;
   }
+  return widest;
+}
 
-  const form = section.querySelector(".controls");
-  const output = section.querySelector(".output");
-  const readout = section.querySelector(".readout");
-  const canvas = section.querySelector("canvas.plot");
-  const note = section.querySelector(".plot-note");
-  const cardsHost = section.querySelector(".cards");
-
-  async function refresh() {
-    output.classList.add("is-pending");
-    const existingError = section.querySelector(".error");
-    if (existingError) existingError.remove();
-    // The pending stat tile and its explanatory line render synchronously, before the fetch
-    // below is even issued — there is no delay to "shorten" because there is no timer here at
-    // all. A viewer never watches a bare "—" waiting for an explanation to catch up.
-    renderPendingReadout(readout, experiment.title);
-
-    try {
-      const result = await postJSON("/api/experiment/" + experiment.name, {
-        params: readParams(form),
-        seed: state.seed,
-      });
-      renderReadout(readout, result);
-      drawPlot(canvas, result);
-      note.textContent = result.payload.note || "";
-      cardsHost.replaceChildren();
-      for (const key of result.method_keys) {
-        if (state.cards[key]) {
-          cardsHost.appendChild(buildCard(state.cards[key]));
-        }
+function tick(nowMs) {
+  const scene = state.scene;
+  if (scene) {
+    if (player.lastFrameMs === 0) player.lastFrameMs = nowMs;
+    const elapsedMs = nowMs - player.lastFrameMs;
+    player.lastFrameMs = nowMs;
+    if (player.playing) {
+      // Advance by wall-clock time against the API's dt, so playback is real-time and does not
+      // drift with frame rate.
+      player.accumulatorMs += elapsedMs;
+      const stepMs = scene.dt * 1000;
+      while (player.accumulatorMs >= stepMs) {
+        player.accumulatorMs -= stepMs;
+        player.step = (player.step + 1) % scene.n_steps;
       }
-    } catch (error) {
-      // The pending placeholder ("Computing …" / the split-half-null explanation) would be
-      // actively wrong to leave on screen next to an error, so it is cleared here rather than
-      // left to linger — the error message is the whole story for this refresh.
-      readout.replaceChildren();
-      const message = document.createElement("p");
-      message.className = "error";
-      message.textContent = error.message;
-      output.appendChild(message);
-    } finally {
-      output.classList.remove("is-pending");
+    }
+    drawScene(document.getElementById("scene-canvas"), scene, player.step);
+    // Bare numbers: index.html prints the unit as a literal after each <output>, so appending
+    // one here too rendered "0.0 s s" and "0.000 m m" on screen.
+    document.getElementById("scene-clock").textContent = (player.step * scene.dt).toFixed(1);
+    document.getElementById("scene-gap").textContent =
+      widestGapAt(scene, player.step).toFixed(3);
+    const scrub = document.getElementById("scene-scrub");
+    if (document.activeElement !== scrub) {
+      scrub.max = String(scene.n_steps - 1);
+      scrub.value = String(player.step);
     }
   }
+  window.requestAnimationFrame(tick);
+}
 
-  const debounced = debounce(refresh, DEBOUNCE_MS);
-  for (const parameter of experiment.parameters) {
-    form.appendChild(buildControl(parameter, debounced));
+// The six knobs Task 6 wired up, each `<input type="range">` paired with an `<output readout>`.
+// `decimals` matches the readout precision already baked into index.html's initial values, so
+// wiring here does not change what the page shows before the first "input" event fires.
+const SCENE_CONTROLS = [
+  { id: "scene-influence", decimals: 2 },
+  { id: "scene-robot-x", decimals: 1 },
+  { id: "scene-robot-y", decimals: 1 },
+  { id: "scene-amplitude", decimals: 2 },
+  { id: "scene-decay", decimals: 2 },
+  { id: "scene-n-pedestrians", decimals: 0 },
+];
+
+function showSceneError(message) {
+  const errorNode = document.getElementById("scene-error");
+  errorNode.textContent = message;
+  errorNode.hidden = false;
+}
+
+function clearSceneError() {
+  const errorNode = document.getElementById("scene-error");
+  errorNode.hidden = true;
+  errorNode.textContent = "";
+}
+
+// Nothing here computes a measured quantity: it reads slider values, builds a query string, and
+// stores whatever /api/scene returns. On a settings change, playback keeps running rather than
+// resetting to step 0 — only `player.step` is clamped into the new scene's range. A failed fetch
+// (the hero element's version of the pending/error pattern the beat sections already use) shows
+// the server's own message in `#scene-error` rather than failing silently to the console; a
+// following successful fetch clears it. This function does not throw — callers do not need a
+// `.catch`.
+async function fetchScene() {
+  const params = new URLSearchParams();
+  params.set("influence", document.getElementById("scene-influence").value);
+  params.set("seed", String(state.seed));
+  params.set("scene_index", "0");
+  params.set("robot_x", document.getElementById("scene-robot-x").value);
+  params.set("robot_y", document.getElementById("scene-robot-y").value);
+  params.set("amplitude", document.getElementById("scene-amplitude").value);
+  params.set("decay", document.getElementById("scene-decay").value);
+  params.set("n_pedestrians", document.getElementById("scene-n-pedestrians").value);
+  try {
+    const scene = await getJSON("/api/scene?" + params.toString());
+    state.scene = scene;
+    const maxStep = scene.n_steps - 1;
+    if (player.step > maxStep) player.step = maxStep;
+    clearSceneError();
+  } catch (error) {
+    showSceneError(error.message);
   }
-  form.addEventListener("submit", (event) => event.preventDefault());
+}
 
-  refresh();
-  return section;
+const debouncedFetchScene = debounce(fetchScene, DEBOUNCE_MS);
+
+function wireSceneControls() {
+  for (const control of SCENE_CONTROLS) {
+    const input = document.getElementById(control.id);
+    const readout = document.getElementById(control.id + "-readout");
+    input.addEventListener("input", () => {
+      readout.textContent = Number(input.value).toFixed(control.decimals);
+      debouncedFetchScene();
+    });
+  }
+}
+
+// Single source of truth for play/pause state, shared by the scrub input and the persistent
+// button below: flips `player.playing`, clears `player.accumulatorMs` on resume so a paused
+// stretch never replays as a burst of catch-up steps, and keeps the button's label in sync.
+function setPlaying(playing) {
+  player.playing = playing;
+  if (playing) {
+    player.accumulatorMs = 0;
+  }
+  document.getElementById("scene-playpause").textContent = playing ? "Pause" : "Play";
+}
+
+// Dragging the scrub pauses and seeks on every "input" event. Releasing it does NOT resume —
+// a viewer who scrubs to inspect a moment should not have playback restart out from under them.
+// Resuming is the persistent play/pause button's job.
+function wireScrub() {
+  const scrub = document.getElementById("scene-scrub");
+  scrub.addEventListener("input", () => {
+    player.step = Number(scrub.value);
+    setPlaying(false);
+  });
+}
+
+function wirePlayPause() {
+  const button = document.getElementById("scene-playpause");
+  button.addEventListener("click", () => {
+    setPlaying(!player.playing);
+  });
+}
+
+// ---------------------------------------------------------------- beat copy
+//
+// The plain-English claim for each experiment's beat, written for a reader who has never read a
+// robotics paper. Keyed by experiment NAME, not by reading position: where a beat lands on the
+// page is decided entirely by the `order` field `/api/meta` supplies (see renderBeats below),
+// never by this table, and never by an `===` comparison against these names anywhere else in this
+// file. A fifth, uncopy-written experiment falls back to its own `claim` field from the API
+// instead of breaking.
+//
+// Each value is an ARRAY of paragraphs, not one blob. A reader meeting "null" and "detection
+// floor" for the first time should meet one definition per breath, so the copy is broken where
+// the ideas break rather than run together. Two standing constraints on every string here:
+// no sentence quotes a figure a rendered control can change (a slider that falsifies the prose
+// is the page lying to whoever moved it), and no sentence describes a state the beat does not
+// load in — where the copy wants the reader at a different setting, it says so imperatively and
+// names the control.
+const BEAT_CLAIMS = {
+  calibration_floor: [
+    "Start with the ruler, before measuring anything with it. Take the crowd with no robot in " +
+      "it at all, split the people into two random halves, and ask how different the two halves " +
+      "look. The answer comes from a divergence: a single number for how far apart two sets of " +
+      "paths are.",
+    "Nothing in this crowd could be responding to a robot, because there is no robot. And yet " +
+      "the number is not zero.",
+    "That leftover has a name. It is the null — the ordinary variation you get between any two " +
+      "halves of the same population, measured with no robot anywhere. Its upper edge is the " +
+      "detection floor: the smallest effect this measurement could ever tell apart from plain " +
+      "noise. An effect below that line is not absent. It is simply invisible at this sample size.",
+    "We have not found a published study of robot-induced perturbation — how far a robot pushes " +
+      "people off the path they would otherwise have walked — that reports this floor. If that " +
+      "holds, the numbers those studies do report have nothing to be judged against. There is no " +
+      "way to tell a real effect from the measurement's own wobble.",
+  ],
+  estimator_comparison: [
+    "In the real world you only ever get to watch one version of events. There is no robot-absent " +
+      "run sitting there to compare against, so most published work guesses at it instead, using " +
+      "a forecaster: predict where a pedestrian was already heading, then measure how far off " +
+      "that prediction turned out to be.",
+    "That prediction error is what most published measurements report as the robot's effect. It " +
+      "comes from an estimator — a formula that turns raw paths into a single number claiming to " +
+      "size up the disturbance.",
+    "Right now the robot in this run is at full strength, and the two methods already disagree. " +
+      "The paired method can look at the robot-absent version of the crowd directly. The standard " +
+      "forecaster-based method cannot, and has to guess.",
+    "Now drag Robot influence down to zero. The robot stops doing anything at all, the two " +
+      "versions of the crowd become the same paths step for step, and the honest answer is " +
+      "exactly zero. That is what the paired method reports.",
+    "The standard method does not. It still reports a substantial disturbance from a robot that " +
+      "did nothing, because what it is really measuring is how wrong its own guess about the " +
+      "pedestrian was. The Forecast horizon slider controls how substantial. Ask the forecaster " +
+      "to predict further ahead and its guess gets worse, and the disturbance it claims to have " +
+      "found grows right along with it. The robot has not changed. Only the guess has.",
+  ],
+  confounding_sweep: [
+    "Here the true disturbance is pinned at exactly zero the whole way across the chart — robot " +
+      "influence set to zero, the same move as in Beat 2. Meanwhile the forecaster behind the " +
+      "standard method is made steadily worse, either by feeding it more noise or by asking it " +
+      "to predict further ahead.",
+    "There is nothing left for it to measure, so the number it reports is tracking only how bad " +
+      "the guess has become. Push the Maximum predictor error slider up and watch that number " +
+      "climb through the detection floor from Beat 1 — the line an effect has to clear before it " +
+      "counts as real — even though the true effect never leaves zero.",
+    "This is the consequence that matters. A robot tuned to make that number small would not be " +
+      "learning to bother people less. It would be learning to move predictably.",
+  ],
+  placebo: [
+    "As a last check, every run of the crowd loses one bystander: a pedestrian who stayed well " +
+      "away from the robot the whole time, deleted from both versions of the world. Then the " +
+      "measurement is taken again.",
+    "A trustworthy measurement should barely notice. Turn Robot influence down to zero and it " +
+      "should not move at all — with no robot, there is nothing a bystander could be carrying a " +
+      "trace of.",
+    "Leave the influence up and it moves a little, and it should. Well away is not the same as " +
+      "untouched, and the small shift you see is the honest size of what is left over. Widen the " +
+      "Exclusion radius and you are asking for a bystander further from the robot, so that shift " +
+      "should shrink.",
+    "What would be damning is a large shift. That would mean the number is being driven by people " +
+      "the robot never went near.",
+  ],
+};
+
+// ---------------------------------------------------------------- beat rendering
+
+function renderCards(container, methodKeys) {
+  container.replaceChildren();
+  for (const key of methodKeys) {
+    const card = state.cards[key];
+    if (card) {
+      container.appendChild(buildCard(card));
+    }
+  }
+}
+
+// Splits one experiment's declared parameters into inline controls (named in its
+// `primary_parameters`) and a "more settings" disclosure for the rest. Reads that field off the
+// experiment descriptor the API supplied — never matches a parameter or experiment name.
+function populateControls(form, experiment, onChange) {
+  form.replaceChildren();
+  const primaryNames = new Set(experiment.primary_parameters);
+  const secondary = [];
+  for (const parameter of experiment.parameters) {
+    if (primaryNames.has(parameter.name)) {
+      form.appendChild(buildControl(parameter, onChange));
+    } else {
+      secondary.push(parameter);
+    }
+  }
+  if (secondary.length > 0) {
+    const details = document.createElement("details");
+    details.className = "more-settings";
+    const summary = document.createElement("summary");
+    summary.textContent = "more settings";
+    details.appendChild(summary);
+    for (const parameter of secondary) {
+      details.appendChild(buildControl(parameter, onChange));
+    }
+    form.appendChild(details);
+  }
+}
+
+function showBeatError(elements, message) {
+  elements.error.textContent = message;
+  elements.error.hidden = false;
+}
+
+function clearBeatError(elements) {
+  elements.error.hidden = true;
+  elements.error.textContent = "";
+}
+
+// Runs one beat's experiment at its form's current parameters and the page seed, then fills in
+// its readout, plot, plot note, and mathematics cards. Shows the shared pending state the instant
+// it starts (never gated behind a delay) and the shared error pattern on failure, matching the
+// scene player's own honesty conventions.
+async function runBeat(experiment, elements) {
+  const params = readParams(elements.form);
+  elements.output.classList.add("is-pending");
+  renderPendingReadout(elements.readout, experiment.title);
+  const pendingPlot = fitCanvas(elements.plot);
+  pendingPlot.context.clearRect(0, 0, pendingPlot.width, pendingPlot.height);
+  elements.note.textContent = "";
+  clearBeatError(elements);
+  try {
+    const result = await postJSON("/api/experiment/" + experiment.name, {
+      params,
+      seed: state.seed,
+    });
+    renderReadout(elements.readout, result);
+    drawPlot(elements.plot, result);
+    elements.note.textContent = result.payload.note || "";
+    renderCards(elements.cards, result.method_keys);
+  } catch (error) {
+    // Clear the pending tile as well as showing the error. Leaving it up puts "Computing … the
+    // first one takes about a minute" permanently above a red error box, which reads as a page
+    // still working on something it has already given up on. Reachable in normal use: raising
+    // Exclusion radius past every pedestrian's closest approach makes the placebo run raise.
+    elements.readout.replaceChildren();
+    showBeatError(elements, error.message);
+  } finally {
+    elements.output.classList.remove("is-pending");
+  }
+}
+
+// Builds all four beats from `beat-template`, in the order `/api/meta` declared — sorted here
+// explicitly rather than assumed pre-sorted, so this file's own ordering guarantee does not
+// silently depend on the server's. No experiment-name branching anywhere in this function: the
+// beat number, the open/closed mathematics disclosure, and the primary/secondary control split
+// all come from fields on `experiment`, never from comparing `experiment.name` to a literal.
+function renderBeats() {
+  const host = document.getElementById("beats");
+  const template = document.getElementById("beat-template");
+  const experiments = state.experiments.slice().sort((a, b) => a.order - b.order);
+
+  for (const experiment of experiments) {
+    const fragment = template.content.cloneNode(true);
+    const indexNode = fragment.querySelector(".section-index");
+    const titleNode = fragment.querySelector(".section-title");
+    const claimNode = fragment.querySelector(".section-claim");
+    const technicalClaimNode = fragment.querySelector(".section-claim-technical");
+    const form = fragment.querySelector(".controls");
+    const output = fragment.querySelector(".output");
+    const readout = fragment.querySelector(".readout");
+    const plot = fragment.querySelector(".plot");
+    const note = fragment.querySelector(".plot-note");
+    const error = fragment.querySelector(".error");
+    const mathDetails = fragment.querySelector(".mathematics");
+    const cards = fragment.querySelector(".cards");
+
+    indexNode.textContent = "Beat " + experiment.order;
+    titleNode.textContent = experiment.title;
+    // A canvas is opaque to a screen reader, so each plot is named from the experiment it draws
+    // — the same treatment #scene-canvas already gets in the static markup.
+    plot.setAttribute("aria-label", experiment.title + " — plot");
+    // Lay copy as one paragraph per idea; a fifth experiment with no entry here falls back to
+    // its Python `claim`, wrapped so the shape is the same either way.
+    const layParagraphs = BEAT_CLAIMS[experiment.name];
+    const paragraphs = layParagraphs || [experiment.claim];
+    claimNode.replaceChildren();
+    for (const paragraph of paragraphs) {
+      const node = document.createElement("p");
+      node.textContent = paragraph;
+      claimNode.appendChild(node);
+    }
+    // The terse technical restatement declared on the Experiment in Python, demoted beneath the
+    // plain-English version. Rendering it is what keeps `Experiment.claim` from being a field
+    // nobody reads, which is how the two copies would silently drift apart. Suppressed when the
+    // fallback above already IS that claim, so an uncopy-written beat does not print it twice.
+    technicalClaimNode.textContent = layParagraphs ? experiment.claim : "";
+    technicalClaimNode.hidden = !layParagraphs;
+    mathDetails.open = experiment.order === 1;
+
+    const elements = { form, output, readout, plot, note, error, cards };
+    const debouncedRun = debounce(() => runBeat(experiment, elements), DEBOUNCE_MS);
+    populateControls(form, experiment, debouncedRun);
+
+    host.appendChild(fragment);
+    runBeat(experiment, elements);
+  }
 }
 
 // ---------------------------------------------------------------- boot
@@ -706,19 +1086,13 @@ async function boot() {
   const methods = await getJSON("/api/methods");
   state.cards = methods.cards;
 
-  const host = document.getElementById("sections");
-  state.experiments.forEach((experiment, index) => {
-    host.appendChild(buildSection(experiment, index));
-  });
+  wireSceneControls();
+  wireScrub();
+  wirePlayPause();
+  await fetchScene();
+  window.requestAnimationFrame(tick);
 
-  const influenceInput = document.getElementById("scene-influence");
-  const influenceReadout = document.getElementById("influence-readout");
-  const redrawScene = debounce(() => {
-    influenceReadout.textContent = Number(influenceInput.value).toFixed(2);
-    drawScene(influenceInput.value);
-  }, DEBOUNCE_MS);
-  influenceInput.addEventListener("input", redrawScene);
-  await drawScene(influenceInput.value);
+  renderBeats();
 
   // /api/export runs all four experiments at their declared defaults, which takes roughly
   // 55 seconds. The button is disabled for the duration so a second click cannot queue a

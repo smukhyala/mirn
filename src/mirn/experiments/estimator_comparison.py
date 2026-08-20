@@ -57,7 +57,8 @@ def influence_parameter(default: float) -> ExperimentParameter:
         step=0.05,
         help_text=(
             "How strongly the robot displaces nearby pedestrians. At 0.0 the robot-present and "
-            "robot-absent arms are bitwise identical, so the true perturbation is exactly zero."
+            "robot-absent versions of the crowd follow identical paths step for step, so the "
+            "true perturbation is exactly zero."
         ),
     )
 
@@ -83,12 +84,13 @@ class EstimatorComparison(Experiment):
     """Three estimators, one dataset, side by side."""
 
     name = "estimator_comparison"
-    title = "What the two estimators report"
+    title = "What the different methods report"
     claim = (
         "On identical data the naive and paired estimators disagree, and only one consults the "
         "robot-absent arm."
     )
     order = 2
+    primary_parameters = ("influence", "horizon_steps")
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         horizon_steps = ExperimentParameter(
@@ -156,8 +158,9 @@ class EstimatorComparison(Experiment):
         payload["divergence"] = divergence
         payload["horizon_steps"] = horizon_steps
         payload["note"] = (
-            "Synthetic data. The two arms share a seed and an exogenous noise realisation, so at "
-            "influence 0.0 they are bitwise identical and the true perturbation is exactly zero."
+            "Synthetic data. The robot-present and robot-absent runs share a seed and the same "
+            "random wobble, so at influence 0.0 they follow identical paths step for step and "
+            "the true perturbation is exactly zero."
         )
 
         return ExperimentResult(

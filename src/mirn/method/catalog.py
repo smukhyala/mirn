@@ -34,6 +34,11 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="divergence",
             title="Average displacement",
             one_liner="Mean pointwise separation between two time-aligned paths.",
+            plain_summary=(
+                "Walk two versions of the same journey side by side, measure the distance "
+                "between the two walkers at every step, and average it. A small number means "
+                "the two journeys stayed close the whole way."
+            ),
             estimand_tex="d_{\\mathrm{ADE}}(a, b) \\;\\ge\\; 0",
             formula_tex=(
                 "\\begin{aligned}"
@@ -62,6 +67,10 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="divergence",
             title="Final displacement",
             one_liner="Separation at the last timestep only.",
+            plain_summary=(
+                "Only look at where the two journeys ended up, and measure how far apart "
+                "those two endpoints are. It ignores everything that happened in between."
+            ),
             estimand_tex="d_{\\mathrm{FDE}}(a, b) \\;\\ge\\; 0",
             formula_tex=(
                 "\\begin{aligned}"
@@ -88,16 +97,22 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="divergence",
             title="Discrete Fréchet distance",
             one_liner="The shortest leash length that lets both paths be walked monotonically.",
+            plain_summary=(
+                "Imagine walking one path while a dog walks the other on a lead, both always "
+                "moving forward. This is the shortest lead that would let you both finish. One "
+                "bad moment sets it, so it reports the worst mismatch rather than the typical "
+                "one."
+            ),
             estimand_tex="d_F(a, b) \\;\\ge\\; 0",
             formula_tex=(
                 "d_F(a,b) \\;=\\; \\min_{\\sigma \\in \\mathcal{M}} \\;"
                 "\\max_{(i,j) \\in \\sigma} \\; \\lVert a_i - b_j \\rVert_2"
             ),
             assumptions=(
-                "Order along each path is meaningful; \\(\\mathcal{M}\\) ranges over monotone "
-                "couplings of the two index sequences.",
-                "Computed by an iterative dynamic program over an explicit \\(T \\times T\\) "
-                "table.",
+                "Order along each path is meaningful: the two paths may only ever be paired up "
+                "moving forward, never by backtracking along either one.",
+                "Computed by an iterative dynamic program over an explicit table of every "
+                "timestep on one path against every timestep on the other.",
             ),
             breaks_when=(
                 "It reports a maximum, so one outlier sample dominates the whole statistic.",
@@ -115,6 +130,11 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="divergence",
             title="Entropic 2-Wasserstein (Sinkhorn)",
             one_liner="Optimal-transport distance between two point clouds with uniform mass.",
+            plain_summary=(
+                "Treat each set of positions as a pile of sand and ask the cheapest way to "
+                "reshape one pile into the other. It compares two crowds as a whole, without "
+                "needing to match up individual people."
+            ),
             estimand_tex=(
                 "W_2(\\alpha, \\beta) \\;=\\; \\Big(\\min_{\\pi \\in \\Pi(\\alpha,\\beta)}"
                 " \\textstyle\\sum_{ij} \\pi_{ij} \\lVert x_i - y_j \\rVert_2^2 \\Big)^{1/2}"
@@ -128,12 +148,12 @@ def _build_cards() -> dict[str, MethodCard]:
             ),
             assumptions=(
                 "Both clouds are treated as empirical measures with uniform marginals.",
-                "Solved by log-domain Sinkhorn iterations for numerical stability at small "
-                "\\(\\varepsilon\\).",
+                "Solved by log-domain Sinkhorn iterations, which stay numerically stable when "
+                "the smoothing strength is small.",
             ),
             breaks_when=(
-                "The entropic regulariser biases the value upward; the bias grows with "
-                "\\(\\varepsilon\\) and does not vanish at finite iteration counts.",
+                "The entropic smoothing biases the value upward; the bias grows with the "
+                "smoothing strength and does not vanish at finite iteration counts.",
                 "It is the slowest divergence here by a wide margin, which makes large "
                 "split-half calibrations expensive.",
             ),
@@ -147,6 +167,12 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="estimator",
             title="Constant-velocity forecast residual",
             one_liner="Standard practice, and the estimator this project exists to critique.",
+            plain_summary=(
+                "Guess where someone was about to walk by assuming they carry straight on at "
+                "their current speed, then measure how far off the guess was. This is the "
+                "method most papers use, and it is the one this project argues is broken: the "
+                "error includes everything the guess got wrong, not just what the robot did."
+            ),
             estimand_tex=_SHARED_ESTIMAND_TEX,
             formula_tex=(
                 "\\hat{\\Delta}^{\\mathrm{CVM}} = \\tfrac{1}{N}\\sum_{n}\\tfrac{1}{K_n}"
@@ -160,7 +186,7 @@ def _build_cards() -> dict[str, MethodCard]:
                 "error — turning, acceleration, sensor noise, model misspecification — that "
                 "would be present in a robot-free world, so the reported number rises with "
                 "predictor error even when the true effect is exactly zero.",
-                "The counterfactual arm is never consulted, so nothing in the computation "
+                "The robot-absent run is never consulted, so nothing in the computation "
                 "references the robot's absence at all.",
                 "A policy trained to minimise it is partly trained to move predictably, which "
                 "is not the same thing as moving unobtrusively.",
@@ -175,6 +201,11 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="estimator",
             title="Paired counterfactual",
             one_liner="Divergence between each pedestrian's factual and robot-absent path.",
+            plain_summary=(
+                "Run the same crowd twice, once with the robot and once without, and measure "
+                "how far each person's two versions drifted apart. Because everything else is "
+                "held identical, that gap is the robot's doing and nothing else."
+            ),
             estimand_tex=_SHARED_ESTIMAND_TEX,
             formula_tex=(
                 "\\hat{\\Delta}^{\\mathrm{paired}} = \\tfrac{1}{N}\\sum_{n}\\tfrac{1}{K_n}"
@@ -183,8 +214,9 @@ def _build_cards() -> dict[str, MethodCard]:
             ),
             assumptions=(_identification_of("paired"),),
             breaks_when=(
-                "The two arms do not actually share a seed and an exogenous noise realisation, "
-                "in which case the divergence picks up ordinary between-rollout variation.",
+                "The robot-present and robot-absent runs do not actually share a seed and the "
+                "same random pedestrian noise, in which case the divergence picks up ordinary "
+                "between-rollout variation rather than the robot's effect.",
                 "It is reported in raw metres, so it has no scale until it is compared against a "
                 "calibrated detection floor.",
                 "The divergence is symmetric, so a pedestrian who approaches the robot out of "
@@ -198,8 +230,17 @@ def _build_cards() -> dict[str, MethodCard]:
         MethodCard(
             key="paired_debiased",
             kind="estimator",
-            title="Paired counterfactual, in MDP units",
+            # The title doubles as the readout tile's label in the page, where the unit is
+            # already spelled out next to it — so it names what the estimator does rather than
+            # repeating "in MDP units" and reading the same thing twice on screen.
+            title="Paired counterfactual, noise-subtracted",
             one_liner="The paired estimate, floor-subtracted and rescaled into detection units.",
+            plain_summary=(
+                "Take the paired measurement and subtract the amount the measurement would "
+                "report even with no robot present, then express what is left as a multiple "
+                "of that noise. A result of 1 means the effect is exactly as big as the "
+                "measurement's own error."
+            ),
             estimand_tex=_SHARED_ESTIMAND_TEX,
             formula_tex=(
                 "\\hat{\\Delta}^{\\mathrm{mdp}} = \\frac{1}{\\mathrm{MDP}_{95}}"
@@ -223,6 +264,12 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="estimator",
             title="Noisy oracle residual (diagnostic)",
             one_liner="A perfect causal predictor corrupted by a known amount of error.",
+            plain_summary=(
+                "A deliberately spoiled predictor: it is told the correct answer and then has "
+                "random error added on top. It exists to show that a method reporting "
+                "prediction error will report a large number even when the robot did nothing "
+                "at all."
+            ),
             estimand_tex=_SHARED_ESTIMAND_TEX,
             formula_tex=(
                 "\\hat{Y}_{n,k} = Y^{(\\mathrm{no\\ robot})}_{n,k} + \\varepsilon,"
@@ -232,12 +279,13 @@ def _build_cards() -> dict[str, MethodCard]:
             ),
             assumptions=(_identification_of("noisy_oracle_residual"),),
             breaks_when=(
-                "Always, by construction. When the true perturbation is zero and \\(d\\) is ADE, "
-                "its expectation is \\(\\sigma\\sqrt{\\pi/2}\\) — a straight line through the "
-                "origin in predictor error, with no dependence on the robot whatsoever.",
+                "Always, by construction. When the true perturbation is zero and the divergence "
+                "is average displacement, the number it reports is directly proportional to the "
+                "injected error — a straight line through the origin in predictor error, with no "
+                "dependence on the robot whatsoever.",
                 "It is a diagnostic instrument for exhibiting that failure, and reporting a "
                 "number from it as a measurement of perturbation would be a category error.",
-                "The counterfactual arm is consulted, but only to be corrupted with noise "
+                "The robot-absent run is consulted, but only to be corrupted with noise "
                 "before comparison — never as a legitimate forecast input. That is what makes "
                 "this look like a residual estimator while testing nothing about the robot.",
             ),
@@ -251,6 +299,11 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="calibration",
             title="Split-half null distribution",
             one_liner="What a divergence reports between two halves of a robot-free crowd.",
+            plain_summary=(
+                "Take a crowd with no robot anywhere near it, split it into two random halves, "
+                "and measure how different the halves look. Repeat many times. Since nothing "
+                "is influencing anybody, whatever you measure here is pure noise."
+            ),
             estimand_tex=(
                 "\\mathcal{N} \\;=\\; \\Big\\{\\, d_{\\text{cloud}}(A_s, B_s) \\,\\Big\\}_{s=1}^{S}"
             ),
@@ -260,8 +313,8 @@ def _build_cards() -> dict[str, MethodCard]:
                 " A_s \\sim \\mathrm{Unif}\\big(\\text{balanced partitions of } \\mathcal{P}\\big)"
             ),
             assumptions=(
-                "\\(\\mathcal{P}\\) is a pedestrian population carrying no robot effect, so any "
-                "divergence between two of its halves is pure measurement noise.",
+                "The pedestrian pool carries no robot effect, so any divergence between two of "
+                "its halves is pure measurement noise.",
                 "Halves are disjoint and drawn afresh on every split from a seeded generator.",
             ),
             breaks_when=(
@@ -280,6 +333,11 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="calibration",
             title="Minimum detectable perturbation",
             one_liner="The detection floor: the effect size resolvable above measurement noise.",
+            plain_summary=(
+                "The size of effect you would have to see before you could tell it apart from "
+                "noise. Anything smaller is not evidence of no effect, only evidence that you "
+                "cannot tell at this sample size."
+            ),
             estimand_tex="\\mathrm{MDP}_{1-\\alpha} \\;=\\; Q_{1-\\alpha}\\big(\\mathcal{N}\\big)",
             formula_tex=(
                 "\\mathrm{MDP}_{95} \\;=\\; Q_{0.95}\\big(\\mathcal{N}\\big), \\qquad"
@@ -305,6 +363,10 @@ def _build_cards() -> dict[str, MethodCard]:
             kind="calibration",
             title="Percentile bootstrap interval",
             one_liner="The confidence interval every estimate is required to carry.",
+            plain_summary=(
+                "Re-draw the same measurements at random, over and over, to see how much the "
+                "answer wobbles. The range it wobbles across is the confidence interval."
+            ),
             estimand_tex=(
                 "\\big[\\, Q_{\\alpha/2}(\\bar{v}^*),\\; Q_{1-\\alpha/2}(\\bar{v}^*) \\,\\big]"
             ),
@@ -315,7 +377,7 @@ def _build_cards() -> dict[str, MethodCard]:
             assumptions=(
                 "The per-pair values are exchangeable, so resampling pairs with replacement "
                 "approximates the sampling distribution of their mean.",
-                "B = 1000 resamples at \\(\\alpha = 0.05\\), from a seeded generator.",
+                "1000 resamples at the 5% level, drawn from a seeded generator.",
             ),
             breaks_when=(
                 "N is small, where the percentile bootstrap undercovers.",

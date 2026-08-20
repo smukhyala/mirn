@@ -12,6 +12,10 @@ two arms are then bitwise identical, not merely close.
 
 The first timestep's displacement is always forced to exactly 0.0 regardless of `influence`, so
 the arms' initial pedestrian state matches exactly — `RolloutPair` requires this of any adapter.
+
+The robot's position, push size, and reach are constructor-settable, but the robot itself remains
+a fixed point for the whole rollout and no pedestrian reacts to it — these are settings on an
+analytic displacement, not motion, and this file is still not a simulator.
 """
 
 from __future__ import annotations
@@ -25,7 +29,6 @@ from mirn.data.base import CHARACTERIZE_COLUMNS, DATASETS, DatasetAdapter, summa
 BOX_WIDTH_M = 20.0
 BOX_HEIGHT_M = 12.0
 _DT = 0.1
-_ROBOT_POSITION_M: tuple[float, float] = (BOX_WIDTH_M / 2.0, BOX_HEIGHT_M / 2.0)
 _ROBOT_AGENT_ID = "robot"
 _BASE_SPEED_MS = 1.2
 _SPEED_NOISE_STD_MS = 0.15
@@ -51,6 +54,9 @@ class SyntheticAdapter(DatasetAdapter):
         n_pedestrians: int = 12,
         n_steps: int = 60,
         seed: int = 0,
+        robot_position: tuple[float, float] | None = None,
+        displacement_amplitude_m: float = DISPLACEMENT_AMPLITUDE_M,
+        displacement_decay_length_m: float = DISPLACEMENT_DECAY_LENGTH_M,
     ) -> None:
         if n_scenes < 1:
             raise ValueError(f"n_scenes must be >= 1, got {n_scenes}")
@@ -58,6 +64,30 @@ class SyntheticAdapter(DatasetAdapter):
             raise ValueError(f"n_pedestrians must be >= 1, got {n_pedestrians}")
         if n_steps < 2:
             raise ValueError(f"n_steps must be >= 2, got {n_steps}")
+        if displacement_amplitude_m < 0.0:
+            raise ValueError(
+                f"displacement_amplitude_m must be >= 0, got {displacement_amplitude_m}"
+            )
+        if displacement_decay_length_m <= 0.0:
+            raise ValueError(
+                "displacement_decay_length_m must be > 0 (it is a divisor), got "
+                f"{displacement_decay_length_m}"
+            )
+        if robot_position is None:
+            resolved_position = (BOX_WIDTH_M / 2.0, BOX_HEIGHT_M / 2.0)
+        else:
+            resolved_position = robot_position
+        if not (0.0 <= resolved_position[0] <= BOX_WIDTH_M):
+            raise ValueError(
+                f"robot_position x must be within 0..{BOX_WIDTH_M}, got {resolved_position[0]}"
+            )
+        if not (0.0 <= resolved_position[1] <= BOX_HEIGHT_M):
+            raise ValueError(
+                f"robot_position y must be within 0..{BOX_HEIGHT_M}, got {resolved_position[1]}"
+            )
+        self.robot_position = resolved_position
+        self.displacement_amplitude_m = displacement_amplitude_m
+        self.displacement_decay_length_m = displacement_decay_length_m
 
         self.n_scenes = n_scenes
         self.n_pedestrians = n_pedestrians
@@ -122,7 +152,7 @@ class SyntheticAdapter(DatasetAdapter):
         )
 
         time_steps = _DT * np.arange(self.n_steps)
-        robot_position = np.array(_ROBOT_POSITION_M, dtype=np.float64)
+        robot_position = np.array(self.robot_position, dtype=np.float64)
 
         factual_trajectories: list[Trajectory] = []
         counterfactual_trajectories: list[Trajectory] = []
@@ -147,8 +177,8 @@ class SyntheticAdapter(DatasetAdapter):
                 if lateral_sign[step_index] == 0.0:
                     lateral_sign[step_index] = 1.0
 
-            decay = np.exp(-distance_from_robot / DISPLACEMENT_DECAY_LENGTH_M)
-            displacement_magnitude = influence * DISPLACEMENT_AMPLITUDE_M * decay
+            decay = np.exp(-distance_from_robot / self.displacement_decay_length_m)
+            displacement_magnitude = influence * self.displacement_amplitude_m * decay
 
             displacement = np.empty((self.n_steps, 2), dtype=np.float64)
             for step_index in range(self.n_steps):

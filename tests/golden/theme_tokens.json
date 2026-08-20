@@ -1,15 +1,15 @@
 {
-  "--mirn-accent": "#b58cf0",
-  "--mirn-background": "#0b0d10",
-  "--mirn-counterfactual": "#5eb1f0",
-  "--mirn-factual": "#f0a35e",
-  "--mirn-floor": "#6b7684",
+  "--mirn-accent": "#5b3fa8",
+  "--mirn-background": "#faf7f2",
+  "--mirn-counterfactual": "#1f5fa8",
+  "--mirn-factual": "#b4541f",
+  "--mirn-floor": "#8a8378",
   "--mirn-font-mono": "'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace",
   "--mirn-font-sans": "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif",
-  "--mirn-grid": "#242a31",
-  "--mirn-ink": "#e8eaed",
-  "--mirn-ink-muted": "#8b949e",
-  "--mirn-naive": "#e5606d",
-  "--mirn-paired": "#4fd1a5",
-  "--mirn-surface": "#14181d"
+  "--mirn-grid": "#ddd6ca",
+  "--mirn-ink": "#141414",
+  "--mirn-ink-muted": "#5c5750",
+  "--mirn-naive": "#a8261f",
+  "--mirn-paired": "#1f6b4a",
+  "--mirn-surface": "#f3efe7"
 }

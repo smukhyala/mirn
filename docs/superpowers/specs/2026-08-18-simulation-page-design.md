@@ -40,7 +40,9 @@ So as a person walks toward the robot, the viewer sees **one person separate int
 
 That image is the project's thesis. It is also exactly what `PairedCounterfactual` computes, so the picture and the number are the same claim.
 
-**Controls:** play, pause, scrub, and a step clock. **Readout:** the widening gap for the person currently nearest the robot.
+**Controls:** play, pause, scrub, and a step clock. **Readout:** the **widest** current gap across all agents — i.e. whoever the robot is displacing most at that instant.
+
+Not "the person nearest the robot", which an earlier draft said: selecting by distance would require the browser to derive a per-agent distance from raw positions, which §4's no-computation rule forbids without a new API field. Widest gap is also the better number — it always foregrounds whoever is most affected, which is exactly the "one person separates into two paths" image this section describes, whereas nearest-to-robot reads near zero for someone spatially close but not yet displaced.
 
 **That gap number is computed server-side**, not in JavaScript. `/api/scene` returns a per-agent `gap_series` (the per-timestep distance between an agent's two arms) alongside the trajectories; the page indexes into it. This preserves the existing rule that the browser renders numbers and never derives them.
 
@@ -80,10 +82,19 @@ The four-section structure is replaced. Each beat is: one plain sentence, the th
 | Beat | Backed by | The point, in the register the page uses |
 |---|---|---|
 | 0 · Two worlds | `/api/scene` | Same crowd, twice, one seed. The gap between a person's two paths *is* the robot's effect. Real life only ever hands you one of these worlds. |
-| 1 · The problem | `estimator_comparison` | Because you only get one world, papers estimate the other with a forecaster. **Switch the robot off entirely.** The honest answer is zero. The standard method still reports about half a metre. |
-| 2 · The floor | `calibration_floor` | With no robot anywhere, split the crowd in half and compare the halves. Still not zero. That is the measurement's own noise, and nobody publishes it — so published numbers have no scale. |
+| 1 · The floor | `calibration_floor` | With no robot anywhere, split the crowd in half and compare the halves. Still not zero. That is the measurement's own noise, and nobody publishes it — so published numbers have no scale. |
+| 2 · The problem | `estimator_comparison` | Because you only get one world, papers estimate the other with a forecaster. **Switch the robot off entirely.** The honest answer is zero. The standard method still reports about half a metre. |
 | 3 · The confound | `confounding_sweep` | Make the forecaster worse and watch the reported number climb through that floor, while the true effect stays pinned at exactly zero. |
 | 4 · The check | `placebo` | Delete a bystander who never went near the robot. A valid measure should not twitch. |
+
+
+**Ordering note.** The floor comes *before* the estimator comparison, matching the `order` fields the
+experiments declare. An earlier draft of this table had them the other way round, on the theory that
+leading with the shocking claim — the standard method reporting half a metre where the truth is zero
+— is the stronger hook. It is, but it does not survive contact with the cards: `estimator_comparison`
+reports `paired_debiased` in MDP units, and that quantity is meaningless until the detection floor
+has been introduced. Establishing the ruler first also stands on its own — *a measurement of nothing
+reads non-zero, and nobody publishes that* is a startling, self-contained fact needing no setup.
 
 ### Keeping the page free of per-experiment branching
 

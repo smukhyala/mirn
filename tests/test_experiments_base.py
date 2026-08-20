@@ -57,6 +57,7 @@ class _Dummy(Experiment):
     title = "Dummy"
     claim = "Nothing at all."
     order = 1
+    primary_parameters = ("influence",)
 
     def parameters(self) -> tuple[ExperimentParameter, ...]:
         return (_float_param(), _choice_param())
