@@ -1,0 +1,3 @@
+/* KaTeX styles for the pre-rendered mathematics. The markup is generated at build time by
+   scripts/build-notes.ts, so no KaTeX JavaScript ships. */
+@import "katex/dist/katex.min.css";

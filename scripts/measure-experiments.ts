@@ -29,10 +29,23 @@ function cfg(seedIndex: number, o: RunConfigOverrides = {}) {
   return makeRunConfig({ seed: BASE_SEED + seedIndex * 7919, nTicks: N_TICKS, ...o });
 }
 
+/**
+ * Mean over the FINITE values, which is a survivorship trap and is why every swept column now
+ * also reports how many runs it actually averaged.
+ *
+ * A censored measurement — recovery that never came inside its tolerance, an arrival that never
+ * happened — comes back NaN and gets dropped here. Recovery time was being averaged over as few
+ * as two of eight runs and presented as a property of the eight, with nothing on the page or in
+ * the facts file to say so. Dropping the value is right; dropping it silently is not.
+ */
 function meanOf(values: readonly number[]): number {
   const finite = values.filter((v) => Number.isFinite(v));
   if (finite.length === 0) return Number.NaN;
   return finite.reduce((a, b) => a + b, 0) / finite.length;
+}
+
+function finiteCount(values: readonly number[]): number {
+  return values.filter((v) => Number.isFinite(v)).length;
 }
 function sdOf(values: readonly number[]): number {
   const finite = values.filter((v) => Number.isFinite(v));
@@ -103,15 +116,30 @@ function sweep(name: string, axis: string, values: readonly number[], build: (v:
     for (const [k, vals] of Object.entries(collected)) {
       row[k] = meanOf(vals);
       row[`${k}_sd`] = sdOf(vals);
+      // How many runs this cell actually averaged. Equal to the seed count unless the measurement
+      // was censored for some of them, which a page citing the cell has to be able to say.
+      row[`${k}_n`] = finiteCount(vals);
     }
     rows.push(row);
   }
   facts[name] = { axis, nSeeds: SEEDS.length, rows };
   console.log(`\n== ${name} (axis: ${axis}, ${SEEDS.length} seeds) ==`);
-  const keys = Object.keys(rows[0]!).filter((k) => !k.endsWith("_sd"));
+  const keys = Object.keys(rows[0]!).filter((k) => !k.endsWith("_sd") && !k.endsWith("_n"));
   console.log(keys.map((k) => k.padStart(13)).join(""));
   for (const row of rows) {
     console.log(keys.map((k) => (row[k] as number).toFixed(3).padStart(13)).join(""));
+  }
+  // Shout about censoring rather than letting it hide inside an average.
+  for (const row of rows) {
+    for (const k of keys) {
+      const n = row[`${k}_n`];
+      if (n !== undefined && n < SEEDS.length) {
+        console.log(
+          `    NOTE ${name} ${axis}=${row[axis]} ${k}: averaged ${n} of ${SEEDS.length} runs; ` +
+            `the rest were censored`,
+        );
+      }
+    }
   }
 }
 
@@ -292,7 +320,7 @@ sweep("e7_politeness", "deflectionWeight", [0, 0.25, 0.5, 1, 2, 3, 4, 6],
   }
   facts["detection_floor"] = { axis: "nPedestrians", nSeeds: SEEDS.length, rows };
   console.log("\n== detection_floor ==");
-  const keys = Object.keys(rows[0]!).filter((k) => !k.endsWith("_sd"));
+  const keys = Object.keys(rows[0]!).filter((k) => !k.endsWith("_sd") && !k.endsWith("_n"));
   console.log(keys.map((k) => k.padStart(16)).join(""));
   for (const r of rows) console.log(keys.map((k) => (r[k] as number).toFixed(3).padStart(16)).join(""));
 }

@@ -4,14 +4,9 @@ import { cvmResidual, paired } from "./engine/measure/estimator/index.js";
 import { replicateBand, type RunToRunBand } from "./engine/measure/null/band.js";
 import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
 import { drawArena, fitCanvas, type ArenaView } from "./ui/arena.js";
-import { cssTokens } from "./ui/theme.js";
 
 // Tokens are injected rather than duplicated in the stylesheet, so the palette has exactly one
 // definition and the canvas and the CSS cannot drift apart.
-const tokenStyle = document.createElement("style");
-tokenStyle.textContent = cssTokens();
-document.head.prepend(tokenStyle);
-
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
   if (node === null) {
