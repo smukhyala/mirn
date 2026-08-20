@@ -1,6 +1,9 @@
 import { SIM_CONSTANTS, type RunConfig } from "../contracts/config.js";
 import { Channel, type NoiseTape } from "../rng/tape.js";
+import type { DisturbanceSpec } from "../contracts/config.js";
+import { applyDisturbances } from "./disturbance.js";
 import { accumulateForces } from "./forces.js";
+import { perceive } from "./perceive.js";
 import { applyCommand, planRobot } from "./robot.js";
 import { ROBOT_UID, type WorldState } from "./state.js";
 
@@ -10,6 +13,8 @@ export interface Scratch {
   readonly fy: Float64Array;
   readonly noiseX: Float64Array;
   readonly noiseY: Float64Array;
+  readonly seenX: Float64Array;
+  readonly seenY: Float64Array;
 }
 
 export function makeScratch(n: number): Scratch {
@@ -18,6 +23,8 @@ export function makeScratch(n: number): Scratch {
     fy: new Float64Array(n),
     noiseX: new Float64Array(n),
     noiseY: new Float64Array(n),
+    seenX: new Float64Array(n),
+    seenY: new Float64Array(n),
   };
 }
 
@@ -34,10 +41,16 @@ export function stepWorld(
   tape: NoiseTape,
   tick: number,
   scratch: Scratch,
+  disturbances: readonly DisturbanceSpec[],
 ): void {
+  // Disturbances land before anything else in the tick, so the trace can say exactly what was
+  // done and then what the ordinary step did with it.
+  applyDisturbances(state, disturbances, tick);
+
   const robot = state.robot;
   if (robot !== null) {
-    const command = planRobot(state, robot, config);
+    const view = perceive(state, config, tape, tick, scratch.seenX, scratch.seenY);
+    const command = planRobot(view, robot, config);
     applyCommand(robot, command, config);
 
     robot.x += robot.vx * config.dt;

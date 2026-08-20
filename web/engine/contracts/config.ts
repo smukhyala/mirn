@@ -1,6 +1,27 @@
 import { fail, requireFinite } from "../core/errors.js";
 import type { TreatmentSpec } from "./pairedRun.js";
 
+export type DisturbanceKind = "impulse" | "goal-shift" | "sensor-dropout";
+
+/**
+ * One scheduled event.
+ *
+ * `atTick` rather than a timestamp: a user clicking "shove" does not mutate the running world, it
+ * appends a spec and the engine re-simulates from tick 0. Every displayed run therefore stays
+ * exactly reproducible from (config, seed) with no hidden history — which is the only form in
+ * which the paired comparison survives someone poking at it.
+ */
+export interface DisturbanceSpec {
+  readonly kind: DisturbanceKind;
+  readonly id: string;
+  readonly atTick: number;
+  readonly durationTicks: number;
+  readonly magnitude: number;
+  readonly headingRad: number;
+  /** -1 targets the robot. */
+  readonly targetUid: number;
+}
+
 /**
  * Every constant of the world, frozen. A run is a pure function of `(RunConfig)` — the seed lives
  * inside it — so a displayed frame is always reproducible from a config alone, with no hidden
@@ -26,9 +47,22 @@ export interface RunConfig {
     readonly maxSpeed: number;
     readonly reactionTimeS: number;
     readonly deflectionWeight: number;
+    /** Multiplier on how much space the robot demands. 0 makes it socially invisible. */
+    readonly repulsionScale: number;
     readonly startXY: readonly [number, number];
     readonly goalXY: readonly [number, number];
   };
+  /**
+   * What the robot believes about where people are. Error here does not make it bump into
+   * anyone; it makes it swerve away from people who are not there, which disturbs people it
+   * never came close to.
+   */
+  readonly perception: {
+    readonly positionSigmaM: number;
+    readonly latencyTicks: number;
+  };
+  /** Scheduled by tick, never by wall clock — so a shove is a variable, not an accident. */
+  readonly disturbances: readonly DisturbanceSpec[];
   /**
    * The demo's robot-blind toggle. Kept because it is the cleanest demonstration on the whole
    * site: switch it off and the true effect is EXACTLY zero while the measured one is not.
@@ -80,20 +114,48 @@ export const DEFAULT_CONFIG: RunConfig = Object.freeze({
     maxSpeed: 1.1,
     reactionTimeS: 0.15,
     deflectionWeight: 0,
+    repulsionScale: 1,
     startXY: Object.freeze([2, 6.5] as [number, number]),
     goalXY: Object.freeze([20, 6.5] as [number, number]),
   }),
+  perception: Object.freeze({ positionSigmaM: 0, latencyTicks: 0 }),
+  disturbances: Object.freeze([] as DisturbanceSpec[]),
   pedestriansSeeRobot: true,
   treatment: Object.freeze({ kind: "robot-presence" as const }),
 });
 
-export function makeRunConfig(overrides: Partial<Omit<RunConfig, "kind">> = {}): RunConfig {
+/**
+ * Overrides are shallow per group rather than all-or-nothing.
+ *
+ * `Partial<RunConfig>` would force every caller that wants to change one robot knob to restate
+ * the whole robot object, which is how a default silently diverges from what a test thinks it is
+ * testing. Each group is independently partial instead.
+ */
+export interface RunConfigOverrides {
+  kind?: "runConfig";
+  seed?: number;
+  replicate?: number;
+  widthM?: number;
+  heightM?: number;
+  dt?: number;
+  nTicks?: number;
+  crowd?: Partial<RunConfig["crowd"]>;
+  robot?: Partial<RunConfig["robot"]>;
+  perception?: Partial<RunConfig["perception"]>;
+  disturbances?: readonly DisturbanceSpec[];
+  pedestriansSeeRobot?: boolean;
+  treatment?: TreatmentSpec;
+}
+
+export function makeRunConfig(overrides: RunConfigOverrides = {}): RunConfig {
   const merged: RunConfig = Object.freeze({
     ...DEFAULT_CONFIG,
     ...overrides,
     kind: "runConfig" as const,
     crowd: Object.freeze({ ...DEFAULT_CONFIG.crowd, ...(overrides.crowd ?? {}) }),
     robot: Object.freeze({ ...DEFAULT_CONFIG.robot, ...(overrides.robot ?? {}) }),
+    perception: Object.freeze({ ...DEFAULT_CONFIG.perception, ...(overrides.perception ?? {}) }),
+    disturbances: Object.freeze([...(overrides.disturbances ?? DEFAULT_CONFIG.disturbances)]),
   });
 
   if (!Number.isInteger(merged.seed)) {
@@ -127,6 +189,38 @@ export function makeRunConfig(overrides: Partial<Omit<RunConfig, "kind">> = {}):
   requireFinite(merged.robot.maxSpeed, "RunConfig.robot.maxSpeed");
   if (merged.robot.maxSpeed < 0) {
     fail(`RunConfig.robot.maxSpeed must be >= 0, got ${merged.robot.maxSpeed}`);
+  }
+  requireFinite(merged.robot.repulsionScale, "RunConfig.robot.repulsionScale");
+  if (merged.robot.repulsionScale < 0) {
+    fail(`RunConfig.robot.repulsionScale must be >= 0, got ${merged.robot.repulsionScale}`);
+  }
+  requireFinite(merged.perception.positionSigmaM, "RunConfig.perception.positionSigmaM");
+  if (merged.perception.positionSigmaM < 0) {
+    fail(
+      `RunConfig.perception.positionSigmaM must be >= 0, got ${merged.perception.positionSigmaM}`,
+    );
+  }
+  if (!Number.isInteger(merged.perception.latencyTicks) || merged.perception.latencyTicks < 0) {
+    fail(
+      `RunConfig.perception.latencyTicks must be a non-negative integer, got ` +
+        `${merged.perception.latencyTicks}`,
+    );
+  }
+  const seenDisturbanceIds = new Set<string>();
+  for (const spec of merged.disturbances) {
+    if (seenDisturbanceIds.has(spec.id)) {
+      fail(`RunConfig.disturbances has duplicate id '${spec.id}'`);
+    }
+    seenDisturbanceIds.add(spec.id);
+    if (!Number.isInteger(spec.atTick) || spec.atTick < 0 || spec.atTick >= merged.nTicks) {
+      fail(
+        `disturbance '${spec.id}' must fire at an integer tick in [0, ${merged.nTicks}), got ` +
+          `${spec.atTick}`,
+      );
+    }
+    if (!Number.isInteger(spec.durationTicks) || spec.durationTicks < 1) {
+      fail(`disturbance '${spec.id}' durationTicks must be >= 1, got ${spec.durationTicks}`);
+    }
   }
   requireFinite(merged.robot.reactionTimeS, "RunConfig.robot.reactionTimeS");
   if (merged.robot.reactionTimeS <= 0) {

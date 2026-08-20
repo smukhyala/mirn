@@ -1,9 +1,10 @@
-import type { RunConfig } from "../contracts/config.js";
+import type { DisturbanceSpec, RunConfig } from "../contracts/config.js";
 import { makePairedRun, type ArmId, type PairedRun } from "../contracts/pairedRun.js";
 import { makeScene, type Scene } from "../contracts/scene.js";
 import { makeTrajectory, type Trajectory } from "../contracts/trajectory.js";
 import { mix4 } from "../rng/mulberry32.js";
 import { makeTape, type NoiseTape } from "../rng/tape.js";
+import { orderedDisturbances } from "./disturbance.js";
 import { agentIdFor, initialState, ROBOT_UID } from "./state.js";
 import { makeScratch, stepWorld } from "./world.js";
 
@@ -28,6 +29,7 @@ export function runArm(
   noiseTape: NoiseTape,
   arm: ArmId,
   withRobot: boolean,
+  disturbances: readonly DisturbanceSpec[],
 ): ArmResult {
   const state = initialState(config, spawnTape, withRobot);
   const scratch = makeScratch(state.n);
@@ -53,7 +55,7 @@ export function runArm(
 
   record(0);
   for (let tick = 0; tick < config.nTicks; tick++) {
-    stepWorld(state, config, noiseTape, tick, scratch);
+    stepWorld(state, config, noiseTape, tick, scratch, disturbances);
     record(tick + 1);
   }
 
@@ -124,8 +126,33 @@ export function runPair(config: RunConfig, nowMs: () => number = () => 0): RunRe
   const treatedHasRobot = true;
   const controlHasRobot = config.treatment.kind !== "robot-presence";
 
-  const treated = runArm(config, spawnTape, noiseTape, "treated", treatedHasRobot);
-  const control = runArm(config, spawnTape, noiseTape, "control", controlHasRobot);
+  // Every disturbance is present in BOTH arms except the one being treated. That is what makes
+  // the pair identify one thing at a time: with a robot-presence treatment both arms carry the
+  // full disturbance list, and with a disturbance treatment the control arm carries the list
+  // minus exactly that spec.
+  const allDisturbances = orderedDisturbances(config);
+  let controlDisturbances = allDisturbances;
+  if (config.treatment.kind === "disturbance") {
+    const treatedId = config.treatment.disturbanceId;
+    controlDisturbances = allDisturbances.filter((spec) => spec.id !== treatedId);
+    if (controlDisturbances.length === allDisturbances.length) {
+      throw new Error(
+        `treatment names disturbance '${treatedId}', which is not in the config's disturbance ` +
+          `list; the control arm would then be identical to the treated one and the pair would ` +
+          `identify nothing`,
+      );
+    }
+  }
+
+  const treated = runArm(config, spawnTape, noiseTape, "treated", treatedHasRobot, allDisturbances);
+  const control = runArm(
+    config,
+    spawnTape,
+    noiseTape,
+    "control",
+    controlHasRobot,
+    controlDisturbances,
+  );
 
   const pair = makePairedRun({
     treated: treated.scene,

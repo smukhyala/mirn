@@ -28,20 +28,30 @@ export interface RunToRunBand {
   readonly samples: Float64Array;
 }
 
-export function replicateBand(config: RunConfig, nReplicates = 6): RunToRunBand {
+/**
+ * `nReplicates` defaults to 8, giving 28 pairs. Six gave 15, and the 95th percentile of 15 samples
+ * is the 14.3rd order statistic — unstable enough that the band visibly jittered between runs of
+ * the same configuration, which is not a property you want in the line every other number is
+ * judged against.
+ */
+export function replicateBand(config: RunConfig, nReplicates = 8): RunToRunBand {
   if (!Number.isInteger(nReplicates) || nReplicates < 2) {
     throw new Error(`replicateBand needs at least 2 replicates, got ${nReplicates}`);
   }
 
-  // Every replicate is a control-condition run: the treatment is switched off, so any difference
-  // between two of them is the measurement's own noise and nothing else.
+  // Every replicate is a ROBOT-ABSENT run. This matters and the first version got it wrong: using
+  // `treatment: none` leaves the robot in both arms, so the robot's own chaotic amplification was
+  // being folded into the "nothing happened" null. The tell was that `repulsionScale` moved the
+  // band at all — a quantity that is supposed to describe the measurement's wobble in a room with
+  // no robot in it was responding to how much space the robot demanded.
   const runs: (readonly Float64Array[])[] = [];
   for (let replicate = 1; replicate <= nReplicates; replicate++) {
     const replicateConfig = makeRunConfig({
       ...config,
       replicate,
-      treatment: { kind: "none" },
+      treatment: { kind: "robot-presence" },
     });
+    // The control arm of a robot-presence pair is the robot-absent world.
     runs.push(runPair(replicateConfig).control.positions);
   }
 

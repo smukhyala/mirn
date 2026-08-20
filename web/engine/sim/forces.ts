@@ -77,6 +77,7 @@ export function accumulateForces(
       if (r2 < SIM_CONSTANTS.robotCutoffM * SIM_CONSTANTS.robotCutoffM && r2 > 1e-12) {
         const r = Math.sqrt(r2);
         const magnitude =
+          config.robot.repulsionScale *
           SIM_CONSTANTS.robotRepulsionA *
           Math.exp(
             (SIM_CONSTANTS.pedRadiusM + SIM_CONSTANTS.robotRadiusM - r) /
