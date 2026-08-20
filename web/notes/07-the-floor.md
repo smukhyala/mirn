@@ -30,10 +30,11 @@ The null is a range, not a single number. Its top edge has a name of its own.
 ```mirn:scene
 id: split-half
 preset: corridor-11-control
-controls: [play, reshuffle]
+controls: [play, scrub]
 caption: >
-  The room from the opening pages with the robot taken out of it. Every person is tinted by which
-  half of the split they landed in. Reshuffle to deal the halves again.
+  The room from the opening pages with the robot taken out of it. This is the population the
+  halves are dealt from: no robot anywhere in it, and every path in it the path somebody would
+  have walked with nothing in their way.
 ```
 
 ## Where the number comes from
@@ -55,8 +56,8 @@ sample size, and to nothing else.
 id: one-split
 metric: detection-floor
 caption: >
-  Click the number. The shuffles it was taken from open underneath it, and the split that landed
-  on the line lights up on the canvas.
+  The working behind the floor: the crowd that was pooled, how many times it was dealt into
+  halves, the range those deals produced, and where the line was drawn through them.
 ```
 
 :::caveat
@@ -83,21 +84,29 @@ pages set every deviation figure against — the band, there. The floor on this 
 line, and the two are never divided by one another.
 
 ```mirn:sweep
-experiment: e2_density
+experiment: detection_floor
 x: nPedestrians
 series:
-  - key: runToRunBandM
-    label: the robot-free spread
+  - key: floorM
+    label: the detection floor
     accent: true
+  - key: nullMeanM
+    label: the middle of the null, for scale
 caption: >
-  At each crowd size, six robot-free runs paired against each other, and the upper edge of what
-  those pairings report, averaged over two crowds. Nothing was done to a single one of these runs.
-  No spread is drawn on this curve, so read its overall climb rather than the step between any two
-  neighbouring points.
+  The floor against how many people were pooled to build it, with no robot in any of these runs.
+  It falls throughout. Nothing about the room changed along this axis and nothing about the robot
+  did either; only the size of the sample did.
 ```
 
-Change how many people are in the room and the spread changes with them. Nothing about the robot
-changed; the room did.
+Change how many people are in the room and the floor changes with them, and it changes a long way:
+it more than halves across this sweep. Nothing about the robot changed, and nothing about how hard
+people push each other changed. Only the number of them being pooled did.
+
+Notice where that leaves this room. Across the whole of that axis the floor stays above the effect
+the robot actually has here. Measured this way, in a crowd this size, the robot's effect on people
+is not something you could tell apart from the shuffle. The paired comparison the earlier pages
+used does not have that problem, because it never estimates anything — but a study that cannot run
+the room twice has no such escape.
 
 That is the mild version of a general complication, and the general version is worth saying
 flatly. Neither of these numbers is a property of the world. Each is a property of what you

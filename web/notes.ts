@@ -1,6 +1,7 @@
 import { makeRunConfig, SIM_CONSTANTS, type RunConfig } from "./engine/contracts/config.js";
 import { runPair, type RunResult } from "./engine/sim/run.js";
 import { deviation } from "./engine/measure/metrics.js";
+import { seededPermutations, splitHalfNull } from "./engine/measure/null/splitHalf.js";
 import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
 import { drawArena, fitCanvas, type ArenaView } from "./ui/arena.js";
 import { drawSweep, type PlotSeries } from "./ui/plot.js";
@@ -42,6 +43,9 @@ const AXIS_LABELS: Readonly<Record<string, string>> = {
 
 const PRESETS: Readonly<Record<string, () => RunConfig>> = {
   "corridor-11": () => makeRunConfig({ nTicks: 800 }),
+  // The same room with nobody responding to the robot, which is how a robot-free crowd is shown:
+  // the control arm of this pair IS the room with no robot in it.
+  "corridor-11-control": () => makeRunConfig({ nTicks: 800, pedestriansSeeRobot: false }),
 };
 
 // ---------------------------------------------------------------- scene widget
@@ -314,7 +318,18 @@ function mountSweep(host: HTMLElement, config: SweepConfig): void {
 
 // ---------------------------------------------------------------- quantity widget
 
-function mountQuantity(host: HTMLElement, config: { readonly caption?: string }): void {
+function mountQuantity(
+  host: HTMLElement,
+  config: { readonly caption?: string; readonly metric?: string },
+): void {
+  // Dispatch on the metric the block asked for. The first version ignored it and always rendered
+  // the deviation working, so the detection-floor panel on page 7 showed two pedestrian
+  // coordinates and a distance — a derivation of something the page was not talking about, sitting
+  // directly under a sentence promising the shuffles it came from.
+  if (config.metric === "detection-floor") {
+    mountFloorDerivation(host);
+    return;
+  }
   const result = runPair(makeRunConfig({ nTicks: 800 }));
   const dev = deviation(result.pair);
   const step = dev.maxAtStep;
@@ -380,6 +395,50 @@ function mountQuantity(host: HTMLElement, config: { readonly caption?: string })
     </div>`;
 }
 
+/**
+ * The detection floor explains itself differently from a deviation: its operands are a population
+ * and a procedure, not two points, so the panel shows what was pooled and what was done to it.
+ */
+function mountFloorDerivation(host: HTMLElement): void {
+  const result = runPair(makeRunConfig({ nTicks: 800 }));
+  const control = result.control.positions;
+  const nullResult = splitHalfNull(control, 40, seededPermutations(20260816));
+  const half = Math.floor(control.length / 2);
+  const sorted = Float64Array.from(nullResult.samples).sort();
+  const lowest = sorted[0] as number;
+  const highest = sorted[sorted.length - 1] as number;
+
+  host.innerHTML = `
+    <div class="derivation">
+      <div class="derivation-column">
+        <p class="derivation-heading">What went in</p>
+        <p>${control.length} people, from the run with no robot in it<br>
+           <span class="derivation-provenance">every position sampled along each crossing</span></p>
+        <p>${nullResult.nSplits} shuffles<br>
+           <span class="derivation-provenance">each dealing ${half} people against ${half}</span></p>
+      </div>
+      <div class="derivation-column">
+        <p class="derivation-heading">How it was combined</p>
+        <p class="mono derivation-chain">
+          each shuffle → one divergence<br>
+          ${nullResult.nSplits} answers, from<br>
+          &nbsp; ${lowest.toFixed(3)} m to ${highest.toFixed(3)} m<br>
+          floor = 95th percentile<br>
+          &nbsp; = ${nullResult.floor.toFixed(4)} m
+        </p>
+        <p class="derivation-units">all lengths in metres</p>
+      </div>
+      <div class="derivation-column">
+        <p class="derivation-heading">What it means</p>
+        <p>Split this robot-free crowd in half at random and the two halves differ by
+           <span class="accent-number">${nullResult.floor.toFixed(2)} m</span> or less on
+           ${Math.round(95)} shuffles in a hundred. No robot was involved in any of them.</p>
+        <p class="derivation-anchor">An effect smaller than that is not absent. It is invisible at
+           this many people.</p>
+      </div>
+    </div>`;
+}
+
 /** A metre means nothing until it is a body-scale comparison. */
 function anchorFor(metres: number): string {
   if (metres < 0.15) {
@@ -421,7 +480,7 @@ for (const host of Array.from(document.querySelectorAll<HTMLElement>("[data-mirn
   } else if (parsed.kind === "sweep") {
     mountSweep(host, parsed.config as SweepConfig);
   } else if (parsed.kind === "quantity") {
-    mountQuantity(host, parsed.config as { caption?: string });
+    mountQuantity(host, parsed.config as { caption?: string; metric?: string });
   } else {
     host.textContent = `unknown figure type '${parsed.kind}'`;
     host.classList.add("widget-error");
