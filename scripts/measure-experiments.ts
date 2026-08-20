@@ -1,5 +1,8 @@
 /**
- * Runs every curated experiment and writes the numbers to results/experiment-facts.json.
+ * Runs every curated experiment and writes the numbers to web/data/experiment-facts.json.
+ *
+ * Not results/, which is gitignored because it holds reproducible experiment output. This file is
+ * a BUILD INPUT: the notes pages cite it and the sweep figures read it, so it is committed.
  *
  * This exists because the explanation paragraph for an experiment cannot honestly be written
  * before the experiment has been run. Prose that asserts a phenomenon the reader is watching not
@@ -263,6 +266,6 @@ sweep("e7_politeness", "deflectionWeight", [0, 0.25, 0.5, 1, 2, 3, 4, 6],
   for (const r of rows) console.log(keys.map((k) => (r[k] as number).toFixed(4).padStart(18)).join(""));
 }
 
-mkdirSync("results", { recursive: true });
-writeFileSync("results/experiment-facts.json", JSON.stringify(facts, null, 2) + "\n");
-console.log("\nwrote results/experiment-facts.json");
+mkdirSync("web/data", { recursive: true });
+writeFileSync("web/data/experiment-facts.json", JSON.stringify(facts, null, 2) + "\n");
+console.log("\nwrote web/data/experiment-facts.json");

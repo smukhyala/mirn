@@ -1,3 +1,18 @@
+> **ARCHIVED — 2026-08-20.**
+>
+> This document describes a research programme MIRN is no longer pursuing: a measurement
+> instrument for robot-induced perturbation of pedestrian motion, aimed at publication. MIRN is now
+> an interactive learning environment. See the repository README.
+>
+> **Nothing in this file governs current work, and no claim in it has been re-verified since it was
+> written.** Every `UNVERIFIED` marker below stands exactly as it was, and §17's own caveat about
+> rate-limited searches applies to every negative claim it makes. If the teaching material takes a
+> claim from here, it cites the primary source directly rather than citing this document.
+>
+> Prepending this block is the only edit made to it. The body below is unchanged.
+
+---
+
 # MIRN Research Wayfinder
 
 **Minimum-Intervention Robot Navigation — literature assessment and project scoping**

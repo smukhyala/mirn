@@ -182,3 +182,197 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   font-size: 0.86rem;
   line-height: 1.5;
 }
+
+/* ---------------------------------------------------------------- notes pages */
+
+.notes-page .masthead { padding-bottom: 1.5rem; }
+.page-subtitle { margin: 0; color: var(--mirn-ink-faint); font-size: 0.95rem; }
+
+.prose {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: block;
+}
+.prose p { margin: 0 0 1.15rem; }
+.prose h2 {
+  margin: 2.5rem 0 1rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.prose em { font-style: italic; }
+.prose a { color: var(--mirn-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+/* A definition is set apart from the argument, because it is a thing to come back to rather than
+   a thing to read through. */
+.term {
+  margin: 1.5rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--mirn-rule);
+  background: var(--mirn-surface);
+}
+.term-name {
+  margin: 0 0 0.35rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.64rem;
+  color: var(--mirn-ink-faint);
+}
+.term-definition { margin: 0; font-size: 0.94rem; }
+
+/* Caveats are always last in their section. Set quietly, so they read as a scientist finishing a
+   thought rather than as a disclaimer. */
+.caveat {
+  margin: 1.75rem 0;
+  padding-left: 1rem;
+  border-left: 2px solid var(--mirn-rule);
+  font-size: 0.88rem;
+  font-style: italic;
+  color: var(--mirn-ink-muted);
+}
+.caveat p { margin: 0 0 0.6rem; }
+.caveat p:last-child { margin: 0; }
+
+/* Figures break out of the prose column: they are the thing being discussed, not an aside. */
+.widget {
+  margin: 2rem 0;
+  width: min(64rem, calc(100vw - 4rem));
+  margin-left: calc(50% - min(32rem, calc(50vw - 2rem)));
+}
+.widget-arena {
+  width: 100%;
+  aspect-ratio: 22 / 13;
+  display: block;
+  background: var(--mirn-paper);
+  border: 1px solid var(--mirn-rule);
+}
+.widget-plot {
+  width: 100%;
+  aspect-ratio: 16 / 8;
+  display: block;
+  background: var(--mirn-paper);
+  border: 1px solid var(--mirn-rule);
+}
+.widget-transport {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  color: var(--mirn-ink-muted);
+}
+.widget-scrub { flex: 1 1 12rem; }
+.widget-toggle { display: flex; align-items: center; gap: 0.4rem; }
+.widget-caption,
+.widget-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--mirn-ink-muted);
+}
+.widget-fallback {
+  margin: 0;
+  padding: 1.5rem;
+  border: 1px dashed var(--mirn-rule);
+  font-size: 0.85rem;
+  color: var(--mirn-ink-muted);
+}
+.widget-error {
+  padding: 1rem;
+  border: 1px solid var(--mirn-perturbation);
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+}
+.widget-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.7rem;
+  color: var(--mirn-ink-muted);
+}
+.widget-legend li::before {
+  content: "";
+  display: inline-block;
+  width: 1.4rem;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+.legend-accent::before { border-top: 2px solid var(--mirn-perturbation); }
+.legend-grey::before { border-top: 1.5px dashed var(--mirn-ink-muted); }
+
+/* The derivation panel. Three columns, hairlines, no box and no shadow: it is a worked answer,
+   not a card. It never covers the figure it explains. */
+.derivation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--mirn-rule);
+  border-bottom: 1px solid var(--mirn-rule);
+  font-size: 0.82rem;
+}
+@media (max-width: 780px) { .derivation { grid-template-columns: minmax(0, 1fr); } }
+.derivation-heading {
+  margin: 0 0 0.6rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.6rem;
+  color: var(--mirn-ink-faint);
+}
+.derivation .mono { font-family: var(--mirn-font-mono); font-variant-numeric: tabular-nums; }
+.derivation-chain { line-height: 1.9; }
+.derivation-provenance { color: var(--mirn-ink-faint); font-size: 0.76rem; }
+.derivation-units { color: var(--mirn-ink-faint); font-size: 0.72rem; }
+.derivation-anchor { color: var(--mirn-ink-muted); }
+.accent-number { color: var(--mirn-perturbation); font-family: var(--mirn-font-mono); }
+/* The same glyph pair appears on the canvas, so the equation and the picture stay tied together. */
+.glyph-filled { color: var(--mirn-ink); }
+.glyph-hollow { color: var(--mirn-ink-muted); }
+
+.quantity {
+  font-family: var(--mirn-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--mirn-perturbation);
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+
+.page-nav {
+  max-width: 40rem;
+  margin: 3rem auto 0;
+  padding: 1.1rem 2rem 0;
+  border-top: 1px solid var(--mirn-rule);
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+}
+.page-nav a { color: var(--mirn-ink-muted); text-decoration: none; }
+.page-nav a:hover { color: var(--mirn-ink); text-decoration: underline; }
+.nav-next { margin-left: auto; }
+
+/* Contents */
+.contents { max-width: 44rem; margin: 0 auto; padding: 0 2rem; }
+.contents-part {
+  margin: 2.5rem 0 0.75rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.64rem;
+  color: var(--mirn-ink-faint);
+}
+.contents ol { list-style: none; margin: 0; padding: 0; }
+.contents li { padding: 0.55rem 0; border-bottom: 1px solid var(--mirn-grid); }
+.contents a { color: var(--mirn-ink); text-decoration: none; font-weight: 500; }
+.contents a:hover { text-decoration: underline; }
+.contents .contents-subtitle { display: block; color: var(--mirn-ink-faint); font-size: 0.82rem; font-weight: 400; }
