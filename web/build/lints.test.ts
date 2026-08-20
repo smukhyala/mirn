@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lintBareNumbers, lintComparatives, proseOf } from "./lints.js";
+import { lintBareNumbers, lintComparatives, lintForwardTerms, proseOf } from "./lints.js";
 
 describe("proseOf", () => {
   it("removes front matter, so declared page numbers are not read as prose", () => {
@@ -85,5 +85,43 @@ describe("the comparative lint", () => {
   it("permits a comparative between two fixed measured values", () => {
     // The rule is about live numbers, not about comparison. Prose comparing two facts is fine.
     expect(lintComparatives(proseOf("the effect grows faster than the floor does"))).toEqual([]);
+  });
+});
+
+describe("the jargon gate", () => {
+  const LADDER = [
+    { id: "deviation", term: "deviation", page: 2 },
+    { id: "the-null", term: "the null", page: 7 },
+    { id: "confound", term: "confound", page: 8 },
+  ];
+
+  it("catches a term used before the page that defines it", () => {
+    const problems = lintForwardTerms("The confound is obvious here.", 3, [], LADDER);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.rule).toBe("forward-term");
+    expect(problems[0]?.message).toContain("page 8");
+  });
+
+  it("permits a term on its own introducing page", () => {
+    expect(lintForwardTerms("A confound is a thing.", 8, ["confound"], LADDER)).toEqual([]);
+  });
+
+  it("permits a term on any later page", () => {
+    expect(lintForwardTerms("The confound again.", 9, [], LADDER)).toEqual([]);
+  });
+
+  it("matches whole words only, so a longer word does not trip it", () => {
+    // "nullify" must not read as "the null", and "deviations" should — inflection is a word
+    // boundary away, a different word is not.
+    expect(lintForwardTerms("This nullifies the point.", 1, [], LADDER)).toEqual([]);
+  });
+
+  it("matches a multi-word term as a phrase", () => {
+    expect(lintForwardTerms("Compare against the null.", 3, [], LADDER)).toHaveLength(1);
+    expect(lintForwardTerms("A null result is fine.", 3, [], LADDER)).toEqual([]);
+  });
+
+  it("is case-insensitive, because a sentence may open with the term", () => {
+    expect(lintForwardTerms("Deviation is what we measure.", 1, [], LADDER)).toHaveLength(1);
   });
 });

@@ -40,7 +40,7 @@ export const COMPARATIVES =
   /\b(more than|less than|greater than|fewer than|larger than|smaller than|bigger than|higher than|lower than|about (?:half|twice|three times)|twice|half of|roughly \w+ times|times (?:the|as))\b/i;
 
 export interface LintProblem {
-  readonly rule: "bare-number" | "comparative";
+  readonly rule: "bare-number" | "comparative" | "forward-term";
   readonly found: string;
   readonly message: string;
 }
@@ -80,6 +80,57 @@ export function lintComparatives(prose: string): LintProblem[] {
         message:
           `comparative "${found[0]}" sits within 80 characters of ${match[0]} — a slider could ` +
           `falsify it. Use {{q:...anchor}} instead, or move the claim away from the live number`,
+      });
+    }
+  }
+  return problems;
+}
+
+/**
+ * The jargon gate: no prose may use a term before the page that defines it.
+ *
+ * This existed as a comment in web/vocab.ts describing a check the build did not perform. The
+ * front-matter closure check only ever compared two DECLARED lists against each other, so a page
+ * could use any term it liked as long as it did not mention it in its own front matter — which is
+ * the opposite of a guarantee. A cross-page audit found the gap; the ladder happened to hold
+ * anyway, by luck rather than by build.
+ *
+ * The introducing sentence is exempt: a term's own definition necessarily contains it, and the
+ * `:::term` callout is rendered from vocab.ts rather than written into the page.
+ */
+export interface LadderTerm {
+  readonly id: string;
+  readonly term: string;
+  readonly page: number;
+}
+
+export function lintForwardTerms(
+  prose: string,
+  pageNumber: number,
+  introduces: readonly string[],
+  terms: readonly LadderTerm[],
+): LintProblem[] {
+  const problems: LintProblem[] = [];
+  for (const entry of terms) {
+    if (entry.page <= pageNumber) {
+      continue;
+    }
+    if (introduces.includes(entry.id)) {
+      continue;
+    }
+    // Word-boundary, case-insensitive, and the multi-word terms are matched whole so that "the
+    // null" does not fire on "null" inside a longer word.
+    const escaped = entry.term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`\\b${escaped}\\b`, "i");
+    const found = prose.match(pattern);
+    if (found !== null) {
+      problems.push({
+        rule: "forward-term",
+        found: found[0],
+        message:
+          `page ${pageNumber} uses "${found[0]}", but the vocabulary ladder does not define ` +
+          `'${entry.id}' until page ${entry.page}. Either move the term later, define it earlier ` +
+          `in web/vocab.ts, or say it in plain words here`,
       });
     }
   }

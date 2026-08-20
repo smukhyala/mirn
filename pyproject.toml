@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mirn"
 version = "0.1.0"
-description = "A measurement instrument for robot-induced perturbation of pedestrian motion."
+description = "The measurement oracle behind MIRN, an interactive notebook about perturbation."
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
@@ -16,15 +16,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-app = [
-    "fastapi",
-    "uvicorn[standard]",
-]
 dev = [
     "pytest",
     "hypothesis",
     "ruff",
-    "httpx",
 ]
 
 [project.scripts]
@@ -33,19 +28,13 @@ mirn = "mirn.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-mirn_app = ["static/*", "static/vendor/katex/*", "static/vendor/katex/fonts/*"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Task 13: importing `fastapi.testclient` (which re-exports `starlette.testclient.TestClient`)
-# unconditionally emits this warning under the installed starlette/httpx combination, regardless
-# of any code in this repo -- it fires on `import starlette.testclient` alone, before any test
-# runs. Starlette's suggested fix is a separate `httpx2` package, which is a new dependency this
-# project does not add. Ignore only this exact, known, pre-existing warning; nothing else here is
-# suppressed.
-filterwarnings = [
-    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+markers = [
+    # The split-half nulls and the Sinkhorn solver dominate the suite's runtime. Marking them lets
+    # `pytest -q -m "not slow"` serve the tight loop while the full suite runs before a push. A
+    # pre-commit gate nobody runs because it takes five minutes is not a gate.
+    "slow: computations heavy enough to be worth skipping in a pre-commit run",
 ]
 
 [tool.ruff]

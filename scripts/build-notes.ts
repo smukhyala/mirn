@@ -21,7 +21,12 @@ import MarkdownIt from "markdown-it";
 import katex from "katex";
 import { load as loadYaml } from "js-yaml";
 import { VOCABULARY, type Term } from "../web/vocab.js";
-import { lintBareNumbers, lintComparatives, proseOf } from "../web/build/lints.js";
+import {
+  lintBareNumbers,
+  lintComparatives,
+  lintForwardTerms,
+  proseOf,
+} from "../web/build/lints.js";
 import { cssTokens } from "../web/ui/theme.js";
 import FACTS from "../web/data/experiment-facts.json";
 import { makeRunConfig } from "../web/engine/contracts/config.js";
@@ -166,7 +171,12 @@ function checkVocabulary(pages: readonly Page[]): void {
 
 function runLints(page: Page): void {
   const prose = proseOf(page.body);
-  for (const problem of [...lintBareNumbers(prose), ...lintComparatives(prose)]) {
+  const problems = [
+    ...lintBareNumbers(prose),
+    ...lintComparatives(prose),
+    ...lintForwardTerms(prose, page.front.page, page.front.introduces ?? [], VOCABULARY),
+  ];
+  for (const problem of problems) {
     fail(page.file, problem.message);
   }
 }

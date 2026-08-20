@@ -1,9 +1,11 @@
-"""The command-line entry point: the non-interactive path to the same results the page shows.
+"""The command-line entry point for the oracle.
 
-This is the only module in `src/mirn/` allowed to print, and the only one allowed to reference
-`mirn_app`. The `mirn_app` import lives inside `_serve` rather than at module scope so that the
-library stays importable without the `app` extra installed, and so an absent extra produces an
-instruction rather than a traceback.
+This is the only module in `src/mirn/` allowed to print. Its three jobs are listing the
+experiments, running one to a CSV, and — the one that matters most now — regenerating the
+cross-language parity fixtures the browser's measurement code is checked against.
+
+There is no longer a `serve` command. The teaching site is static and the FastAPI layer it
+replaced has been removed.
 """
 
 from __future__ import annotations
@@ -133,21 +135,6 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_serve(args: argparse.Namespace) -> int:
-    try:
-        from mirn_app.server import run_server
-    except ModuleNotFoundError:
-        print(
-            "the web interface needs the optional app dependencies; install them with:\n"
-            '    pip install -e ".[app]"',
-            file=sys.stderr,
-        )
-        return 1
-    print(f"serving the MIRN instrument on http://{args.host}:{args.port}")
-    run_server(args.host, args.port)
-    return 0
-
-
 def _cmd_fixtures(args: argparse.Namespace) -> int:
     """Regenerate the cross-language parity fixtures.
 
@@ -181,10 +168,6 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--out", default=None, help="CSV output path")
     run_parser.add_argument("--figure", default=None, help="optional figure output path")
 
-    serve_parser = subparsers.add_parser("serve", help="run the local web interface")
-    serve_parser.add_argument("--host", default="127.0.0.1")
-    serve_parser.add_argument("--port", type=int, default=8000)
-
     fixtures_parser = subparsers.add_parser(
         "fixtures", help="regenerate the cross-language parity fixtures"
     )
@@ -204,9 +187,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_list()
     if args.command == "run":
         return _cmd_run(args)
-    if args.command == "fixtures":
-        return _cmd_fixtures(args)
-    return _cmd_serve(args)
+    return _cmd_fixtures(args)
 
 
 if __name__ == "__main__":
