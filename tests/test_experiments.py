@@ -5,6 +5,7 @@ JSON-safety and parameter-validation coverage the moment it registers."""
 from __future__ import annotations
 
 import json
+import re
 
 import numpy as np
 import pandas as pd
@@ -638,3 +639,65 @@ def test_describe_carries_primary_parameters() -> None:
         assert list(described["primary_parameters"]) == list(
             EXPERIMENTS.create(name).primary_parameters
         )
+
+
+# The page renders every string below verbatim to a reader who has never read a robotics paper:
+# `label` and `help_text` under each control, `title` and `claim` at the head of each beat, and
+# `payload["note"]` directly under each plot. A raw snake_case identifier in any of them is a code
+# leak onto a lay surface. This recurred four separate times in one review round — `predictor_noise`
+# and `forecast_horizon` in the sweep's help text, `exclusion_radius_m` in the placebo's error, and
+# `sigma`/axis names in prose — so it is guarded mechanically rather than by re-reading the copy.
+_SNAKE_CASE = re.compile(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+
+# Column and payload keys are legitimately snake_case where a note names the CSV it wrote; these
+# are the only identifiers allowed to reach the page, because they are what the reader would type
+# to find the column. Keep this list short — an addition here is a decision to show code to a
+# non-expert, not a way to silence the test.
+_IDENTIFIERS_ALLOWED_ON_THE_PAGE = frozenset(
+    {
+        "removed_agent_closest_approach_m",
+        "removed_agent_residual_displacement_m",
+    }
+)
+
+
+def _identifier_leaks(text: str) -> list[str]:
+    leaks = []
+    for match in _SNAKE_CASE.findall(text):
+        if match not in _IDENTIFIERS_ALLOWED_ON_THE_PAGE:
+            leaks.append(match)
+    return leaks
+
+
+def test_no_control_label_or_help_text_shows_a_code_identifier() -> None:
+    for name in EXPERIMENTS.names():
+        experiment = EXPERIMENTS.create(name)
+        for parameter in experiment.parameters():
+            for field_name in ("label", "help_text"):
+                text = getattr(parameter, field_name)
+                if not text:
+                    continue
+                leaks = _identifier_leaks(text)
+                assert not leaks, (
+                    f"{name}.{parameter.name}.{field_name} shows code identifiers {leaks} "
+                    f"to the reader: {text!r}"
+                )
+
+
+def test_no_experiment_title_or_claim_shows_a_code_identifier() -> None:
+    for name in EXPERIMENTS.names():
+        experiment = EXPERIMENTS.create(name)
+        for field_name in ("title", "claim"):
+            text = getattr(experiment, field_name)
+            leaks = _identifier_leaks(text)
+            assert not leaks, f"{name}.{field_name} shows code identifiers {leaks}: {text!r}"
+
+
+def test_no_plot_note_shows_a_code_identifier() -> None:
+    """The note renders directly under each plot, where every honesty caveat lives."""
+    for name in EXPERIMENTS.names():
+        experiment = EXPERIMENTS.create(name)
+        result = experiment.run(_fast_params(name), seed=0)
+        note = result.payload.get("note", "")
+        leaks = _identifier_leaks(str(note))
+        assert not leaks, f"{name} plot note shows code identifiers {leaks}: {note!r}"

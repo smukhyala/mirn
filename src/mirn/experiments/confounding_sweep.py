@@ -128,9 +128,9 @@ class ConfoundingSweep(Experiment):
             default="predictor_noise",
             choices=_AXES,
             help_text=(
-                "predictor_noise corrupts a perfect oracle by a known sigma and gives the "
-                "relationship in closed form. forecast_horizon degrades a real constant-velocity "
-                "forecaster instead."
+                "Predictor noise corrupts a perfect forecaster by a known amount and gives the "
+                "relationship in closed form. Forecast horizon degrades a real constant-velocity "
+                "forecaster instead, by asking it to predict further ahead."
             ),
         )
         n_points = ExperimentParameter(
@@ -151,7 +151,9 @@ class ConfoundingSweep(Experiment):
             minimum=0.001,
             maximum=2.0,
             step=0.01,
-            help_text="Upper end of the sigma grid; ignored on the forecast_horizon axis.",
+            help_text=(
+                "Upper end of the predictor-error range; ignored on the forecast-horizon axis."
+            ),
         )
         return (
             influence_parameter(0.0),
@@ -218,7 +220,7 @@ class ConfoundingSweep(Experiment):
         payload["note"] = (
             "Synthetic data. True perturbation is measured by the paired estimator on the same "
             "pairs and is exactly zero when influence is 0.0, so every metre the reported curve "
-            "climbs is predictor error wearing a causal label. On the forecast_horizon axis, the "
+            "climbs is predictor error wearing a causal label. On the forecast-horizon axis, the "
             "'genuine' constant-velocity forecaster is only fighting i.i.d. per-step Gaussian "
             "jitter — a best case for that model class — so its floor-crossing point is a "
             "property of this toy noise model and does not transfer to real pedestrian curvature "

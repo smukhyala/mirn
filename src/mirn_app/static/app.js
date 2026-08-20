@@ -143,15 +143,41 @@ function buildCard(card) {
 
 // ---------------------------------------------------------------- canvas plotting
 
-function plotFrame(canvas) {
+// Matches a canvas's backing store to the CSS box it is actually laid out in, times the display's
+// device-pixel ratio, and scales the drawing context so every call site keeps working in CSS
+// pixels. Without this the markup's fixed width/height attributes are stretched or squashed into
+// whatever the responsive layout gives them — soft paths at 1x and softer on a HiDPI screen.
+//
+// The backing store is only reassigned when it actually changes, because assigning to
+// canvas.width clears the bitmap and resets the transform; drawScene calls this every animation
+// frame. Returns the CSS-pixel dimensions to draw against, falling back to the attribute size if
+// the element is not laid out yet (zero-size rect).
+function fitCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const cssWidth = rect.width || canvas.width;
+  const cssHeight = rect.height || canvas.height;
+  const ratio = window.devicePixelRatio || 1;
+  const backingWidth = Math.round(cssWidth * ratio);
+  const backingHeight = Math.round(cssHeight * ratio);
+  if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
+    canvas.width = backingWidth;
+    canvas.height = backingHeight;
+  }
   const context = canvas.getContext("2d");
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  return { context, width: cssWidth, height: cssHeight };
+}
+
+function plotFrame(canvas) {
+  const fitted = fitCanvas(canvas);
+  const context = fitted.context;
+  context.clearRect(0, 0, fitted.width, fitted.height);
   return {
     context,
     left: 54,
-    right: canvas.width - 16,
+    right: fitted.width - 16,
     top: 16,
-    bottom: canvas.height - 34,
+    bottom: fitted.height - 34,
   };
 }
 
@@ -454,6 +480,40 @@ const STAT_CLASS = {
   paired_debiased: "stat-paired",
 };
 
+// The readout sits three centimetres under prose written for someone who has never read a
+// robotics paper, so it must not print code identifiers at them. An estimator's display name is
+// the `title` its own MethodCard already declares in Python — looked up, never duplicated here —
+// and the raw key survives only as a fallback if a card is ever missing.
+function estimatorLabel(key) {
+  const card = state.cards[key];
+  if (card && card.title) {
+    return card.title;
+  }
+  return key;
+}
+
+// "mdp" is an abbreviation whose only expansion lives inside a card in a disclosure that is
+// closed by default, so it is spelled out at the point of use instead.
+const UNIT_LABEL = {
+  metres: "metres",
+  mdp: "× the detection floor",
+};
+
+function unitLabel(units) {
+  return UNIT_LABEL[units] || units;
+}
+
+// The placebo experiment labels its two rows by variant rather than by estimator; neither value
+// is a card key, so they get plain-English names of their own.
+const VARIANT_LABEL = {
+  full: "Everyone present",
+  pedestrian_removed: "One bystander removed",
+};
+
+function variantLabel(variant) {
+  return VARIANT_LABEL[variant] || variant;
+}
+
 function renderReadout(target, result) {
   target.replaceChildren();
   const rows = result.rows;
@@ -479,7 +539,7 @@ function renderReadout(target, result) {
     if (row.estimator !== undefined) {
       target.appendChild(
         statBlock(
-          row.estimator + " (" + row.units + ")",
+          estimatorLabel(row.estimator) + " (" + unitLabel(row.units) + ")",
           row.value.toFixed(3),
           formatCI(row),
           STAT_CLASS[row.estimator] || ""
@@ -488,7 +548,7 @@ function renderReadout(target, result) {
     } else if (row.variant !== undefined) {
       target.appendChild(
         statBlock(
-          row.variant + " (" + row.units + ")",
+          variantLabel(row.variant) + " (" + unitLabel(row.units) + ")",
           row.value.toFixed(4),
           formatCI(row),
           "stat-paired"
@@ -516,7 +576,14 @@ function buildControl(parameter, onChange) {
     for (const choice of parameter.choices) {
       const option = document.createElement("option");
       option.value = choice;
-      option.textContent = choice;
+      // Divergence choices are card keys, so they carry a declared title; choices that are not
+      // (the sweep's axis) at least lose their underscores rather than reading as code.
+      const card = state.cards[choice];
+      if (card && card.title) {
+        option.textContent = card.title;
+      } else {
+        option.textContent = choice.split("_").join(" ");
+      }
       input.appendChild(option);
     }
     input.value = parameter.default;
@@ -563,18 +630,19 @@ function readParams(form) {
 // no measured quantity is derived here. The gap shown comes from the API's gap_series.
 const player = { step: 0, playing: true, lastFrameMs: 0, accumulatorMs: 0 };
 
-function sceneScales(canvas, extent) {
+function sceneScales(width, height, extent) {
   const pad = 22;
   return {
-    x: makeScale(0, extent.width, pad, canvas.width - pad),
-    y: makeScale(0, extent.height, canvas.height - pad, pad),
+    x: makeScale(0, extent.width, pad, width - pad),
+    y: makeScale(0, extent.height, height - pad, pad),
   };
 }
 
 function drawScene(canvas, scene, step) {
-  const context = canvas.getContext("2d");
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  const scale = sceneScales(canvas, scene.extent);
+  const fitted = fitCanvas(canvas);
+  const context = fitted.context;
+  context.clearRect(0, 0, fitted.width, fitted.height);
+  const scale = sceneScales(fitted.width, fitted.height, scene.extent);
 
   // The arena, so the paths read as people crossing a room rather than lines in a void.
   context.strokeStyle = token("--mirn-grid");
@@ -677,10 +745,11 @@ function tick(nowMs) {
       }
     }
     drawScene(document.getElementById("scene-canvas"), scene, player.step);
-    document.getElementById("scene-clock").textContent =
-      (player.step * scene.dt).toFixed(1) + " s";
+    // Bare numbers: index.html prints the unit as a literal after each <output>, so appending
+    // one here too rendered "0.0 s s" and "0.000 m m" on screen.
+    document.getElementById("scene-clock").textContent = (player.step * scene.dt).toFixed(1);
     document.getElementById("scene-gap").textContent =
-      widestGapAt(scene, player.step).toFixed(3) + " m";
+      widestGapAt(scene, player.step).toFixed(3);
     const scrub = document.getElementById("scene-scrub");
     if (document.activeElement !== scrub) {
       scrub.max = String(scene.n_steps - 1);
@@ -792,86 +861,84 @@ function wirePlayPause() {
 // never by this table, and never by an `===` comparison against these names anywhere else in this
 // file. A fifth, uncopy-written experiment falls back to its own `claim` field from the API
 // instead of breaking.
+//
+// Each value is an ARRAY of paragraphs, not one blob. A reader meeting "null" and "detection
+// floor" for the first time should meet one definition per breath, so the copy is broken where
+// the ideas break rather than run together. Two standing constraints on every string here:
+// no sentence quotes a figure a rendered control can change (a slider that falsifies the prose
+// is the page lying to whoever moved it), and no sentence describes a state the beat does not
+// load in — where the copy wants the reader at a different setting, it says so imperatively and
+// names the control.
 const BEAT_CLAIMS = {
-  calibration_floor:
-    "Every figure on this page compares a real run against its counterfactual — the exact same " +
-    "crowd and paths, with the robot simply deleted from the scene, nothing steered and nothing " +
-    "reacting to anything. This experiment takes that robot-absent crowd, splits it into two " +
-    "random halves, and measures how different the halves look using a divergence: a single " +
-    "number for how far apart two sets of paths are. Even though nothing here could be " +
-    "responding to a robot that isn't there, the number is not zero — that gap is the null, " +
-    "ordinary variation between two halves of one population, and its upper edge is the " +
-    "detection floor: the smallest effect this measurement could ever tell apart from plain " +
-    "noise. No published perturbation study reports this number, which means every number they " +
-    "do report has nothing to be judged against.",
-  estimator_comparison:
-    "In the real world you only ever observe one version of events, so most published work " +
-    "estimates the missing “no robot” version with a forecaster instead: predict where a " +
-    "pedestrian was already heading, then measure how far off that guess turned out to be. That " +
-    "prediction-error number is what most published measurements report as the robot's effect " +
-    "— it comes from an estimator, a formula that turns raw paths into one number claiming " +
-    "to size up the robot's disturbance. Set the robot's influence to zero here and the honest " +
-    "answer becomes exactly zero, since the two arms are then identical paths end to end; the " +
-    "paired estimator, which actually looks at the counterfactual run, reports that correctly, " +
-    "while the standard forecaster-based one still reports on the order of half a metre of " +
-    "disturbance from a robot that did nothing at all.",
-  confounding_sweep:
-    "Here the true perturbation is pinned at exactly zero for the whole sweep — robot " +
-    "influence back to zero, the same trick as the last section — while the forecaster " +
-    "behind the standard estimator is made progressively worse, either by feeding it more noise " +
-    "or asking it to predict further ahead. There is nothing for it to be measuring here, so the " +
-    "reported number is tracking only how bad the guess is, and it climbs straight through the " +
-    "detection floor established earlier even though the true effect never leaves zero. A policy " +
-    "trained to make that number small would only be trained to move in a way that is easy to " +
-    "predict — not to disturb people less.",
-  placebo:
-    "As a last check, this experiment finds one pedestrian who never comes anywhere near the " +
-    "robot during the run, deletes them from both versions of the world, and re-measures. That " +
-    "pedestrian's path carries no trace of the robot's displacement, so a trustworthy measurement " +
-    "should not move when they disappear — no twitch, no phantom signal from someone who was " +
-    "never part of the story. If the number moves anyway, that is a sign the measurement is " +
-    "picking up something other than what the robot actually did.",
+  calibration_floor: [
+    "Start with the ruler, before measuring anything with it. Take the crowd with no robot in " +
+      "it at all, split the people into two random halves, and ask how different the two halves " +
+      "look. The answer comes from a divergence: a single number for how far apart two sets of " +
+      "paths are.",
+    "Nothing in this crowd could be responding to a robot, because there is no robot. And yet " +
+      "the number is not zero.",
+    "That leftover has a name. It is the null — the ordinary variation you get between any two " +
+      "halves of the same population, measured with no robot anywhere. Its upper edge is the " +
+      "detection floor: the smallest effect this measurement could ever tell apart from plain " +
+      "noise. An effect below that line is not absent. It is simply invisible at this sample size.",
+    "We have not found a published study of robot-induced perturbation — how far a robot pushes " +
+      "people off the path they would otherwise have walked — that reports this floor. If that " +
+      "holds, the numbers those studies do report have nothing to be judged against. There is no " +
+      "way to tell a real effect from the measurement's own wobble.",
+  ],
+  estimator_comparison: [
+    "In the real world you only ever get to watch one version of events. There is no robot-absent " +
+      "run sitting there to compare against, so most published work guesses at it instead, using " +
+      "a forecaster: predict where a pedestrian was already heading, then measure how far off " +
+      "that prediction turned out to be.",
+    "That prediction error is what most published measurements report as the robot's effect. It " +
+      "comes from an estimator — a formula that turns raw paths into a single number claiming to " +
+      "size up the disturbance.",
+    "Right now the robot in this run is at full strength, and the two methods already disagree. " +
+      "The paired method can look at the robot-absent version of the crowd directly. The standard " +
+      "forecaster-based method cannot, and has to guess.",
+    "Now drag Robot influence down to zero. The robot stops doing anything at all, the two " +
+      "versions of the crowd become the same paths step for step, and the honest answer is " +
+      "exactly zero. That is what the paired method reports.",
+    "The standard method does not. It still reports a substantial disturbance from a robot that " +
+      "did nothing, because what it is really measuring is how wrong its own guess about the " +
+      "pedestrian was. The Forecast horizon slider controls how substantial. Ask the forecaster " +
+      "to predict further ahead and its guess gets worse, and the disturbance it claims to have " +
+      "found grows right along with it. The robot has not changed. Only the guess has.",
+  ],
+  confounding_sweep: [
+    "Here the true disturbance is pinned at exactly zero the whole way across the chart — robot " +
+      "influence set to zero, the same move as in Beat 2. Meanwhile the forecaster behind the " +
+      "standard method is made steadily worse, either by feeding it more noise or by asking it " +
+      "to predict further ahead.",
+    "There is nothing left for it to measure, so the number it reports is tracking only how bad " +
+      "the guess has become. Push the Maximum predictor error slider up and watch that number " +
+      "climb through the detection floor from Beat 1 — the line an effect has to clear before it " +
+      "counts as real — even though the true effect never leaves zero.",
+    "This is the consequence that matters. A robot tuned to make that number small would not be " +
+      "learning to bother people less. It would be learning to move predictably.",
+  ],
+  placebo: [
+    "As a last check, every run of the crowd loses one bystander: a pedestrian who stayed well " +
+      "away from the robot the whole time, deleted from both versions of the world. Then the " +
+      "measurement is taken again.",
+    "A trustworthy measurement should barely notice. Turn Robot influence down to zero and it " +
+      "should not move at all — with no robot, there is nothing a bystander could be carrying a " +
+      "trace of.",
+    "Leave the influence up and it moves a little, and it should. Well away is not the same as " +
+      "untouched, and the small shift you see is the honest size of what is left over. Widen the " +
+      "Exclusion radius and you are asking for a bystander further from the robot, so that shift " +
+      "should shrink.",
+    "What would be damning is a large shift. That would mean the number is being driven by people " +
+      "the robot never went near.",
+  ],
 };
 
 // ---------------------------------------------------------------- beat rendering
 
-// paired_debiased's plain_summary presupposes "a measurement has its own error even with no
-// robot" — the idea the detection-floor cards establish. If a future panel ever renders
-// paired_debiased's card ahead of one of these two within the SAME panel, this reorders only
-// those two floor cards to precede it; every other card in the panel keeps its declared position.
-// Keyed by card key, never by experiment name, so it applies to any panel a fifth experiment
-// might introduce.
-const FLOOR_CARD_KEYS = ["split_half_null", "minimum_detectable_perturbation"];
-
-function orderCardKeysForPanel(methodKeys) {
-  const debiasedIndex = methodKeys.indexOf("paired_debiased");
-  if (debiasedIndex === -1) {
-    return methodKeys.slice();
-  }
-  const beforeDebiased = [];
-  const floorCardsAfterDebiased = [];
-  const restAfterDebiased = [];
-  methodKeys.forEach((key, index) => {
-    if (index === debiasedIndex) {
-      return;
-    }
-    if (index < debiasedIndex) {
-      beforeDebiased.push(key);
-      return;
-    }
-    if (FLOOR_CARD_KEYS.indexOf(key) !== -1) {
-      floorCardsAfterDebiased.push(key);
-    } else {
-      restAfterDebiased.push(key);
-    }
-  });
-  return beforeDebiased.concat(floorCardsAfterDebiased, ["paired_debiased"], restAfterDebiased);
-}
-
 function renderCards(container, methodKeys) {
   container.replaceChildren();
-  const orderedKeys = orderCardKeysForPanel(methodKeys);
-  for (const key of orderedKeys) {
+  for (const key of methodKeys) {
     const card = state.cards[key];
     if (card) {
       container.appendChild(buildCard(card));
@@ -924,7 +991,8 @@ async function runBeat(experiment, elements) {
   const params = readParams(elements.form);
   elements.output.classList.add("is-pending");
   renderPendingReadout(elements.readout, experiment.title);
-  elements.plot.getContext("2d").clearRect(0, 0, elements.plot.width, elements.plot.height);
+  const pendingPlot = fitCanvas(elements.plot);
+  pendingPlot.context.clearRect(0, 0, pendingPlot.width, pendingPlot.height);
   elements.note.textContent = "";
   clearBeatError(elements);
   try {
@@ -937,6 +1005,11 @@ async function runBeat(experiment, elements) {
     elements.note.textContent = result.payload.note || "";
     renderCards(elements.cards, result.method_keys);
   } catch (error) {
+    // Clear the pending tile as well as showing the error. Leaving it up puts "Computing … the
+    // first one takes about a minute" permanently above a red error box, which reads as a page
+    // still working on something it has already given up on. Reachable in normal use: raising
+    // Exclusion radius past every pedestrian's closest approach makes the placebo run raise.
+    elements.readout.replaceChildren();
     showBeatError(elements, error.message);
   } finally {
     elements.output.classList.remove("is-pending");
@@ -958,6 +1031,7 @@ function renderBeats() {
     const indexNode = fragment.querySelector(".section-index");
     const titleNode = fragment.querySelector(".section-title");
     const claimNode = fragment.querySelector(".section-claim");
+    const technicalClaimNode = fragment.querySelector(".section-claim-technical");
     const form = fragment.querySelector(".controls");
     const output = fragment.querySelector(".output");
     const readout = fragment.querySelector(".readout");
@@ -969,7 +1043,25 @@ function renderBeats() {
 
     indexNode.textContent = "Beat " + experiment.order;
     titleNode.textContent = experiment.title;
-    claimNode.textContent = BEAT_CLAIMS[experiment.name] || experiment.claim;
+    // A canvas is opaque to a screen reader, so each plot is named from the experiment it draws
+    // — the same treatment #scene-canvas already gets in the static markup.
+    plot.setAttribute("aria-label", experiment.title + " — plot");
+    // Lay copy as one paragraph per idea; a fifth experiment with no entry here falls back to
+    // its Python `claim`, wrapped so the shape is the same either way.
+    const layParagraphs = BEAT_CLAIMS[experiment.name];
+    const paragraphs = layParagraphs || [experiment.claim];
+    claimNode.replaceChildren();
+    for (const paragraph of paragraphs) {
+      const node = document.createElement("p");
+      node.textContent = paragraph;
+      claimNode.appendChild(node);
+    }
+    // The terse technical restatement declared on the Experiment in Python, demoted beneath the
+    // plain-English version. Rendering it is what keeps `Experiment.claim` from being a field
+    // nobody reads, which is how the two copies would silently drift apart. Suppressed when the
+    // fallback above already IS that claim, so an uncopy-written beat does not print it twice.
+    technicalClaimNode.textContent = layParagraphs ? experiment.claim : "";
+    technicalClaimNode.hidden = !layParagraphs;
     mathDetails.open = experiment.order === 1;
 
     const elements = { form, output, readout, plot, note, error, cards };
