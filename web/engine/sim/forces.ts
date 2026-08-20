@@ -30,19 +30,24 @@ export function accumulateForces(
     // Goal attraction. An arrived pedestrian stops steering rather than being deleted, so its
     // trajectory stays the full length the paired contract requires — and, usefully, arriving at
     // different ticks in the two arms is exactly the "time lost" signal.
-    let fx = 0;
-    let fy = 0;
-    if (arrived[i] === 0) {
-      const dx = (gx[i] as number) - (x[i] as number);
-      const dy = (gy[i] as number) - (y[i] as number);
-      const d = Math.sqrt(dx * dx + dy * dy);
-      const safe = d === 0 ? 1 : d;
-      fx = ((v0 * dx) / safe - (vx[i] as number)) / tau;
-      fy = ((v0 * dy) / safe - (vy[i] as number)) / tau;
-    } else {
-      fx = (0 - (vx[i] as number)) / tau;
-      fy = (0 - (vy[i] as number)) / tau;
+    // An arrived pedestrian is skipped entirely: it stands where it stopped, still exerting
+    // repulsion on everyone else but no longer integrating. The obvious alternative — keep
+    // integrating with the goal force replaced by damping — looks right and is not: the
+    // exogenous noise keeps pushing, damping only bounds the drift rate rather than removing it,
+    // and an "arrived" pedestrian random-walks metres away from its goal over the rest of the
+    // episode. That was visible in the browser as people wandering out through the wall.
+    if (arrived[i] === 1) {
+      outFx[i] = 0;
+      outFy[i] = 0;
+      continue;
     }
+
+    const dx = (gx[i] as number) - (x[i] as number);
+    const dy = (gy[i] as number) - (y[i] as number);
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const safe = d === 0 ? 1 : d;
+    let fx = ((v0 * dx) / safe - (vx[i] as number)) / tau;
+    let fy = ((v0 * dy) / safe - (vy[i] as number)) / tau;
 
     // Pedestrian repulsion.
     for (let j = 0; j < n; j++) {
@@ -82,11 +87,15 @@ export function accumulateForces(
       }
     }
 
-    // Soft walls, top and bottom only.
+    // Soft walls on all four sides. The demo had only top and bottom — it carried a disabled
+    // x-term multiplied by zero — because its agents were meant to walk out of the ends and be
+    // respawned. This roster is fixed for the whole episode, so the room has to contain people.
     const wall = SIM_CONSTANTS.wallStrength;
     const scale = SIM_CONSTANTS.wallScaleM;
     fy += wall * Math.exp(-((y[i] as number) - 0.3) / scale);
     fy -= wall * Math.exp(-(config.heightM - 0.3 - (y[i] as number)) / scale);
+    fx += wall * Math.exp(-((x[i] as number) - 0.3) / scale);
+    fx -= wall * Math.exp(-(config.widthM - 0.3 - (x[i] as number)) / scale);
 
     outFx[i] = fx + (noiseX[i] as number);
     outFy[i] = fy + (noiseY[i] as number);

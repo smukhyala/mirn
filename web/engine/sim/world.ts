@@ -83,6 +83,12 @@ export function stepWorld(
 
   const cap = config.crowd.desiredSpeed * SIM_CONSTANTS.speedCapFactor;
   for (let i = 0; i < state.n; i++) {
+    if (state.arrived[i] === 1) {
+      state.vx[i] = 0;
+      state.vy[i] = 0;
+      continue;
+    }
+
     let vx = (state.vx[i] as number) + (scratch.fx[i] as number) * config.dt;
     let vy = (state.vy[i] as number) + (scratch.fy[i] as number) * config.dt;
     const speed = Math.sqrt(vx * vx + vy * vy);
@@ -101,6 +107,14 @@ export function stepWorld(
     if (y > config.heightM - 0.25) {
       y = config.heightM - 0.25;
       vy = -Math.abs(vy) * SIM_CONSTANTS.wallRestitution;
+    }
+    if (x < 0.25) {
+      x = 0.25;
+      vx = Math.abs(vx) * SIM_CONSTANTS.wallRestitution;
+    }
+    if (x > config.widthM - 0.25) {
+      x = config.widthM - 0.25;
+      vx = -Math.abs(vx) * SIM_CONSTANTS.wallRestitution;
     }
 
     state.vx[i] = vx;

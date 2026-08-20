@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MIRN — the same room, twice</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="masthead">
+  <p class="eyebrow">Phase 1 · the world moves</p>
+  <h1>The same room, twice</h1>
+  <p class="standfirst">
+    One crowd, run twice from the same starting positions and the same random wobble: once with a
+    robot crossing the room, once with no robot at all. Because everything else is held identical,
+    the difference between a person's two paths <em>is</em> the robot's effect on them, with
+    nothing predicted or guessed at.
+  </p>
+</header>
+
+<main>
+  <section class="stage">
+    <canvas id="arena" aria-label="Two crowds, one with a robot and one without"></canvas>
+    <div class="transport">
+      <button id="playpause" type="button">Pause</button>
+      <label class="scrub">
+        <span class="visually-hidden">Timeline</span>
+        <input id="scrub" type="range" min="0" max="100" step="1" value="0">
+      </label>
+      <span class="readout">t <output id="clock">0.0</output> s</span>
+      <span class="readout accent">typical gap <output id="gap-mean">0.000</output> m</span>
+      <span class="readout accent">widest <output id="gap">0.000</output> m</span>
+    </div>
+    <ul class="legend">
+      <li><span class="key key-treated"></span>with the robot</li>
+      <li><span class="key key-control"></span>without the robot</li>
+      <li><span class="key key-robot"></span>the robot</li>
+      <li><span class="key key-gap"></span>the robot's effect on this person</li>
+    </ul>
+  </section>
+
+  <aside class="controls">
+    <p class="panel-title">The room</p>
+    <label class="control">
+      <span>People <output id="n-readout">18</output></span>
+      <input id="n" type="range" min="2" max="44" step="1" value="18">
+    </label>
+    <label class="control">
+      <span>Robot speed <output id="speed-readout">1.10</output> m/s</span>
+      <input id="speed" type="range" min="0" max="1.8" step="0.05" value="1.1">
+    </label>
+    <label class="control">
+      <span>Reaction time <output id="reaction-readout">0.15</output> s</span>
+      <input id="reaction" type="range" min="0.05" max="1" step="0.05" value="0.15">
+    </label>
+    <label class="control">
+      <span>Seed <output id="seed-readout">20260816</output></span>
+      <input id="seed" type="range" min="0" max="40" step="1" value="0">
+    </label>
+    <label class="toggle">
+      <input id="see-robot" type="checkbox" checked>
+      <span>People notice the robot</span>
+    </label>
+    <label class="toggle">
+      <input id="show-control" type="checkbox" checked>
+      <span>Show the robot-free run</span>
+    </label>
+    <label class="toggle">
+      <input id="show-gaps" type="checkbox" checked>
+      <span>Show the gap</span>
+    </label>
+    <p class="note" id="timing">—</p>
+    <p class="note">
+      Turn off <em>People notice the robot</em> and the gap collapses to exactly zero. The robot is
+      still there and still moving; nobody is responding to it. That is what a true effect of
+      nothing looks like, and it is the thing every measurement on this site has to reproduce.
+    </p>
+  </aside>
+</main>
+
+<footer class="page-footer">
+  <p>Everything here is simulated. The crowd is a model, not a recording of real people, and no
+  number on this page is a measurement of anything that happened.</p>
+</footer>
+
+<script type="module" src="./main.ts"></script>
+</body>
+</html>
