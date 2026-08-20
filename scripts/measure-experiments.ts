@@ -17,6 +17,7 @@ import { runPair, type RunResult } from "../web/engine/sim/run.js";
 import { paired, cvmResidual } from "../web/engine/measure/estimator/index.js";
 import { replicateBand } from "../web/engine/measure/null/band.js";
 import { clearance, deviation, recovery, robotCost } from "../web/engine/measure/metrics.js";
+import { seededPermutations, splitHalfNull } from "../web/engine/measure/null/splitHalf.js";
 
 const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7];
 const BASE_SEED = 20260816;
@@ -264,6 +265,36 @@ sweep("e7_politeness", "deflectionWeight", [0, 0.25, 0.5, 1, 2, 3, 4, 6],
   const keys = Object.keys(rows[0]!);
   console.log(keys.map((k) => k.padStart(18)).join(""));
   for (const r of rows) console.log(keys.map((k) => (r[k] as number).toFixed(4).padStart(18)).join(""));
+}
+
+// ---- the detection floor, and its dependence on how many people you pooled ---------------------
+// Page 7's sharpest claim is that the floor is not a property of the world but a property of your
+// sample, so the sweep is over pool size rather than over anything physical.
+{
+  const perm = seededPermutations(20260816);
+  const rows: Point[] = [];
+  for (const nPedestrians of [8, 12, 18, 24, 32, 44]) {
+    const floors: number[] = [];
+    const means: number[] = [];
+    for (const s of SEEDS) {
+      // Measured on the ROBOT-ABSENT arm: a population that carries no robot effect at all.
+      const control = runPair(cfg(s, { crowd: { nPedestrians } })).control.positions;
+      const nullResult = splitHalfNull(control, 40, perm);
+      floors.push(nullResult.floor);
+      means.push(nullResult.mean);
+    }
+    rows.push({
+      nPedestrians,
+      floorM: meanOf(floors),
+      floorM_sd: sdOf(floors),
+      nullMeanM: meanOf(means),
+    });
+  }
+  facts["detection_floor"] = { axis: "nPedestrians", nSeeds: SEEDS.length, rows };
+  console.log("\n== detection_floor ==");
+  const keys = Object.keys(rows[0]!).filter((k) => !k.endsWith("_sd"));
+  console.log(keys.map((k) => k.padStart(16)).join(""));
+  for (const r of rows) console.log(keys.map((k) => (r[k] as number).toFixed(3).padStart(16)).join(""));
 }
 
 mkdirSync("web/data", { recursive: true });

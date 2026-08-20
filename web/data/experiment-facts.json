@@ -532,5 +532,47 @@
         "reportsOverFloor": 0.994090229702916
       }
     ]
+  },
+  "detection_floor": {
+    "axis": "nPedestrians",
+    "nSeeds": 8,
+    "rows": [
+      {
+        "nPedestrians": 8,
+        "floorM": 1.623651572533994,
+        "floorM_sd": 0.26490596259793703,
+        "nullMeanM": 1.1494860255370742
+      },
+      {
+        "nPedestrians": 12,
+        "floorM": 1.200017359901793,
+        "floorM_sd": 0.14396822603512097,
+        "nullMeanM": 0.9123488801709779
+      },
+      {
+        "nPedestrians": 18,
+        "floorM": 0.8136093370523743,
+        "floorM_sd": 0.050178212736907216,
+        "nullMeanM": 0.6823034019628911
+      },
+      {
+        "nPedestrians": 24,
+        "floorM": 0.643836481241682,
+        "floorM_sd": 0.040865081491647526,
+        "nullMeanM": 0.5410574011396936
+      },
+      {
+        "nPedestrians": 32,
+        "floorM": 0.5236368086136158,
+        "floorM_sd": 0.01725073087477427,
+        "nullMeanM": 0.4627588501156075
+      },
+      {
+        "nPedestrians": 44,
+        "floorM": 0.44106612293507197,
+        "floorM_sd": 0.013171474018128496,
+        "nullMeanM": 0.3998946111806084
+      }
+    ]
   }
 }

@@ -305,8 +305,12 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   margin-right: 0.4rem;
   vertical-align: middle;
 }
+/* Each swatch reproduces its line's actual stroke. Weight and dash are the only thing
+   distinguishing series once hue is gone, so a shared swatch would make the legend useless. */
 .legend-accent::before { border-top: 2px solid var(--mirn-perturbation); }
-.legend-grey::before { border-top: 1.5px dashed var(--mirn-ink-muted); }
+.legend-grey-0::before { border-top: 2px solid var(--mirn-ink); }
+.legend-grey-1::before { border-top: 1.5px dashed var(--mirn-ink-muted); }
+.legend-grey-2::before { border-top: 1.5px dotted var(--mirn-ink-faint); }
 
 /* The derivation panel. Three columns, hairlines, no box and no shadow: it is a worked answer,
    not a card. It never covers the figure it explains. */

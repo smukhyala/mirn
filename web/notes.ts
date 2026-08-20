@@ -4,7 +4,6 @@ import { deviation } from "./engine/measure/metrics.js";
 import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
 import { drawArena, fitCanvas, type ArenaView } from "./ui/arena.js";
 import { drawSweep, type PlotSeries } from "./ui/plot.js";
-import { cssTokens } from "./ui/theme.js";
 import FACTS from "./data/experiment-facts.json";
 
 /**
@@ -15,10 +14,6 @@ import FACTS from "./data/experiment-facts.json";
  * figures, so a reader without JavaScript loses the pictures and keeps the point.
  */
 
-const tokenStyle = document.createElement("style");
-tokenStyle.textContent = cssTokens();
-document.head.prepend(tokenStyle);
-
 interface FactRow {
   readonly [key: string]: number;
 }
@@ -28,6 +23,22 @@ interface FactTable {
   readonly rows: readonly FactRow[];
 }
 const FACT_TABLES = FACTS as unknown as Record<string, FactTable>;
+
+/**
+ * Axis names in the facts file are code identifiers, and guardrail 12 forbids one of those
+ * reaching a reader. Anything not listed here falls back to the raw key, which is ugly on purpose:
+ * an ugly axis in review is better than a silently plausible wrong one.
+ */
+const AXIS_LABELS: Readonly<Record<string, string>> = {
+  horizonS: "how far ahead the forecast is rolled (seconds)",
+  nPedestrians: "people in the room",
+  repulsionScale: "how much space the robot demands (multiples of the default)",
+  maxSpeed: "robot top speed (metres per second)",
+  passingOffsetM: "how far off centre the robot passes (metres)",
+  closestApproachFromM: "how close that person ever came to the robot (metres)",
+  positionSigmaM: "error in the robot's view of where people are (metres)",
+  deflectionWeight: "how hard the planner tries to stay out of the way",
+};
 
 const PRESETS: Readonly<Record<string, () => RunConfig>> = {
   "corridor-11": () => makeRunConfig({ nTicks: 800 }),
@@ -236,7 +247,9 @@ function mountSweep(host: HTMLElement, config: SweepConfig): void {
   const x = table.rows.map((row) => row[xKey] as number);
 
   const series: PlotSeries[] = [];
+  const greyClasses: string[] = [];
   let accentUsed = false;
+  let greyIndex = 0;
   for (const s of config.series) {
     const values = table.rows.map((row) => row[s.key] as number);
     if (values.some((v) => v === undefined)) {
@@ -251,6 +264,12 @@ function mountSweep(host: HTMLElement, config: SweepConfig): void {
     const accent = s.accent === true && !accentUsed;
     if (accent) {
       accentUsed = true;
+      greyClasses.push("legend-accent");
+    } else {
+      // The legend has to reproduce the stroke, not just name it. With hue gone, a swatch that is
+      // the same for every grey series tells the reader nothing about which line is which.
+      greyClasses.push(`legend-grey-${greyIndex % 3}`);
+      greyIndex++;
     }
     series.push({
       key: s.key,
@@ -265,10 +284,10 @@ function mountSweep(host: HTMLElement, config: SweepConfig): void {
   canvas.className = "widget-plot";
   const legend = document.createElement("ul");
   legend.className = "widget-legend";
-  for (const s of series) {
+  for (let i = 0; i < series.length; i++) {
     const item = document.createElement("li");
-    item.className = s.accent === true ? "legend-accent" : "legend-grey";
-    item.textContent = s.label;
+    item.className = greyClasses[i] ?? "legend-grey-0";
+    item.textContent = (series[i] as PlotSeries).label;
     legend.append(item);
   }
   const note = document.createElement("p");
@@ -284,7 +303,7 @@ function mountSweep(host: HTMLElement, config: SweepConfig): void {
     const box = fitCanvas(canvas, window.devicePixelRatio);
     drawSweep(
       context,
-      { x, xLabel: xKey, yLabel: config.yLabel ?? "metres", series },
+      { x, xLabel: AXIS_LABELS[xKey] ?? xKey, yLabel: config.yLabel ?? "metres", series },
       box.width,
       box.height,
     );
