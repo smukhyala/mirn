@@ -1,5 +1,7 @@
 import { makeRunConfig, SIM_CONSTANTS, type RunConfig } from "./engine/contracts/config.js";
 import { runPair, type RunResult } from "./engine/sim/run.js";
+import { cvmResidual, paired } from "./engine/measure/estimator/index.js";
+import { replicateBand, type RunToRunBand } from "./engine/measure/null/band.js";
 import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
 import { drawArena, fitCanvas, type ArenaView } from "./ui/arena.js";
 import { cssTokens } from "./ui/theme.js";
@@ -42,7 +44,22 @@ const controls = {
   showControl: el<HTMLInputElement>("show-control"),
   showGaps: el<HTMLInputElement>("show-gaps"),
   timing: el<HTMLParagraphElement>("timing"),
+  horizon: el<HTMLInputElement>("horizon"),
+  horizonReadout: el<HTMLOutputElement>("horizon-readout"),
+  mTrue: el<HTMLOutputElement>("m-true"),
+  mMeasured: el<HTMLOutputElement>("m-measured"),
+  mBand: el<HTMLOutputElement>("m-band"),
+  verdict: el<HTMLParagraphElement>("verdict"),
 };
+
+/**
+ * Where the forecaster is evaluated.
+ *
+ * Not the end of the episode. By then everyone has arrived and parked, so a constant-velocity
+ * forecast of a stationary person is exactly right and the estimator reads 0.000 however bad it
+ * is. Measured where the crowd is actually moving, or not measured at all.
+ */
+const ACTIVE_STEP = 200;
 
 const BASE_SEED = 20260816;
 
@@ -68,6 +85,7 @@ function configFromControls(): RunConfig {
 }
 
 let result: RunResult = runPair(configFromControls(), () => performance.now());
+let band: RunToRunBand = replicateBand(configFromControls(), 6);
 let playing = true;
 let base: PlaybackBase = {
   wallStartMs: performance.now(),
@@ -109,12 +127,53 @@ function gapsAt(step: number): { readonly mean: number; readonly widest: number 
   return { mean: n === 0 ? 0 : total / n, widest: worst };
 }
 
+function updateMeasurements(): void {
+  const horizonSteps = Number(controls.horizon.value);
+  const trueEffect = paired(result.pair).value;
+  const measured = cvmResidual(result.pair, horizonSteps, ACTIVE_STEP).value;
+
+  controls.mTrue.value = trueEffect.toFixed(3);
+  controls.mMeasured.value = measured.toFixed(3);
+  controls.mBand.value = band.value.toFixed(3);
+
+  // The verdict never asserts a relation a control could falsify — it recomputes the comparison
+  // from the two numbers actually on screen, so no slider position can make the page lie.
+  const trueRatio = trueEffect / band.value;
+  const measuredRatio = measured / band.value;
+  let verdict: string;
+  if (trueEffect === 0 && measured > band.value) {
+    verdict =
+      `Nobody in this room responded to the robot, so its true effect is exactly zero. The ` +
+      `forecaster still reports ${measured.toFixed(3)} m — ${measuredRatio.toFixed(1)}x the band, ` +
+      `which would read as a real, publishable disturbance. What it is measuring is its own error.`;
+  } else if (trueEffect === 0) {
+    verdict =
+      `The true effect is exactly zero, and the forecaster reports ${measured.toFixed(3)} m — ` +
+      `still below the band, so it would not be mistaken for an effect. Lengthen the forecast ` +
+      `horizon and watch that change, on a run where the honest answer cannot.`;
+  } else if (trueRatio < 1) {
+    verdict =
+      `The robot's true effect is ${trueEffect.toFixed(3)} m, which is below the run-to-run band. ` +
+      `That does not mean it did nothing. It means this measurement cannot tell it apart from ` +
+      `the ordinary difference between two runs of the same room.`;
+  } else {
+    verdict =
+      `The robot's true effect is ${trueEffect.toFixed(3)} m, ${trueRatio.toFixed(1)}x the band, ` +
+      `so it is resolvable. The forecaster reports ${measured.toFixed(3)} m for the same run — ` +
+      `${measuredRatio.toFixed(1)}x the band. The two are measuring different things.`;
+  }
+  controls.verdict.textContent = verdict;
+}
+
 function recompute(): void {
-  result = runPair(configFromControls(), () => performance.now());
+  const config = configFromControls();
+  result = runPair(config, () => performance.now());
+  band = replicateBand(config, 6);
   controls.scrub.max = String(nSamples() - 1);
   controls.timing.textContent = `${result.config.crowd.nPedestrians} people · both runs computed in ${result.timingMs.toFixed(0)} ms`;
   sample = Math.min(sample, nSamples() - 1);
   base = { ...base, wallStartMs: performance.now(), sampleAtStart: sample };
+  updateMeasurements();
 }
 
 function syncReadouts(): void {
@@ -122,6 +181,7 @@ function syncReadouts(): void {
   controls.speedReadout.value = Number(controls.speed.value).toFixed(2);
   controls.reactionReadout.value = Number(controls.reaction.value).toFixed(2);
   controls.seedReadout.value = String(BASE_SEED + Number(controls.seed.value) * 7919);
+  controls.horizonReadout.value = (Number(controls.horizon.value) * 0.05).toFixed(2);
 }
 
 function render(): void {
@@ -171,6 +231,13 @@ for (const input of [controls.n, controls.speed, controls.reaction, controls.see
   });
 }
 controls.seeRobot.addEventListener("change", recompute);
+
+// The horizon changes only how the forecaster is applied to an existing run, not the run itself.
+// Re-simulating here would be wrong as well as slow: the point is that the robot has not changed.
+controls.horizon.addEventListener("input", () => {
+  syncReadouts();
+  updateMeasurements();
+});
 
 controls.scrub.addEventListener("input", () => {
   sample = Number(controls.scrub.value);

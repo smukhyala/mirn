@@ -8,7 +8,7 @@
 </head>
 <body>
 <header class="masthead">
-  <p class="eyebrow">Phase 1 · the world moves</p>
+  <p class="eyebrow">Phase 2 · the number appears</p>
   <h1>The same room, twice</h1>
   <p class="standfirst">
     One crowd, run twice from the same starting positions and the same random wobble: once with a
@@ -31,6 +31,28 @@
       <span class="readout accent">typical gap <output id="gap-mean">0.000</output> m</span>
       <span class="readout accent">widest <output id="gap">0.000</output> m</span>
     </div>
+    <div class="readouts">
+      <div class="tile">
+        <p class="tile-label">True effect</p>
+        <p class="tile-value accent"><output id="m-true">0.000</output> <span class="unit">m</span></p>
+        <p class="tile-note">The gap between each person's two paths, averaged. Knowable only
+          because this room is invented and can be run twice.</p>
+      </div>
+      <div class="tile">
+        <p class="tile-label">What a forecaster reports</p>
+        <p class="tile-value"><output id="m-measured">0.000</output> <span class="unit">m</span></p>
+        <p class="tile-note">Guess where each person was about to walk, then call the error the
+          robot's doing. This is what you can measure without a second world.</p>
+      </div>
+      <div class="tile">
+        <p class="tile-label">Run-to-run band</p>
+        <p class="tile-value"><output id="m-band">0.000</output> <span class="unit">m</span></p>
+        <p class="tile-note">How far apart two undisturbed runs of this same room are. Anything
+          below this line is indistinguishable from the measurement's own wobble.</p>
+      </div>
+    </div>
+    <p class="verdict" id="verdict">&nbsp;</p>
+
     <ul class="legend">
       <li><span class="key key-treated"></span>with the robot</li>
       <li><span class="key key-control"></span>without the robot</li>
@@ -57,6 +79,10 @@
       <span>Seed <output id="seed-readout">20260816</output></span>
       <input id="seed" type="range" min="0" max="40" step="1" value="0">
     </label>
+    <label class="control">
+      <span>Forecast horizon <output id="horizon-readout">0.80</output> s</span>
+      <input id="horizon" type="range" min="4" max="60" step="2" value="16">
+    </label>
     <label class="toggle">
       <input id="see-robot" type="checkbox" checked>
       <span>People notice the robot</span>
@@ -71,9 +97,10 @@
     </label>
     <p class="note" id="timing">—</p>
     <p class="note">
-      Turn off <em>People notice the robot</em> and the gap collapses to exactly zero. The robot is
-      still there and still moving; nobody is responding to it. That is what a true effect of
-      nothing looks like, and it is the thing every measurement on this site has to reproduce.
+      Turn off <em>People notice the robot</em>. The true effect collapses to exactly zero — the
+      robot is still there and still crossing the room; nobody is responding to it. Now drag
+      <em>Forecast horizon</em> to the right and watch the forecaster's number climb through the
+      band, on a run where the honest answer is zero and cannot change.
     </p>
   </aside>
 </main>

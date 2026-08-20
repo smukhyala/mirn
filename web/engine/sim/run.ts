@@ -24,11 +24,12 @@ export interface ArmResult {
  */
 export function runArm(
   config: RunConfig,
-  tape: NoiseTape,
+  spawnTape: NoiseTape,
+  noiseTape: NoiseTape,
   arm: ArmId,
   withRobot: boolean,
 ): ArmResult {
-  const state = initialState(config, tape, withRobot);
+  const state = initialState(config, spawnTape, withRobot);
   const scratch = makeScratch(state.n);
   const nSamples = config.nTicks + 1;
 
@@ -52,7 +53,7 @@ export function runArm(
 
   record(0);
   for (let tick = 0; tick < config.nTicks; tick++) {
-    stepWorld(state, config, tape, tick, scratch);
+    stepWorld(state, config, noiseTape, tick, scratch);
     record(tick + 1);
   }
 
@@ -110,8 +111,12 @@ export interface RunResult {
  */
 export function runPair(config: RunConfig, nowMs: () => number = () => 0): RunResult {
   const started = nowMs();
-  const effectiveSeed = mix4(config.seed, config.replicate, 0, 0);
-  const tape = makeTape(effectiveSeed);
+  // Two tapes, on purpose. Placement comes from the seed alone, so every replicate of a
+  // configuration puts the same people in the same places; only the in-run noise moves with the
+  // replicate. Mixing the replicate into placement as well turned each replicate into a different
+  // crowd entirely and inflated the run-to-run band to room scale.
+  const spawnTape = makeTape(config.seed);
+  const noiseTape = makeTape(mix4(config.seed, config.replicate, 0, 0));
 
   // The robot is always in the treated arm. Under a robot-presence treatment the control arm has
   // no robot at all; under every other treatment it is in both arms and the difference is
@@ -119,8 +124,8 @@ export function runPair(config: RunConfig, nowMs: () => number = () => 0): RunRe
   const treatedHasRobot = true;
   const controlHasRobot = config.treatment.kind !== "robot-presence";
 
-  const treated = runArm(config, tape, "treated", treatedHasRobot);
-  const control = runArm(config, tape, "control", controlHasRobot);
+  const treated = runArm(config, spawnTape, noiseTape, "treated", treatedHasRobot);
+  const control = runArm(config, spawnTape, noiseTape, "control", controlHasRobot);
 
   const pair = makePairedRun({
     treated: treated.scene,

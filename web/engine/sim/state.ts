@@ -54,8 +54,18 @@ export function agentIdFor(uid: number): string {
  * Both arms call this with the same tape and the same config, so they start identical by
  * construction rather than by a copy step — which is what `PairedRun`'s exact first-position
  * check then verifies.
+ *
+ * The SPAWN tape is deliberately a different tape from the in-run noise. A replicate is meant to
+ * be the same world with a different roll of the dice, so that two replicates differ only in
+ * exogenous noise and their difference measures the measurement's own wobble. Seeding the spawn
+ * from the replicate as well made every replicate a different crowd in different places, and the
+ * run-to-run band came out at 11 m — room-scale, because it was comparing strangers.
  */
-export function initialState(config: RunConfig, tape: NoiseTape, withRobot: boolean): WorldState {
+export function initialState(
+  config: RunConfig,
+  spawnTape: NoiseTape,
+  withRobot: boolean,
+): WorldState {
   const n = config.crowd.nPedestrians;
   const state: WorldState = {
     n,
@@ -73,14 +83,14 @@ export function initialState(config: RunConfig, tape: NoiseTape, withRobot: bool
   for (let i = 0; i < n; i++) {
     const uid = i;
     state.uid[i] = uid;
-    const sideDraw = tape(-1, uid, Channel.SpawnX);
+    const sideDraw = spawnTape(-1, uid, Channel.SpawnX);
     const fromLeft = sideDraw < 0.5;
-    const inset = 0.8 + tape(-1, uid, Channel.SpawnY) * 1.6;
+    const inset = 0.8 + spawnTape(-1, uid, Channel.SpawnY) * 1.6;
     state.x[i] = fromLeft ? inset : config.widthM - inset;
-    state.y[i] = 1.2 + tape(-1, uid, Channel.SpawnGoalY) * (config.heightM - 2.4);
+    state.y[i] = 1.2 + spawnTape(-1, uid, Channel.SpawnGoalY) * (config.heightM - 2.4);
     state.gx[i] = fromLeft ? config.widthM - 1.0 : 1.0;
     // A second, independent draw for the goal's height, so start and goal are not correlated.
-    state.gy[i] = 1.2 + tape(-2, uid, Channel.SpawnGoalY) * (config.heightM - 2.4);
+    state.gy[i] = 1.2 + spawnTape(-2, uid, Channel.SpawnGoalY) * (config.heightM - 2.4);
   }
 
   if (withRobot) {
