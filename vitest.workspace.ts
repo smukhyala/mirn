@@ -19,7 +19,7 @@ export default defineWorkspace([
       name: "ui",
       globals: true,
       environment: "node",
-      include: ["web/ui/**/*.test.ts", "web/app/**/*.test.ts"],
+      include: ["web/ui/**/*.test.ts", "web/app/**/*.test.ts", "web/build/**/*.test.ts"],
     },
   },
 ]);

@@ -21,6 +21,7 @@ import MarkdownIt from "markdown-it";
 import katex from "katex";
 import { load as loadYaml } from "js-yaml";
 import { VOCABULARY, type Term } from "../web/vocab.js";
+import { lintBareNumbers, lintComparatives, proseOf } from "../web/build/lints.js";
 
 const NOTES_DIRS = ["web/notes", "web/notes/experiments"];
 const OUT_DIR = "web/generated";
@@ -154,46 +155,13 @@ function checkVocabulary(pages: readonly Page[]): void {
 
 // ---------------------------------------------------------------- lints
 
-const COMPARATIVES =
-  /\b(more than|less than|greater than|fewer than|larger than|smaller than|bigger than|higher than|lower than|about (?:half|twice|three times)|twice|half of|roughly \w+ times|times (?:the|as))\b/i;
+// The rules themselves live in web/build/lints.ts, with tests: a lint nobody has watched fire is
+// a lint nobody has.
 
-/** Prose only: strips fenced blocks, inline code, maths and the escape hatches first. */
-function proseOf(body: string): string {
-  return body
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`[^`]*`/g, " ")
-    .replace(/\$\$[\s\S]*?\$\$/g, " ")
-    .replace(/\$[^$\n]*\$/g, " ")
-    .replace(/\{\{lit:[^}]*\}\}/g, " ")
-    .replace(/^---[\s\S]*?^---/m, " ");
-}
-
-const BARE_NUMBER =
-  /(?<![\w.:/-])(\d+(?:\.\d+)?)\s*(m|s|cm|km|metres|meters|seconds|m\/s|%)\b/gi;
-
-function lintBareNumbers(page: Page, prose: string): void {
-  for (const match of prose.matchAll(BARE_NUMBER)) {
-    fail(
-      page.file,
-      `bare number "${match[0].trim()}" in prose. Wrap a setting as {{lit:${match[0].trim()}}} or ` +
-        `use a {{q:}} token for a live result — see docs/teaching/authoring.md`,
-    );
-  }
-}
-
-function lintComparatives(page: Page, prose: string): void {
-  const tokenPattern = /\{\{q:[^}]*\}\}/g;
-  for (const match of prose.matchAll(tokenPattern)) {
-    const index = match.index ?? 0;
-    const window = prose.slice(Math.max(0, index - 80), index + match[0].length + 80);
-    const found = window.match(COMPARATIVES);
-    if (found !== null) {
-      fail(
-        page.file,
-        `comparative "${found[0]}" sits within 80 characters of ${match[0]} — a slider could ` +
-          `falsify it. Use {{q:...anchor}} instead, or move the claim away from the live number`,
-      );
-    }
+function runLints(page: Page): void {
+  const prose = proseOf(page.body);
+  for (const problem of [...lintBareNumbers(prose), ...lintComparatives(prose)]) {
+    fail(page.file, problem.message);
   }
 }
 
@@ -450,9 +418,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 for (let i = 0; i < ordered.length; i++) {
   const page = ordered[i] as Page;
-  const prose = proseOf(page.body);
-  lintBareNumbers(page, prose);
-  lintComparatives(page, prose);
+  runLints(page);
 
   const { text, blocks } = extractBlocks(page, page.body);
   let html = md.render(text);

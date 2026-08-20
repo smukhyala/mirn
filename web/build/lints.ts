@@ -1,0 +1,87 @@
+/**
+ * The two prose lints, as pure functions so they can be tested.
+ *
+ * They live here rather than inside scripts/build-notes.ts because a lint nobody has watched fire
+ * is a lint nobody has. Both encode a promise the site makes in prose, and both should be readable
+ * as that promise rather than as a regex.
+ */
+
+/**
+ * Strip everything that is not prose before linting: fenced blocks, inline code, maths, the
+ * literal escape hatch, and the front matter.
+ *
+ * Getting this wrong in either direction is bad. Too little stripping and every YAML block trips
+ * the number lint; too much and a real violation hides inside something that merely looks like
+ * code.
+ */
+export function proseOf(body: string): string {
+  return body
+    .replace(/^---[\s\S]*?^---/m, " ")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`[^`]*`/g, " ")
+    .replace(/\$\$[\s\S]*?\$\$/g, " ")
+    .replace(/\$[^$\n]*\$/g, " ")
+    .replace(/\{\{lit:[^}]*\}\}/g, " ");
+}
+
+/**
+ * A numeral immediately followed by a unit.
+ *
+ * The negative lookbehind keeps it off version numbers, times of day and paths. The trailing
+ * guard is `(?!\w)` rather than `\b`, which matters more than it looks: `\b` after `%` never
+ * matches, because `%` and end-of-string are both non-word characters, so the first version of
+ * this rule silently ignored every percentage on the site. `(?!\w)` also stops `m` matching
+ * inside `mm` while still letting the alternation reach `metres`.
+ */
+export const BARE_NUMBER =
+  /(?<![\w.:/-])(\d+(?:\.\d+)?)\s*(m|s|cm|km|metres|meters|seconds|m\/s|%)(?!\w)/gi;
+
+export const COMPARATIVES =
+  /\b(more than|less than|greater than|fewer than|larger than|smaller than|bigger than|higher than|lower than|about (?:half|twice|three times)|twice|half of|roughly \w+ times|times (?:the|as))\b/i;
+
+export interface LintProblem {
+  readonly rule: "bare-number" | "comparative";
+  readonly found: string;
+  readonly message: string;
+}
+
+/** "Never display a number without explaining where it came from", as a build error. */
+export function lintBareNumbers(prose: string): LintProblem[] {
+  const problems: LintProblem[] = [];
+  for (const match of prose.matchAll(BARE_NUMBER)) {
+    const found = match[0].trim();
+    problems.push({
+      rule: "bare-number",
+      found,
+      message:
+        `bare number "${found}" in prose. Wrap a setting as {{lit:${found}}} or use a {{q:}} ` +
+        `token for a live result — see docs/teaching/authoring.md`,
+    });
+  }
+  return problems;
+}
+
+/**
+ * "No sentence may assert a relation a rendered control could falsify."
+ *
+ * Only fires near a live quantity, because a comparative between two fixed measured values is
+ * fine — it is a comparative next to a number the reader can change that is the problem.
+ */
+export function lintComparatives(prose: string): LintProblem[] {
+  const problems: LintProblem[] = [];
+  for (const match of prose.matchAll(/\{\{q:[^}]*\}\}/g)) {
+    const index = match.index ?? 0;
+    const window = prose.slice(Math.max(0, index - 80), index + match[0].length + 80);
+    const found = window.match(COMPARATIVES);
+    if (found !== null) {
+      problems.push({
+        rule: "comparative",
+        found: found[0],
+        message:
+          `comparative "${found[0]}" sits within 80 characters of ${match[0]} — a slider could ` +
+          `falsify it. Use {{q:...anchor}} instead, or move the claim away from the live number`,
+      });
+    }
+  }
+  return problems;
+}
