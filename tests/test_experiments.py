@@ -112,6 +112,9 @@ _CALIBRATION_COLUMNS = [
     "null_sd",
     "mdp_95",
     "seed",
+    "epsilon",
+    "max_iter",
+    "tol",
 ]
 
 

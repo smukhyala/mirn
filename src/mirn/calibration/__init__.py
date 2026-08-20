@@ -10,7 +10,13 @@ from __future__ import annotations
 from mirn.calibration.null import (
     calibration_report,
     minimum_detectable_perturbation,
+    solver_settings_for,
     split_half_null,
 )
 
-__all__ = ["calibration_report", "minimum_detectable_perturbation", "split_half_null"]
+__all__ = [
+    "calibration_report",
+    "minimum_detectable_perturbation",
+    "solver_settings_for",
+    "split_half_null",
+]

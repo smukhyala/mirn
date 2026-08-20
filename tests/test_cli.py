@@ -51,6 +51,12 @@ def test_run_writes_a_csv_to_the_requested_path(tmp_path) -> None:
         "null_sd",
         "mdp_95",
         "seed",
+        # The solver settings the floor was computed under. Empty for ade/fde, which have no
+        # solver, but present as columns regardless: a CSV whose shape depends on a parameter
+        # value is a CSV nothing can concatenate.
+        "epsilon",
+        "max_iter",
+        "tol",
     ]
     assert len(frame) == 1
 

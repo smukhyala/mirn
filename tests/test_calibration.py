@@ -6,6 +6,7 @@ import pytest
 from mirn.calibration.null import (
     calibration_report,
     minimum_detectable_perturbation,
+    solver_settings_for,
     split_half_null,
 )
 from mirn.data.synthetic import SyntheticAdapter
@@ -101,6 +102,9 @@ def test_calibration_report_columns_and_single_row() -> None:
         "null_sd",
         "mdp_95",
         "seed",
+        "epsilon",
+        "max_iter",
+        "tol",
     ]
     assert len(report) == 1
     assert report.loc[0, "divergence"] == "ade"
@@ -120,3 +124,46 @@ def test_calibration_report_rejects_frechet() -> None:
     scenes = _counterfactual_scenes()
     with pytest.raises(ValueError):
         calibration_report(scenes, "frechet", seed=1)
+
+
+def test_split_half_null_threads_solver_settings_to_the_divergence() -> None:
+    """The detection floor must not be set by a constructor default a caller cannot see.
+
+    Before this, `split_half_null` built its divergence with `DIVERGENCES.create(name)` and no
+    arguments, so `SinkhornW2`'s class defaults silently fixed the floor. The floor is the scale
+    every other number in the project is expressed as a multiple of, so an invisible default there
+    is not a tidiness problem: it makes the headline number irreproducible.
+    """
+    adapter = SyntheticAdapter(n_scenes=1, n_pedestrians=6, n_steps=8, seed=0)
+    scenes = [pair.counterfactual for pair in adapter.rollout_pairs()]
+
+    loose = split_half_null(
+        scenes, "sinkhorn_w2", seed=3, n_splits=4, divergence_kwargs={"epsilon": 0.5}
+    )
+    tight = split_half_null(
+        scenes, "sinkhorn_w2", seed=3, n_splits=4, divergence_kwargs={"epsilon": 0.02}
+    )
+
+    # Same seed and the same splits; only the solver differs. If the kwargs were being dropped
+    # these would be identical, which is exactly the bug.
+    assert not np.allclose(loose, tight)
+
+
+def test_calibration_report_records_the_solver_settings_it_used() -> None:
+    """A published floor has to be reproducible from the CSV row alone."""
+    adapter = SyntheticAdapter(n_scenes=1, n_pedestrians=6, n_steps=8, seed=0)
+    scenes = [pair.counterfactual for pair in adapter.rollout_pairs()]
+
+    report = calibration_report(
+        scenes, "sinkhorn_w2", seed=3, divergence_kwargs={"epsilon": 0.25}
+    )
+
+    assert report["epsilon"].iloc[0] == 0.25
+    assert report["max_iter"].iloc[0] == 50000
+    assert report["tol"].iloc[0] == 1e-5
+
+
+def test_solverless_divergences_report_empty_settings_rather_than_missing_columns() -> None:
+    """A CSV whose columns depend on a parameter value is a CSV nothing can concatenate."""
+    settings = solver_settings_for("ade", None)
+    assert settings == {"epsilon": "", "max_iter": "", "tol": ""}

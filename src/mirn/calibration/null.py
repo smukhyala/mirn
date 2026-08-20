@@ -18,7 +18,7 @@ cloud-capable alternatives.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -41,7 +41,12 @@ def _validate_cloud_capable(divergence: str) -> None:
 
 
 def split_half_null(
-    scenes: Sequence[Scene], divergence: str, seed: int, n_splits: int = 200
+    scenes: Sequence[Scene],
+    divergence: str,
+    seed: int,
+    n_splits: int = 200,
+    *,
+    divergence_kwargs: Mapping[str, object] | None = None,
 ) -> np.ndarray:
     """Sample the null distribution of `divergence` under random half-population splits.
 
@@ -57,7 +62,11 @@ def split_half_null(
     if n_splits < 1:
         raise ValueError(f"split_half_null n_splits must be >= 1, got {n_splits}")
 
-    divergence_instance = DIVERGENCES.create(divergence)
+    if divergence_kwargs is None:
+        resolved_kwargs: dict[str, object] = {}
+    else:
+        resolved_kwargs = dict(divergence_kwargs)
+    divergence_instance = DIVERGENCES.create(divergence, **resolved_kwargs)
 
     pedestrian_positions: list[np.ndarray] = []
     for scene in scenes:
@@ -115,13 +124,48 @@ def minimum_detectable_perturbation(null_samples: np.ndarray, alpha: float = 0.0
     return float(np.quantile(null_samples, quantile_level))
 
 
-def calibration_report(scenes: Sequence[Scene], divergence: str, seed: int) -> pd.DataFrame:
+def solver_settings_for(
+    divergence: str, divergence_kwargs: Mapping[str, object] | None
+) -> dict[str, object]:
+    """The solver parameters a run actually used, resolved from the class defaults plus overrides.
+
+    Reported alongside every floor so the number can be reproduced. Divergences with no solver
+    (`ade`, `fde`) report empty strings rather than being omitted, because a CSV whose columns
+    depend on a parameter value is a CSV nothing can concatenate.
+    """
+    if divergence_kwargs is None:
+        overrides: dict[str, object] = {}
+    else:
+        overrides = dict(divergence_kwargs)
+
+    instance = DIVERGENCES.create(divergence, **overrides)
+    settings: dict[str, object] = {}
+    for name in ("epsilon", "max_iter", "tol"):
+        if hasattr(instance, name):
+            settings[name] = getattr(instance, name)
+        else:
+            settings[name] = ""
+    return settings
+
+
+def calibration_report(
+    scenes: Sequence[Scene],
+    divergence: str,
+    seed: int,
+    *,
+    divergence_kwargs: Mapping[str, object] | None = None,
+) -> pd.DataFrame:
     """One-row calibration summary: null mean/sd and the 95% minimum detectable perturbation.
 
-    Columns are exactly `divergence, n_scenes, n_splits, null_mean, null_sd, mdp_95, seed`.
+    Columns are exactly `divergence, n_scenes, n_splits, null_mean, null_sd, mdp_95, seed,
+    epsilon, max_iter, tol`. The last three record the solver settings the floor was computed
+    under: the floor is the scale every other number is judged against, so a report that does not
+    say how it was computed is not reproducible.
     """
     n_splits = _DEFAULT_N_SPLITS
-    null_samples = split_half_null(scenes, divergence, seed, n_splits=n_splits)
+    null_samples = split_half_null(
+        scenes, divergence, seed, n_splits=n_splits, divergence_kwargs=divergence_kwargs
+    )
     mdp_95 = minimum_detectable_perturbation(null_samples, alpha=0.05)
 
     row: dict[str, object] = {}
@@ -133,5 +177,21 @@ def calibration_report(scenes: Sequence[Scene], divergence: str, seed: int) -> p
     row["mdp_95"] = mdp_95
     row["seed"] = seed
 
-    columns = ["divergence", "n_scenes", "n_splits", "null_mean", "null_sd", "mdp_95", "seed"]
+    settings = solver_settings_for(divergence, divergence_kwargs)
+    row["epsilon"] = settings["epsilon"]
+    row["max_iter"] = settings["max_iter"]
+    row["tol"] = settings["tol"]
+
+    columns = [
+        "divergence",
+        "n_scenes",
+        "n_splits",
+        "null_mean",
+        "null_sd",
+        "mdp_95",
+        "seed",
+        "epsilon",
+        "max_iter",
+        "tol",
+    ]
     return pd.DataFrame([row], columns=columns)

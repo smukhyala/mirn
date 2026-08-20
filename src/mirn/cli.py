@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 import matplotlib
 
@@ -147,6 +148,23 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fixtures(args: argparse.Namespace) -> int:
+    """Regenerate the cross-language parity fixtures.
+
+    This is the oracle's job now: the browser owns the simulation and the teaching product, and
+    the only thing keeping the two implementations of the measurement honest is that Python writes
+    the answers down and TypeScript has to reproduce them.
+    """
+    from mirn.fixtures import write_fixtures
+
+    out_dir = Path(args.out)
+    written = write_fixtures(out_dir)
+    for path in written:
+        print(f"wrote {path}")
+    print(f"{len(written)} fixture(s) written to {out_dir}")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="mirn", description="The MIRN measurement instrument.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -167,6 +185,13 @@ def _build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8000)
 
+    fixtures_parser = subparsers.add_parser(
+        "fixtures", help="regenerate the cross-language parity fixtures"
+    )
+    fixtures_parser.add_argument(
+        "--out", default="tests/golden/parity", help="fixture output directory"
+    )
+
     return parser
 
 
@@ -179,6 +204,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_list()
     if args.command == "run":
         return _cmd_run(args)
+    if args.command == "fixtures":
+        return _cmd_fixtures(args)
     return _cmd_serve(args)
 
 
