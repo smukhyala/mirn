@@ -5,10 +5,12 @@ an empty formula would silently render as a blank panel in the UI."""
 from __future__ import annotations
 
 import dataclasses
+import re
 
 import pytest
 
 from mirn.method.cards import MethodCard
+from mirn.method.catalog import CARDS
 
 
 def _valid_card(**overrides: object) -> MethodCard:
@@ -122,3 +124,26 @@ def test_plain_summary_rejects_latex() -> None:
 def test_plain_summary_round_trips_through_as_dict() -> None:
     card = _valid_card(plain_summary="How far apart two paths are, on average.")
     assert card.as_dict()["plain_summary"] == "How far apart two paths are, on average."
+
+
+# Cards render on the page inside the mathematics disclosure. `assumptions` is deliberately NOT
+# covered here: that field is the estimator's `identification()` contract string, which also lands
+# in `PerturbationEstimate.identification` and every exported CSV, so it is a provenance record and
+# stays precise even where precision costs readability. `breaks_when`, `plain_summary`, `one_liner`
+# and `title` are authored page copy, and are held to the page's plain-English rule.
+_ARM_JARGON = re.compile(r"\b(arms?|exogenous|bitwise)\b", re.IGNORECASE)
+
+
+def test_no_card_copy_uses_trial_arm_jargon() -> None:
+    """"Arm" is clinical-trial vocabulary and "exogenous" is unglossed; the page says
+    robot-present / robot-absent run everywhere else, so the cards must too."""
+    for key, card in CARDS.items():
+        texts: list[tuple[str, str]] = []
+        texts.append(("title", card.title))
+        texts.append(("one_liner", card.one_liner))
+        texts.append(("plain_summary", card.plain_summary))
+        for index, text in enumerate(card.breaks_when):
+            texts.append((f"breaks_when[{index}]", text))
+        for field_name, text in texts:
+            found = _ARM_JARGON.findall(text)
+            assert not found, f"{key}.{field_name} uses {found} in page copy: {text!r}"

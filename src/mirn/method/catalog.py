@@ -186,7 +186,7 @@ def _build_cards() -> dict[str, MethodCard]:
                 "error — turning, acceleration, sensor noise, model misspecification — that "
                 "would be present in a robot-free world, so the reported number rises with "
                 "predictor error even when the true effect is exactly zero.",
-                "The counterfactual arm is never consulted, so nothing in the computation "
+                "The robot-absent run is never consulted, so nothing in the computation "
                 "references the robot's absence at all.",
                 "A policy trained to minimise it is partly trained to move predictably, which "
                 "is not the same thing as moving unobtrusively.",
@@ -214,8 +214,9 @@ def _build_cards() -> dict[str, MethodCard]:
             ),
             assumptions=(_identification_of("paired"),),
             breaks_when=(
-                "The two arms do not actually share a seed and an exogenous noise realisation, "
-                "in which case the divergence picks up ordinary between-rollout variation.",
+                "The robot-present and robot-absent runs do not actually share a seed and the "
+                "same random pedestrian noise, in which case the divergence picks up ordinary "
+                "between-rollout variation rather than the robot's effect.",
                 "It is reported in raw metres, so it has no scale until it is compared against a "
                 "calibrated detection floor.",
                 "The divergence is symmetric, so a pedestrian who approaches the robot out of "
@@ -284,7 +285,7 @@ def _build_cards() -> dict[str, MethodCard]:
                 "dependence on the robot whatsoever.",
                 "It is a diagnostic instrument for exhibiting that failure, and reporting a "
                 "number from it as a measurement of perturbation would be a category error.",
-                "The counterfactual arm is consulted, but only to be corrupted with noise "
+                "The robot-absent run is consulted, but only to be corrupted with noise "
                 "before comparison — never as a legitimate forecast input. That is what makes "
                 "this look like a residual estimator while testing nothing about the robot.",
             ),
