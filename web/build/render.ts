@@ -43,6 +43,21 @@ export interface RenderProblem {
   readonly message: string;
 }
 
+/**
+ * The two optional front-matter lines that open a page: what it shows, and what to touch first.
+ *
+ * A plain typed record with two optional strings, not an extension point. Both are written for the
+ * reader — unlike `reader_can`, which is the page's success criterion and is written for the
+ * author — and both are optional, because a page with nothing specific to say here should say
+ * nothing rather than print a label with a shrug under it.
+ */
+export interface PageOrientation {
+  /** One sentence, plain English, on what this page shows the reader. */
+  readonly shows?: string | undefined;
+  /** One imperative sentence naming a specific control to touch first. */
+  readonly try?: string | undefined;
+}
+
 export interface RenderContext {
   /** The page's own number on the ladder, so a definition callout cannot appear before its page. */
   readonly pageNumber: number;
@@ -50,10 +65,14 @@ export interface RenderContext {
   readonly quantities: QuantityData;
   /** Where this page's widget ids start. The caller owns the counter; see the file comment. */
   readonly startWidgetIndex: number;
+  /** Absent, or either half absent, renders nothing at all. */
+  readonly orientation?: PageOrientation | undefined;
 }
 
 export interface RenderResult {
   readonly html: string;
+  /** The orientation strip, or an empty string when the page declares neither line. */
+  readonly orientationHtml: string;
   readonly problems: readonly RenderProblem[];
   readonly nextWidgetIndex: number;
 }
@@ -158,6 +177,46 @@ export function renderBody(source: string, context: RenderContext): RenderResult
   return `<div class="widget"><div class="widget-mount" id="${id}" data-mirn-widget='${escapeAttribute(payload)}'><noscript><p class="widget-fallback">This is an interactive figure. It needs JavaScript; the argument around it does not.</p></noscript></div>${caption}</div>`;
   }
 
+  // ---------------------------------------------------------------- 0. orientation
+
+  /**
+   * The strip that sits under the page title: what the page shows, and what to touch first.
+   *
+   * Built HERE, as real HTML, for the same reason a figure caption is built here rather than
+   * appended by the mount function: the strip is prose, and the prose on this site survives
+   * JavaScript being switched off. It also means the two lines get the treatment prose gets —
+   * `{{lit:}}` and `{{q:}}` resolved against the measured facts — so a setting quoted in the strip
+   * cannot drift from the same setting quoted in the body.
+   *
+   * A page that declares neither line gets no markup at all. An empty label is furniture, and a
+   * reader who meets furniture twice stops reading the strip on the pages that filled it in.
+   */
+  function orientationLine(kind: string, label: string, line: string | undefined): string {
+    if (typeof line !== "string") {
+      return "";
+    }
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      return "";
+    }
+    const resolved = resolveTokens(escapeHtml(trimmed));
+    return (
+      `<p class="orientation-line orientation-${kind}">` +
+      `<span class="orientation-label">${escapeHtml(label)}</span>` +
+      `<span class="orientation-text">${resolved}</span></p>`
+    );
+  }
+
+  let orientationHtml = "";
+  const orientation = context.orientation;
+  if (orientation !== undefined) {
+    const showsLine = orientationLine("shows", "What you are looking at", orientation.shows);
+    const tryLine = orientationLine("try", "Try this first", orientation.try);
+    if (showsLine.length > 0 || tryLine.length > 0) {
+      orientationHtml = `<div class="orientation">${showsLine}${tryLine}</div>`;
+    }
+  }
+
   // ---------------------------------------------------------------- 1. extract
 
   let text = source.replace(
@@ -239,5 +298,5 @@ export function renderBody(source: string, context: RenderContext): RenderResult
     (_all, index: string) => blocks[Number(index)] as string,
   );
 
-  return { html, problems, nextWidgetIndex: widgetIndex };
+  return { html, orientationHtml, problems, nextWidgetIndex: widgetIndex };
 }

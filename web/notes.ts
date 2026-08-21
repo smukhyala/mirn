@@ -275,7 +275,13 @@ function mountScene(host: HTMLElement, config: SceneConfig): void {
   }
 
   const controls = new Set(requested);
-  let seeRobot = config.seeRobot ?? true;
+  // The preset says whether the people in this room can see the robot. A page may override it, and
+  // the toggle moves it afterwards where a page draws one; nothing else does. Reading `true` here
+  // instead made every control preset inert, because `build()` below writes this value straight
+  // over the preset's: page 7 asked for the room with nobody responding to a robot and was handed
+  // the ordinary room back, under a caption saying the robot had been taken out of it.
+  const presetSeesRobot = preset().pedestriansSeeRobot;
+  let seeRobot = config.seeRobot ?? presetSeesRobot;
   let showControl = config.showControl ?? true;
   let showGaps = showControl;
   let highlight: ArenaHighlight | null = null;
@@ -371,6 +377,10 @@ function mountScene(host: HTMLElement, config: SceneConfig): void {
     );
   }
   if (controls.has("seeRobot")) {
+    // No page draws this one today, and the page that first does needs to read `robotForView`
+    // below before it does: with the box unticked the figure becomes a room with no robot drawn in
+    // it, which is more than this label promises. Either say so in the label or narrow that
+    // function to the preset.
     bar.append(
       toggle("People notice the robot", seeRobot, (on) => {
         seeRobot = on;
@@ -391,9 +401,46 @@ function mountScene(host: HTMLElement, config: SceneConfig): void {
     );
   }
 
+  /**
+   * The robot's own path, when this room has a robot in it to draw.
+   *
+   * A configuration where the people cannot see the robot is how a robot-free crowd is shown: every
+   * path on the canvas is then the path that person would have walked with nothing in their way.
+   * Page 7 says exactly that above the figure — "no robot anywhere in it" — and the machine's
+   * square, its halo and its trail were being drawn over the words denying them. Derived from the
+   * run's own configuration rather than from a flag a page has to remember to set, so a later page
+   * reaching for the same preset cannot forget.
+   */
+  function robotForView(): Float64Array | null {
+    if (!result.config.pedestriansSeeRobot) {
+      return null;
+    }
+    return result.treated.robotPositions;
+  }
+
+  /** What the canvas is a picture of, for a reader who cannot see it. Same rule as above. */
+  function roomSummary(): string {
+    if (!result.config.pedestriansSeeRobot) {
+      return "An invented crowd with no robot anywhere in it.";
+    }
+    return "The same crowd run twice, once with a robot and once without.";
+  }
+
+  function ariaLabel(text: string): string {
+    const seconds = (sample * result.config.dt).toFixed(1);
+    return `${roomSummary()} At ${seconds} seconds the ${text}.`;
+  }
+
   function describe(): string {
     const dev = deviation(result.pair);
     const gap = dev.series[sample] ?? 0;
+    if (!result.config.pedestriansSeeRobot) {
+      // The two arms are one run here, so this reads zero wherever the timeline is put. Guardrail 6
+      // is what the phrase after the dash is for: page 7 argues that a number it is about is not
+      // zero, and a bare "0.000 m" under that argument invites the reader to think the two are the
+      // same number.
+      return `typical gap ${gap.toFixed(3)} m — no robot in this room for anybody to respond to`;
+    }
     // Guardrails 6 and 7: a metre never appears on its own. The anchor is the cheapest thing that
     // gives it scale, and it is the same wording the derivation panels use.
     return `typical gap ${gap.toFixed(3)} m — ${anchorFor(gap)}`;
@@ -401,8 +448,9 @@ function mountScene(host: HTMLElement, config: SceneConfig): void {
 
   // Written once at mount as well as every frame. The animation loop below never starts if the
   // canvas has no 2d context, and a reader in that position was shown an empty readout instead of
-  // a number.
+  // a number — and, since the canvas carries `role="img"`, a picture with no description at all.
   readout.textContent = describe();
+  canvas.setAttribute("aria-label", ariaLabel(readout.textContent));
 
   const context = canvas.getContext("2d");
   if (context === null) {
@@ -422,6 +470,7 @@ function mountScene(host: HTMLElement, config: SceneConfig): void {
       scrub.value = String(sample);
     }
     const box = fitCanvas(canvas, window.devicePixelRatio);
+    const robotPath = robotForView();
     const view: ArenaView = {
       widthM: result.config.widthM,
       heightM: result.config.heightM,
@@ -429,7 +478,7 @@ function mountScene(host: HTMLElement, config: SceneConfig): void {
       nSamples,
       treated: result.treated.positions,
       control: result.control.positions,
-      robot: result.treated.robotPositions,
+      robot: robotPath,
       showControl,
       showGaps,
       trailSamples: 90,
@@ -440,11 +489,7 @@ function mountScene(host: HTMLElement, config: SceneConfig): void {
     drawArena(context as CanvasRenderingContext2D, view, box.width, box.height);
     const text = describe();
     readout.textContent = text;
-    canvas.setAttribute(
-      "aria-label",
-      `The same crowd run twice, once with a robot and once without. At ` +
-        `${(sample * result.config.dt).toFixed(1)} seconds the ${text}.`,
-    );
+    canvas.setAttribute("aria-label", ariaLabel(text));
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -978,8 +1023,9 @@ function buildNearMiss(config: RunConfig): Built {
         ${rows.join("<br>")}
      </p><p class="derivation-units">all lengths in metres</p>`,
     `<p>At a threshold of half a metre this run contains
-        <span class="accent-number">${middle.nearMissEpisodes}</span> near misses. Stricter and it
-        contains fewer; looser and it contains more.</p>
+        <span class="accent-number">${middle.nearMissEpisodes}</span> near misses. The counts above are not a
+        ladder: widening the line can merge two separate dips into one episode, so a looser
+        threshold sometimes reports fewer near misses rather than more.</p>
      <p class="derivation-anchor">The number moved and the run did not. A metric with a threshold
         inside it is part measurement and part opinion, and the honest thing is to show it at
         several thresholds and see whether the conclusion survives all of them.</p>`,

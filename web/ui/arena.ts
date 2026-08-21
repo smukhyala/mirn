@@ -1,6 +1,23 @@
 import { PALETTE, SERIES } from "./theme.js";
 
 /**
+ * Rendering constants for the robot's mark. There is exactly one thing on this canvas that is not
+ * a person, and at a few pixels it was being told apart from forty of them by shape alone. These
+ * numbers are pixels on a screen: nothing in `web/engine/` reads them, so moving them moves no
+ * number the site quotes.
+ */
+const ROBOT_DRAW_SCALE = 1.3;
+const ROBOT_MIN_HALF_PX = 5;
+const ROBOT_HALO_GAP_PX = 2;
+const ROBOT_HALO_RING_PX = 1;
+const ROBOT_TRAIL_SAMPLES = 40;
+const ROBOT_TRAIL_ALPHA = 0.55;
+const ROBOT_TRAIL_MIN_WIDTH_FRACTION = 0.4;
+
+/** Shared so the per-frame draw loop never allocates an array to clear the dash pattern. */
+const NO_DASH: number[] = [];
+
+/**
  * Everything the arena needs to draw one frame. A frozen plain object — there is no path from a
  * draw function to a control, which is the specific defect this file exists not to reproduce
  * (the demo's `drawArena` read `ui.ghost.checked` directly).
@@ -95,6 +112,52 @@ function drawTrail(
     }
   }
   context.stroke();
+}
+
+/**
+ * Where the robot has just been, drawn from the same buffer the square is drawn from. No second
+ * history is kept, nothing is stored between frames, and nothing here is measured — it is a
+ * direction cue, so a reader can see which way the machine is going and where it came in from.
+ * Deliberately shorter than the crowd's trails, so it never reads as a fifth path to compare.
+ */
+function drawRobotTrail(
+  context: CanvasRenderingContext2D,
+  buffer: Float64Array,
+  sample: number,
+  trailSamples: number,
+  t: Transform,
+): void {
+  const span = Math.min(trailSamples, ROBOT_TRAIL_SAMPLES);
+  const first = Math.max(0, sample - span);
+  const drawn = sample - first;
+  if (drawn < 1) {
+    return;
+  }
+
+  const style = SERIES.robot as (typeof SERIES)[string];
+  context.save();
+  context.strokeStyle = style.stroke;
+  context.setLineDash(NO_DASH);
+  context.lineCap = "round";
+
+  let previousX = t.offsetX + (buffer[2 * first] as number) * t.scale;
+  let previousY = t.offsetY + (buffer[2 * first + 1] as number) * t.scale;
+  for (let s = first + 1; s <= sample; s++) {
+    const x = t.offsetX + (buffer[2 * s] as number) * t.scale;
+    const y = t.offsetY + (buffer[2 * s + 1] as number) * t.scale;
+    const freshness = (s - first) / drawn;
+    const taper = ROBOT_TRAIL_MIN_WIDTH_FRACTION + (1 - ROBOT_TRAIL_MIN_WIDTH_FRACTION) * freshness;
+    context.globalAlpha = ROBOT_TRAIL_ALPHA * freshness;
+    context.lineWidth = style.width * taper;
+    context.beginPath();
+    context.moveTo(previousX, previousY);
+    context.lineTo(x, y);
+    context.stroke();
+    previousX = x;
+    previousY = y;
+  }
+
+  context.restore();
 }
 
 function dot(
@@ -196,8 +259,21 @@ export function drawArena(
       dot(context, buffer, view.sample, view.pedRadiusM, t, false, PALETTE.inkMuted);
     }
   }
+  // Muted, not black. This makes the robot's square the only *filled* mark on the canvas in the
+  // darkest ink — one square among forty discs of the same tone is not a difference a reader can
+  // find at a few pixels.
+  //
+  // The trails were deliberately not muted with the dots, so the canvas still carries black
+  // lines: `SERIES.treated` is `PALETTE.ink` and stays that way, because page 2 asks the reader
+  // to tell the solid path from "the faint one", and because the same `SERIES` entries are drawn
+  // by plot.ts and by the key on the page. What changed is narrower than "the darkest ink belongs
+  // to the robot": every black *dot* on the canvas is now the robot. What separates the two runs
+  // is unchanged — filled here, hollow for the run with no robot in it.
+  //
+  // The one other ink-filled disc is the highlight's treated point in `drawHighlight`, which is a
+  // spotlight drawn over a dimmed room and is meant to be the darkest thing on screen.
   for (const buffer of view.treated) {
-    dot(context, buffer, view.sample, view.pedRadiusM, t, true, PALETTE.ink);
+    dot(context, buffer, view.sample, view.pedRadiusM, t, true, PALETTE.inkMuted);
   }
 
   if (view.highlight !== null) {
@@ -205,16 +281,28 @@ export function drawArena(
   }
 
   if (view.robot !== null) {
+    drawRobotTrail(context, view.robot, view.sample, view.trailSamples, t);
+
     const x = t.offsetX + (view.robot[2 * view.sample] as number) * t.scale;
     const y = t.offsetY + (view.robot[2 * view.sample + 1] as number) * t.scale;
-    const r = view.robotRadiusM * t.scale;
-    // A square, so the robot is distinguishable from a person by shape rather than by hue.
+    // A square, so the robot is distinguishable from a person by shape rather than by hue. Shape
+    // is carrying that distinction alone, so it is drawn a little past the radius the simulator
+    // gives it and ringed — a paper gap, then a thin outline — which holds the square together
+    // against a dense crowd. Size on screen is a drawing decision; nothing measures pixels.
+    const half = Math.max(ROBOT_MIN_HALF_PX, view.robotRadiusM * t.scale * ROBOT_DRAW_SCALE);
+    context.setLineDash(NO_DASH);
     context.fillStyle = PALETTE.ink;
-    context.fillRect(x - r, y - r, r * 2, r * 2);
+    context.fillRect(x - half, y - half, half * 2, half * 2);
+
+    const gapHalf = half + ROBOT_HALO_GAP_PX / 2;
     context.strokeStyle = PALETTE.paper;
-    context.lineWidth = 1.5;
-    context.setLineDash([]);
-    context.strokeRect(x - r, y - r, r * 2, r * 2);
+    context.lineWidth = ROBOT_HALO_GAP_PX;
+    context.strokeRect(x - gapHalf, y - gapHalf, gapHalf * 2, gapHalf * 2);
+
+    const ringHalf = half + ROBOT_HALO_GAP_PX + ROBOT_HALO_RING_PX / 2;
+    context.strokeStyle = PALETTE.ink;
+    context.lineWidth = ROBOT_HALO_RING_PX;
+    context.strokeRect(x - ringHalf, y - ringHalf, ringHalf * 2, ringHalf * 2);
   }
 }
 

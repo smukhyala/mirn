@@ -15,6 +15,11 @@ title: The same room, twice
 subtitle: Where deviation comes from
 introduces: [nominal-trajectory, deviation, state, seed]   # ids from web/vocab.ts
 uses: [run, trajectory]                                    # must all be introduced EARLIER
+shows: >                  # optional. One sentence, for the READER, on what this page shows.
+  An invented crowd walking a {{lit:22 m}} corridor while a robot crosses it, and the question
+  that one crossing cannot answer.
+try: >                    # optional. One imperative sentence NAMING a control.
+  Drag the slider under the first figure to the moment the robot passes closest to somebody.
 reader_can: >
   One sentence per capability. This is the page's own success criterion, kept in the source
   where it can be read while writing.
@@ -23,6 +28,44 @@ reader_can: >
 
 `introduces` and `uses` are checked against `web/vocab.ts` at build time. Using a term before its
 page is a build error, and so is introducing one twice or never.
+
+## The orientation strip
+
+`shows` and `try` are the only front-matter fields a reader ever sees. They compile to a strip
+directly under the page title — mono labels, rules above and below — so somebody landing on the
+page can tell what it shows and what to touch before reading a word of the argument. `reader_can`
+is not part of it: that one is written for the author and stays out of the HTML.
+
+Both are optional and independent. Omit one and only the other renders; omit both and there is no
+strip at all, no label and no empty box. Write `try:` with nothing after it and the build fails,
+because a half-written field is a mistake rather than an omission.
+
+Three rules. **One of them the build catches. The other two are yours to hold, and saying so is
+the point** — a rule that claims a gate it does not have is the failure this project has already
+made once, with the `Math.hypot` ban that sat in a comment.
+
+- **Enforced. The strip is prose, so all four lints run over it**, exactly as they run over a
+  paragraph: `runLints` in `scripts/build-notes.ts` joins `shows` and `try` into the body before
+  `proseOf` sees either. A numeral followed by a unit is a build error unless it is
+  `{{lit:0.05 s}}`; a term the ladder introduces later is a build error; so is a synonym off the
+  list. `{{lit:}}` and `{{q:}}` both resolve here, against the same facts the body uses. The build
+  also rejects a half-written field, which is a parse rule rather than a lint.
+- **Not enforced. `try` names a control**, in the imperative, by the words printed on it, and the
+  control has to be one the page actually draws — "drag the slider under the figure", "turn the
+  dial marked people up", not "explore the figure", and not "read the first chart", which names no
+  control at all. The label is not the id: the scene declares `scrub` and draws an unlabelled
+  range input, so a reader looking for a "scrubber" finds nothing. Nothing checks this, and a lint
+  could only check the half that does not matter. A `try` line names a control by the label a
+  reader sees; the page declares it by id, and several correct lines point at something clickable
+  that appears in no `controls:` list — a number in the prose that opens its working. A lint over
+  ids would fire on pages that are right, which is worse than this sentence. Open the page and
+  touch the thing the line tells the reader to touch.
+- **Not enforced. `shows` calls the crowd invented before it quotes any size or number**, which is
+  guardrail 1 in the position where a reader meets it first. The only mechanical trace of it is a
+  single assertion in `web/app/__tests__/render.test.ts`, against one page; every other page rests
+  on whoever wrote it. The same obligation binds the landing page, which has no front matter at
+  all: its standfirst says the crowd is invented above the animation, because that animation is
+  the first crowd anybody sees.
 
 ## Blocks
 

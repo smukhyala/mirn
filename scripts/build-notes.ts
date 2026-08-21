@@ -59,6 +59,11 @@ interface FrontMatter {
   introduces?: string[];
   uses?: string[];
   reader_can?: string;
+  // The orientation strip. `reader_can` is written for the author; these two are written for the
+  // reader, and are the only front-matter fields that reach the page. Both optional: a page with
+  // nothing specific to say here prints nothing.
+  shows?: string;
+  try?: string;
 }
 
 interface Page {
@@ -100,6 +105,24 @@ function collect(): Page[] {
         fail(file, "front matter is missing `title`");
         continue;
       }
+      // `shows` and `try` are optional, but a half-written one is a mistake rather than an
+      // omission: `try:` with nothing after it parses as null, which would silently render an
+      // empty strip. Absent means absent; present means a sentence.
+      let malformed = false;
+      for (const field of ["shows", "try"] as const) {
+        const value = front[field];
+        if (value !== undefined && typeof value !== "string") {
+          fail(
+            file,
+            `front matter \`${field}\` must be a sentence of text. Omit the field entirely if ` +
+              `this page has nothing to say there`,
+          );
+          malformed = true;
+        }
+      }
+      if (malformed) {
+        continue;
+      }
       pages.push({
         file,
         front,
@@ -138,7 +161,12 @@ function checkFrontMatterClosure(pages: readonly Page[]): void {
 // a lint nobody has.
 
 function runLints(page: Page): void {
-  const prose = proseOf(page.body);
+  // The orientation strip is linted with the body rather than beside it. `proseOf` strips front
+  // matter, so these two lines would otherwise be the only prose on the site the four rules never
+  // see — and they are the first prose a reader meets. Joined in, they get all four: a numeral
+  // with a unit in `try` needs {{lit:}} exactly as it would in a paragraph.
+  const orientationText = [page.front.shows ?? "", page.front.try ?? ""].join("\n\n");
+  const prose = proseOf(`${page.body}\n\n${orientationText}`);
   const problems = [
     ...lintBareNumbers(prose),
     ...lintComparatives(prose),
@@ -216,7 +244,7 @@ const QUANTITIES: QuantityData = {
 
 // ---------------------------------------------------------------- shell
 
-function shell(page: Page, contentHtml: string, nav: string): string {
+function shell(page: Page, contentHtml: string, orientationHtml: string, nav: string): string {
   const subtitle =
     page.front.subtitle === undefined
       ? ""
@@ -242,6 +270,7 @@ function shell(page: Page, contentHtml: string, nav: string): string {
   <p class="eyebrow">${escapeHtml(eyebrow)}</p>
   <h1>${escapeHtml(page.front.title)}</h1>
   ${subtitle}
+  ${orientationHtml}
 </header>
 <main class="prose">
 ${contentHtml}
@@ -265,48 +294,71 @@ function contentsPage(pages: readonly Page[]): string {
     4: "Part IV — Why this is harder than it looks",
   };
 
+  /**
+   * The one line under a title, and the only two links that get one.
+   *
+   * Eighteen links each carrying a subtitle read as a table of contents, which is what somebody
+   * arriving has no use for. The titles carry themselves; these two do not. "Experiments" has to
+   * say that the seven questions are behind it, because this page no longer lists them, and "the
+   * instrument" is a name for a thing a reader has not met yet.
+   */
+  const SUBTITLES: Readonly<Record<string, string>> = {
+    experiments: "Seven questions, one changed setting each",
+    instrument: "Every control, no prose",
+  };
+
+  function row(id: string, title: string, href: string): string {
+    const subtitle =
+      SUBTITLES[id] === undefined
+        ? ""
+        : `<span class="contents-subtitle">${escapeHtml(SUBTITLES[id] as string)}</span>`;
+    return `<li><a href="${href}">${escapeHtml(title)}</a>${subtitle}</li>`;
+  }
+
   const sections: string[] = [];
   let currentPart: number | null = null;
   let open = false;
 
+  /**
+   * The closing page has no part, and used to print an empty heading above itself. It joins the
+   * instrument under "Also" instead, which is what both of them are.
+   */
+  const closing: Page[] = [];
+
   const numbered = pages.filter((p) => !p.isExperiment);
   for (const page of numbered) {
-    const part = page.front.part ?? 0;
+    const part = page.front.part;
+    if (part === undefined || PART_NAMES[part] === undefined) {
+      closing.push(page);
+      continue;
+    }
     if (part !== currentPart) {
       if (open) {
         sections.push("</ol>");
       }
-      const name = PART_NAMES[part];
-      sections.push(`<p class="contents-part">${escapeHtml(name ?? "")}</p><ol>`);
+      sections.push(`<p class="contents-part">${escapeHtml(PART_NAMES[part] as string)}</p><ol>`);
       currentPart = part;
       open = true;
     }
-    const subtitle =
-      page.front.subtitle === undefined
-        ? ""
-        : `<span class="contents-subtitle">${escapeHtml(page.front.subtitle)}</span>`;
-    sections.push(
-      `<li><a href="./generated/${page.front.id}.html">${escapeHtml(page.front.title)}</a>${subtitle}</li>`,
-    );
+    sections.push(row(page.front.id, page.front.title, `./generated/${page.front.id}.html`));
   }
   if (open) {
     sections.push("</ol>");
   }
 
-  const experiments = pages.filter((p) => p.isExperiment);
-  if (experiments.length > 0) {
-    sections.push(`<p class="contents-part">The seven experiments</p><ol>`);
-    for (const page of experiments) {
-      const subtitle =
-        page.front.subtitle === undefined
-          ? ""
-          : `<span class="contents-subtitle">${escapeHtml(page.front.subtitle)}</span>`;
-      sections.push(
-        `<li><a href="./generated/${page.front.id}.html">${escapeHtml(page.front.title)}</a>${subtitle}</li>`,
-      );
-    }
-    sections.push("</ol>");
+  sections.push(`<p class="contents-part">Also</p><ol>`);
+  for (const page of closing) {
+    sections.push(row(page.front.id, page.front.title, `./generated/${page.front.id}.html`));
   }
+  sections.push(row("instrument", "The instrument", "./instrument.html"));
+  sections.push("</ol>");
+
+  // The seven experiments are deliberately absent. Every one of them is linked from page 6,
+  // which is the page that says what an experiment on this site is and what corridor-11 is — the
+  // two things that make an experiment page mean anything. Listing them here as well made a first
+  // screen of eighteen links, and offered seven of them to a reader told none of that yet.
+  // web/app/__tests__/landing.test.ts checks page 6 still carries all seven, so this stays a
+  // delegation rather than becoming seven orphans.
 
   return `<!doctype html>
 <html lang="en">
@@ -317,28 +369,35 @@ function contentsPage(pages: readonly Page[]): string {
 <link rel="stylesheet" href="./theme.gen.css">
 <link rel="stylesheet" href="./style.css">
 </head>
-<body>
+<body class="landing">
 <header class="masthead">
   <p class="eyebrow">An interactive notebook</p>
   <h1>What a robot does to a crowd, and how you would know</h1>
-  <p class="standfirst">
-    A robot crosses a room full of people. Some of them move differently than they would have.
-    This is about how much, how you would measure it, and why the obvious way of measuring it does
-    not work. You need no robotics background; the mathematics goes no further than the distance
-    between two points.
-  </p>
+  <!-- Guardrail 1, in the one place on the site with no front matter to carry it. The animation
+       below is the first crowd anybody sees, so the word "invented" has to be above it and not in
+       the figcaption underneath — and the figure is hidden without JavaScript, which would leave
+       a scriptless reader nothing but the footer. One sentence, and it opens with the disclosure. -->
+  <p class="standfirst">Every crowd on this site is invented: a robot crosses one, some of the
+  people move differently than they would have, and this is how you would measure how much — you
+  need no robotics background.</p>
 </header>
+<!-- Hidden until web/hero.ts fills it, so a reader with no JavaScript gets the title, the
+     sentence and the index rather than an empty box captioned as an animation. -->
+<figure class="hero" id="hero" hidden>
+  <canvas class="hero-arena" id="hero-arena" role="img"
+    aria-label="A robot crossing a room of invented pedestrians, drawn as it is computed."></canvas>
+  <figcaption class="hero-caption">An invented crowd, computed in your browser as you watch.
+  Nobody in it is a recording of a real person.</figcaption>
+</figure>
+<p class="start"><a class="start-link" href="./generated/the-room.html">Start reading</a></p>
 <main class="contents">
 ${sections.join("\n")}
-<p class="contents-part">Also</p>
-<ol>
-  <li><a href="./instrument.html">The instrument</a><span class="contents-subtitle">The bare readout: one crowd, run twice, with every control exposed.</span></li>
-</ol>
 </main>
 <footer class="page-footer">
   <p>Everything here is simulated. The crowd is a model, not a recording of real people, and no
   number on this site is a measurement of anything that happened.</p>
 </footer>
+<script type="module" src="./hero.ts"></script>
 </body>
 </html>
 `;
@@ -393,6 +452,7 @@ for (let i = 0; i < ordered.length; i++) {
     terms: VOCABULARY,
     quantities: QUANTITIES,
     startWidgetIndex: widgetIndex,
+    orientation: { shows: page.front.shows, try: page.front.try },
   });
   widgetIndex = rendered.nextWidgetIndex;
   for (const problem of rendered.problems) {
@@ -412,7 +472,7 @@ for (let i = 0; i < ordered.length; i++) {
 
   writeFileSync(
     join(OUT_DIR, `${page.front.id}.html`),
-    shell(page, rendered.html, navParts.join("")),
+    shell(page, rendered.html, rendered.orientationHtml, navParts.join("")),
   );
 }
 
@@ -435,6 +495,8 @@ writeFileSync(
       subtitle: p.front.subtitle ?? null,
       isExperiment: p.isExperiment,
       readerCan: p.front.reader_can ?? null,
+      shows: p.front.shows ?? null,
+      try: p.front.try ?? null,
     })),
     null,
     2,
