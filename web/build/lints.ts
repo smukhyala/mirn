@@ -1,9 +1,14 @@
 /**
- * The two prose lints, as pure functions so they can be tested.
+ * The four prose lints, as pure functions so they can be tested: bare number, comparative near a
+ * live figure, term used before the page that defines it, and synonym for a term the site never
+ * defines. `scripts/build-notes.ts` runs all four over every page.
  *
  * They live here rather than inside scripts/build-notes.ts because a lint nobody has watched fire
- * is a lint nobody has. Both encode a promise the site makes in prose, and both should be readable
+ * is a lint nobody has. Each encodes a promise the site makes in prose, and each should be readable
  * as that promise rather than as a regex.
+ *
+ * There were two when this file was written, and the header still said two after the third and
+ * fourth arrived. A fifth means editing this sentence in the same commit.
  */
 
 /**
@@ -69,7 +74,14 @@ export function lintBareNumbers(prose: string): LintProblem[] {
  */
 export function lintComparatives(prose: string): LintProblem[] {
   const problems: LintProblem[] = [];
+  // `.anchor` is exempt, and has to be: it resolves to a body-scale phrase like "about one
+  // stride" that moves with the number, which is precisely why the rule's own error message
+  // recommends it. Without this the lint rejected the construct it told you to use, and the
+  // documented escape hatch was itself a build error.
   for (const match of prose.matchAll(/\{\{q:[^}]*\}\}/g)) {
+    if (match[0].endsWith(".anchor}}")) {
+      continue;
+    }
     const index = match.index ?? 0;
     const window = prose.slice(Math.max(0, index - 80), index + match[0].length + 80);
     const found = window.match(COMPARATIVES);

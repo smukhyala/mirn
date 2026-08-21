@@ -48,10 +48,10 @@ series:
     accent: true
 caption: >
   Nobody has been deleted here. Each person is filed by their own closest approach to the robot,
-  measured on the run with no robot in it — the leftmost group came within 1 m of it, the rightmost
-  never came within 5 m — and the height is that group's mean deviation. This sweep fills the room
+  measured on the run with no robot in it — the leftmost group came within {{lit:1 m}} of it, the
+  rightmost never came within {{lit:5 m}} — and the height is that group's mean deviation. This sweep fills the room
   fuller than the rest of the site does, which is the only way the far bins get anybody in them at
-  all; even so, in a 22 x 13 m room with a robot crossing the middle, almost nobody manages to stay
+  all; even so, in a {{lit:22 x 13 m}} room with a robot crossing the middle, almost nobody manages to stay
   away from it. The rightmost bin is four people, pooled over every run.
 ```
 

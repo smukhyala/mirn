@@ -18,7 +18,7 @@ cloud-capable alternatives.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -28,6 +28,17 @@ from mirn.divergence import DIVERGENCES
 
 _CLOUD_CAPABLE_DIVERGENCES: tuple[str, ...] = ("ade", "fde", "sinkhorn_w2")
 _DEFAULT_N_SPLITS = 200
+
+PermutationSource = Callable[[int, int], np.ndarray]
+"""`(n_pedestrians, split_index) -> permutation of range(n_pedestrians)`.
+
+Injectable for one reason: numpy's PCG64 cannot be reproduced in JavaScript without
+reimplementing a numpy internal, so `web/engine/measure/null/splitHalf.ts` takes the same
+capability and the parity fixture supplies both languages with the identical splits as data. That
+isolates the divergence arithmetic — the thing worth checking — from the stream of random bits,
+which is the thing that cannot be checked. Addressed by `split_index` rather than by a cursor so
+splits can be computed in any order and still agree.
+"""
 
 
 def _validate_cloud_capable(divergence: str) -> None:
@@ -40,6 +51,32 @@ def _validate_cloud_capable(divergence: str) -> None:
         )
 
 
+def _validated_permutation(
+    candidate: np.ndarray, n_pedestrians: int, split_index: int
+) -> np.ndarray:
+    """Check an injected split really is a permutation before it selects the two halves.
+
+    An injected index array that repeated an index, or omitted one, would still produce a
+    plausible-looking float: the halves would simply overlap or drop somebody, and the resulting
+    floor would be quietly wrong rather than obviously broken. That is exactly the failure a
+    hand-written parity fixture can make, so it is caught here rather than discovered on a page.
+    """
+    permutation = np.asarray(candidate, dtype=np.intp)
+    if permutation.shape != (n_pedestrians,):
+        raise ValueError(
+            f"split_half_null permutation for split {split_index} must have shape "
+            f"({n_pedestrians},), got {permutation.shape}"
+        )
+    expected = np.arange(n_pedestrians, dtype=np.intp)
+    if not np.array_equal(np.sort(permutation), expected):
+        raise ValueError(
+            f"split_half_null permutation for split {split_index} is not a permutation of "
+            f"range({n_pedestrians}): every index must appear exactly once, got "
+            f"{permutation.tolist()}"
+        )
+    return permutation
+
+
 def split_half_null(
     scenes: Sequence[Scene],
     divergence: str,
@@ -47,6 +84,8 @@ def split_half_null(
     n_splits: int = 200,
     *,
     divergence_kwargs: Mapping[str, object] | None = None,
+    permutations: PermutationSource | None = None,
+    stride_steps: int = 1,
 ) -> np.ndarray:
     """Sample the null distribution of `divergence` under random half-population splits.
 
@@ -55,12 +94,23 @@ def split_half_null(
     `numpy.random.default_rng(seed)`, re-permuted fresh on every split) and computes
     `divergence.between_clouds` between the two halves' pooled position points. Returns the
     `(n_splits,)` array of null divergence values.
+
+    `permutations`, when given, supplies those splits instead and `seed` goes unused; see
+    `PermutationSource` for why that capability exists.
+
+    `stride_steps` subsamples each trajectory before pooling, and it is a stated parameter rather
+    than a hidden optimisation because it moves the answer: sparser clouds have larger
+    nearest-neighbour distances, so a larger stride shifts the whole null upward and the floor
+    with it. Two floors computed at different strides are not comparable and must never be shown
+    side by side. The default of 1 keeps every point.
     """
     _validate_cloud_capable(divergence)
     if len(scenes) < 1:
         raise ValueError("split_half_null requires at least one scene")
     if n_splits < 1:
         raise ValueError(f"split_half_null n_splits must be >= 1, got {n_splits}")
+    if stride_steps < 1:
+        raise ValueError(f"split_half_null stride_steps must be >= 1, got {stride_steps}")
 
     if divergence_kwargs is None:
         resolved_kwargs: dict[str, object] = {}
@@ -71,7 +121,7 @@ def split_half_null(
     pedestrian_positions: list[np.ndarray] = []
     for scene in scenes:
         for pedestrian in scene.pedestrians:
-            pedestrian_positions.append(pedestrian.positions)
+            pedestrian_positions.append(pedestrian.positions[::stride_steps])
 
     n_pedestrians = len(pedestrian_positions)
     if n_pedestrians < 2:
@@ -85,7 +135,12 @@ def split_half_null(
 
     null_values = np.empty(n_splits, dtype=np.float64)
     for split_index in range(n_splits):
-        permutation = rng.permutation(n_pedestrians)
+        if permutations is None:
+            permutation = rng.permutation(n_pedestrians)
+        else:
+            permutation = _validated_permutation(
+                permutations(n_pedestrians, split_index), n_pedestrians, split_index
+            )
         group_a_indices = permutation[:half_size]
         group_b_indices = permutation[half_size : 2 * half_size]
 

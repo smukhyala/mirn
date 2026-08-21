@@ -62,13 +62,16 @@ addressable noise tape, so they share their randomness by construction and there
 in step.
 
 Python is the oracle. `src/mirn/` holds the reference implementations of the divergences,
-estimators and calibration, and `mirn fixtures` writes their answers to `tests/golden/parity/`. The
-TypeScript has to reproduce them, at a tolerance the oracle author declares in the fixture itself.
-Fréchet is compared bitwise and is the canary.
+estimators and calibration, and `.venv/bin/python -m mirn.cli fixtures` writes their answers to
+`tests/golden/parity/`. The TypeScript has to reproduce them, at a tolerance the oracle author
+declares in the fixture itself. Fréchet is compared bitwise and is the canary.
+
+Nothing from the virtualenv is on PATH, so the Python commands are spelled out in full.
 
 ```bash
 npm run check                                     # typecheck, tests, notes build, site build
-.venv/bin/python -m pytest -q                     # the oracle
+.venv/bin/python -m pytest -q                     # the oracle: 297 tests, about six minutes
+.venv/bin/python -m pytest -q -m "not slow"       # 274 of them, minus the heavy nulls, in 20 s
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity
 npm run measure                                   # re-run every experiment, rewrite the facts
 ```
@@ -76,10 +79,14 @@ npm run measure                                   # re-run every experiment, rew
 The notes are Markdown compiled to real HTML at build time, with the mathematics pre-rendered.
 With JavaScript disabled you lose the figures and keep the argument.
 
-Two lints fail the build, because they are the mechanical form of promises the site makes in prose:
-a bare number in prose must be either a stated setting or a live quantity that can explain itself,
-and no sentence may assert a comparison a slider could falsify. A third check enforces the
-vocabulary ladder, so no term can be used before the page that defines it.
+Four prose lints fail the build, because each is the mechanical form of a promise the site makes.
+A bare number must be either a stated setting or a live quantity that can explain itself. A
+comparative word may not sit within eighty characters of a live figure, because a slider could
+falsify it. No page may use a term the vocabulary ladder does not define until a later page. And a
+known synonym for a defined term — "displacement" for deviation — is rejected by name, because a
+word the reader was never given is jargon however ordinary it sounds. A fifth check closes each
+page's declared vocabulary against the ladder, and the renderer turns an unknown widget, an unwired
+control or an unresolvable reference into the same kind of build error.
 
 ---
 

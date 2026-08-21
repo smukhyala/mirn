@@ -55,7 +55,7 @@ export interface LiveMetric {
    * count, and rendering either as "16.744 m" would be a units error printed in the reader's
    * sentence — the exact class of mistake this whole pipeline exists to make impossible.
    */
-  readonly unit?: "m" | "s" | "count";
+  readonly unit?: "m" | "s" | "count" | "person-metres";
 }
 
 /** Everything the resolver reads that is fixed for the whole build. */
@@ -265,6 +265,11 @@ function resolveLive(
   }
   if (unit === "count") {
     return value(Number.isInteger(metres) ? metres.toFixed(0) : metres.toFixed(1));
+  }
+  if (unit === "person-metres") {
+    // Not metres. It is a sum over people, and calling it metres invites the reader to compare it
+    // with a per-person figure elsewhere on the site.
+    return value(`${metres.toFixed(1)} person-metres`);
   }
   return value(`${metres.toFixed(3)} m`);
 }

@@ -1,11 +1,15 @@
 /**
- * Plain-English names for machine keys, harvested from `src/mirn_app/static/app.js:487-516`
- * on the `feat/simulation-page` branch.
+ * Plain-English names for machine keys, harvested from the server-era `src/mirn_app/static/app.js`
+ * before that layer was retired. The file is gone; this is what was worth keeping from it.
  *
- * These exist because guardrail 11 forbids a bare code identifier reaching a reader. Every
- * lookup here falls back to the raw key rather than throwing: a missing label should show up
- * as an ugly identifier in the page (which the jargon test then catches by name) rather than
- * as a blank tile or a crash.
+ * These exist because guardrail 12 forbids a bare code identifier reaching a reader. Every lookup
+ * falls back to the raw key rather than throwing, so a missing label shows up as an ugly
+ * identifier in the page rather than as a blank tile or a crash.
+ *
+ * That fallback is a review aid, not a check. `labels.test.ts` pins the fallback behaviour itself;
+ * nothing scans these maps for coverage, and `unitLabel`/`variantLabel` currently have no caller
+ * at all. The reader-facing surfaces that ARE checked are the provenance notes and the axis names,
+ * by the jargon assertion in `web/app/__tests__/render.test.ts`.
  */
 
 /** Keys whose expansion lives only inside a disclosure that is closed by default, so the

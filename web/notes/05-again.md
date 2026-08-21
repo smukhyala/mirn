@@ -39,7 +39,8 @@ metric: perturbation
 caption: The robot's whole effect on the crowd, for the seed currently on screen.
 ```
 
-For the seed on screen, the robot's whole effect on the crowd comes to {{q:this-seed}}. That is one
+For the seed on screen, the robot's whole effect on the crowd — every person's gap, added up — comes
+to {{q:this-seed}}. That is one
 afternoon, in one room, with those particular strangers in it.
 
 Turn the dial one click and it reads otherwise.

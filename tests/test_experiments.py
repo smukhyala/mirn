@@ -41,6 +41,7 @@ def test_every_registered_experiment_has_fast_params_declared() -> None:
         assert name in _FAST_PARAMS, f"add fast params for the '{name}' experiment"
 
 
+@pytest.mark.slow
 def test_every_experiment_is_deterministic_under_a_fixed_seed() -> None:
     for name in EXPERIMENTS.names():
         experiment = EXPERIMENTS.create(name)
@@ -50,6 +51,7 @@ def test_every_experiment_is_deterministic_under_a_fixed_seed() -> None:
         assert first.payload == second.payload
 
 
+@pytest.mark.slow
 def test_every_experiment_payload_is_json_safe() -> None:
     for name in EXPERIMENTS.names():
         experiment = EXPERIMENTS.create(name)
@@ -73,6 +75,7 @@ def test_every_experiment_declares_unique_parameter_names() -> None:
             seen.append(parameter.name)
 
 
+@pytest.mark.slow
 def test_every_experiment_method_key_resolves_to_a_card() -> None:
     """An experiment must never point the UI at mathematics that does not exist."""
     for name in EXPERIMENTS.names():
@@ -158,6 +161,7 @@ def test_calibration_floor_does_not_offer_the_order_dependent_divergence() -> No
             assert "frechet" not in parameter.choices
 
 
+@pytest.mark.slow
 def test_cached_floor_matches_every_influence() -> None:
     """The load-bearing test: `cached_floor` is deliberately not keyed on `influence`, on the
     belief that the counterfactual arm is the pre-displacement trajectory and therefore identical
@@ -191,6 +195,7 @@ def test_cached_floor_is_deterministic_on_repeat_call() -> None:
     assert first == second
 
 
+@pytest.mark.slow
 def test_cached_floor_keys_on_divergence_n_scenes_and_seed() -> None:
     """Distinct argument combinations must land in distinct cache slots, and in particular a
     changed seed must change the returned value — otherwise the key isn't actually being used and
@@ -218,6 +223,7 @@ def test_cached_floor_cache_clear_recomputes_the_same_value() -> None:
     assert first == second
 
 
+@pytest.mark.slow
 def test_cached_null_samples_matches_split_half_null_element_for_element() -> None:
     """`cached_null_samples` now backs both `CalibrationFloor.run()`'s own histogram and
     `cached_floor`'s scalar, so it is a bigger surface than the old cached-scalar-only design.
@@ -241,6 +247,7 @@ def test_cached_null_samples_matches_split_half_null_element_for_element() -> No
         assert cached[sample_index] == float(direct[sample_index])
 
 
+@pytest.mark.slow
 def test_cached_floor_matches_minimum_detectable_perturbation_over_cached_samples() -> None:
     """`cached_floor` derives its scalar from `cached_null_samples` rather than recomputing the
     split-half null itself; prove the two really do agree rather than assume the refactor is a
@@ -260,6 +267,7 @@ def test_cached_floor_matches_minimum_detectable_perturbation_over_cached_sample
     assert actual == expected
 
 
+@pytest.mark.slow
 def test_calibration_floor_run_shares_the_cache_with_cached_floor() -> None:
     """The whole point of the fix: at matching arguments, `CalibrationFloor.run()`'s own request
     and `cached_floor`'s (the one `estimator_comparison`/`confounding_sweep` call) must land on
@@ -293,6 +301,7 @@ def test_calibration_floor_run_shares_the_cache_with_cached_floor() -> None:
     assert floor_from_shared_cache > 0.0
 
 
+@pytest.mark.slow
 def test_null_samples_for_matches_cached_null_samples() -> None:
     """`null_samples_for` is a thin lock-serialising wrapper around `cached_null_samples`; prove
     it returns the identical tuple for the same arguments rather than assuming the wrapper cannot

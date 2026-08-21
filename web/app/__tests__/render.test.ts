@@ -100,6 +100,47 @@ describe("the built pages boot", () => {
     expect(note?.textContent).toContain("sweep");
   });
 
+  it("opens that provenance without naming a table, column or axis in code", async () => {
+    // Guardrail 12: no bare code identifiers on any surface a reader sees. This panel was built
+    // straight out of the reference the author wrote, so it told the reader the figure came "from
+    // the e1_push_strength sweep" — a variable name, in the one sentence whose whole job is to
+    // explain where a number came from to somebody who has never seen the repository.
+    //
+    // The guard is behavioural rather than a check on the label table, so it also fails when a new
+    // experiment is added with no reader-facing name for it, and when a column or an axis leaks by
+    // some other route.
+    const pages = [
+      "e1-push-strength",
+      "e2-density",
+      "e3-robot-speed",
+      "e4-recovery",
+      "e5-propagation",
+      "e6-perception",
+      "e7-politeness",
+      "the-guess",
+      "the-floor",
+    ];
+    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
+    const offenders: string[] = [];
+
+    for (const id of pages) {
+      const { document, window } = await boot(id);
+      const cited = Array.from(document.querySelectorAll<HTMLElement>("[data-quantity]"));
+      expect(cited.length, `${id} cites nothing, so this page proves nothing`).toBeGreaterThan(0);
+      for (const span of cited) {
+        click(span, window);
+        const note = span.nextElementSibling;
+        const text = note?.textContent ?? "";
+        const found = identifier.exec(text);
+        if (found !== null) {
+          offenders.push(`${id}: "${found[0]}" in ${text.trim()}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   it("renders the prediction question with real labels, not [object Object]", async () => {
     const { document } = await boot("e1-push-strength");
     const options = Array.from(document.querySelectorAll(".predict-option")).map(

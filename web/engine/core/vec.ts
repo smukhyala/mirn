@@ -7,6 +7,9 @@
  * `Math.sqrt` is correctly rounded by IEEE 754 on both sides, so `sqrt(dx*dx + dy*dy)` is the
  * portable spelling. This costs nothing and it is the difference between a parity fixture that
  * holds at 1e-15 and one that has to be loosened until it means nothing.
+ *
+ * Both halves of that are checked rather than trusted:
+ * `web/engine/measure/__tests__/hypot.test.ts` greps `engine/measure/` and this file.
  */
 
 export type Vec2 = readonly [number, number];

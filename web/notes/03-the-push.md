@@ -108,10 +108,12 @@ series:
   - key: finalDeviationM
     label: what is still there at the last tick
 caption: >
-  Eight runs per point. The robot is aimed 0 to 3 m off the centre line of the room, everything
-  else held as it was. The eight runs scatter by 0.10 m around the leftmost peak and 0.28 m around
-  the rightmost, wide enough to overlap the neighbouring settings, so read the two ends against
-  each other rather than any single point.
+  Eight runs per point. The robot is aimed {{lit:0}} to {{lit:3 m}} off the centre line of the
+  room, everything else held as it was. The eight runs scatter by
+  {{q:e4_recovery[passingOffsetM=0].peakDeviationM.sd}} around the leftmost peak and
+  {{q:e4_recovery[passingOffsetM=3].peakDeviationM.sd}} around the rightmost, wide enough to
+  overlap the neighbouring settings, so read the two ends against each other rather than any
+  single point.
 ```
 
 Across the sweep as a whole, the top of the curve sits lower at the far end than at the near one,

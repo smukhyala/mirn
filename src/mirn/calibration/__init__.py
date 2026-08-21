@@ -8,6 +8,7 @@ that floor, never in raw metres, per the project's working agreement.
 from __future__ import annotations
 
 from mirn.calibration.null import (
+    PermutationSource,
     calibration_report,
     minimum_detectable_perturbation,
     solver_settings_for,
@@ -15,6 +16,7 @@ from mirn.calibration.null import (
 )
 
 __all__ = [
+    "PermutationSource",
     "calibration_report",
     "minimum_detectable_perturbation",
     "solver_settings_for",

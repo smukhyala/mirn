@@ -41,11 +41,11 @@ caption: >
 
 ````markdown
 ```mirn:sweep
-experiment: e2_density        # a key in results/experiment-facts.json
+experiment: e2_density        # a key in web/data/experiment-facts.json
 x: nPedestrians
 series:
   - key: meanDeviationM
-    label: displacement per person
+    label: deviation per person
     accent: true              # at most ONE series per plot may be the accent colour
   - key: runToRunBandM
     label: how much two robot-free runs differ
@@ -97,19 +97,33 @@ a build error, and the error names what was available instead.
 `e2` is accepted as short for `e2_density`. A reference that resolves to a censored measurement is
 rejected rather than printed, so `NaN` cannot reach a reader.
 
-## Two lints you must write around
+## Four lints you must write around
 
 **The comparative lint.** Sentences may quote live figures, but may not assert *relations* a
 control could falsify. `{{q:x}} from where they would have been` is fine; `which is more than a
 metre` is a build error, because a slider can make it false. Comparative words within 80
 characters of a `{{q:}}` token fail the build. The sanctioned escape is `{{q:x.anchor}}`, which
-interpolates the live scale anchor and cannot go stale.
+interpolates the live scale anchor and cannot go stale. Note what this does *not* do: it never
+looks at the figure itself, so it cannot tell you whether a quoted number moves, and a comparative
+written more than 80 characters from the number it depends on passes. Read your page at both ends
+of every dial on it.
 
 **The bare-number lint.** Any numeral immediately followed by a unit, in prose, outside a code
 span, a `$…$`, a `mirn:` block or an explicit `{{lit:0.42 m}}`, is a build error. This is what
 makes "never display a number without explaining where it came from" a compiler-enforced property
 rather than a resolution. Use `{{lit:}}` only for numbers that are *settings* rather than
 results — "a 22 m room", "a 0.05 s timestep".
+
+**The forward-term lint.** Every term in `web/vocab.ts` carries the page that introduces it, and no
+earlier page may use that term — in its prose, not just in its front matter. The page that
+introduces a term is exempt from its own definition. If you need the idea earlier, either move the
+term down the ladder or say it in plain words.
+
+**The undefined-synonym lint.** A short list of words that mean a defined term but are not it:
+"displacement" for deviation, "ground truth" or "baseline run" for the run with no robot in it. A
+synonym the reader was never handed is jargon however ordinary it sounds. The list is in
+`web/build/lints.ts` and only knows the synonyms somebody has already been caught using — when you
+find a new one, add it there rather than only fixing the page.
 
 ## Voice
 

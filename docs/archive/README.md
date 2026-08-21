@@ -5,7 +5,7 @@
 These are the documents from MIRN's first life as a research measurement instrument for
 robot-induced perturbation of pedestrian motion. They are kept for three reasons and no others:
 
-1. **Provenance.** They are why the teaching pages are the ones they are. The five-part argument
+1. **Provenance.** They are why the teaching pages are the ones they are. The four-part argument
    the site makes — the paired design, the detection floor, the confounded estimator, the placebo
    check — came from this assessment.
 2. **Citation backing.** The notes take a small number of claims about the literature from here and

@@ -10,6 +10,12 @@ import { argmax, mean, pathLength, perStepDistance } from "./kernels.js";
  * Deliberately absent: cumulative deviation in metre-seconds, which is a unit nobody has a feel
  * for and which hides which of its two factors moved; and a separate collision count, which is a
  * lossy summary of the clearance series whose value depends on the timestep.
+ *
+ * These functions compute values. They do not carry a description of how the value was reached:
+ * the arithmetic runs here, over the kernels in `kernels.ts`, and the wording a reader opens
+ * underneath a number is built by hand in `web/notes.ts`. Keeping the two in step is a convention
+ * and not a mechanism — a derivation panel has already once explained a different quantity from
+ * the one printed above it — so a change to any formula below is a change to its builder as well.
  */
 
 export interface Deviation {

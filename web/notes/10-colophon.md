@@ -99,12 +99,12 @@ together with the forecaster's error, and no floor has been established to say w
 is big enough to be worth believing. Those are the counterfactual, the confound and the detection
 floor you have just spent nine pages on, with the citations taken out and a crowd put in.
 
-The reading and the literature assessment are in `docs/research/`, the design decisions in
-`docs/superpowers/`. They are unedited, they are written for someone who already knows the field, and
+The reading and the literature assessment are in `docs/archive/`, the design decisions in
+`docs/archive/superpowers/`. They are unedited, they are written for someone who already knows the field, and
 where a claim could not be traced to a primary source it is marked as unverified rather than tidied
 away. If something here matters to you, that is where to check it.
 
-Every plotted curve on these pages is a sweep out of `results/experiment-facts.json`, and you can
+Every plotted curve on these pages is a sweep out of `web/data/experiment-facts.json`, and you can
 read that file without me. Each point on one is a mean over repeated runs of the same room at that
 setting — eight of them wherever a spread is quoted — and the uncertainty you saw quoted is that
 spread across those runs and nothing else. The canvases are the exception: each of those is one run,

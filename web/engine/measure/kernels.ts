@@ -1,15 +1,21 @@
 /**
  * The numeric inner loops.
  *
- * This module is the ONLY place in `measure/` allowed to do bare arithmetic. Metrics compose
- * traced combinators instead, so that a number and its explanation are produced by the same call
- * and cannot drift; the fast paths live here, are unit-tested individually, and are covered by
- * the cross-language parity fixtures.
+ * This is the fast layer, and it is where the float behaviour that has to match numpy is decided:
+ * pairwise summation, per-step distance, path length, argmax tie-breaking and the linear quantile.
+ * `metrics.ts` composes these into the six measurements the lesson quotes. Everything here is unit
+ * tested directly and covered again by the cross-language parity fixtures.
+ *
+ * Neither this file nor `metrics.ts` explains itself. The wording a reader opens underneath a
+ * number is written separately, by the derivation builders in `web/notes.ts`, and nothing checks
+ * that the two still describe the same arithmetic — so a formula change here is not finished until
+ * its builder has been changed too.
  *
  * `Math.hypot` is banned throughout this directory. V8's implementation scales to avoid
  * intermediate overflow and is *more* accurate than numpy's naive `sqrt(sum(d*d))` — so it
  * disagrees with the oracle in the last bits, which is the one thing a parity harness must not
- * have to tolerate.
+ * have to tolerate. `__tests__/hypot.test.ts` enforces that by reading this directory's source;
+ * before it existed the ban was three comments and no check.
  */
 
 /**

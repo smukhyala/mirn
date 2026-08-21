@@ -60,6 +60,27 @@ const AXIS_LABELS: Readonly<Record<string, string>> = {
   deflectionWeight: "how hard the planner tries to stay out of the way",
 };
 
+/**
+ * The same problem one level up: a table key is a code identifier too.
+ *
+ * The provenance note under a cited number used to read "from the e1_push_strength sweep", which
+ * is a variable name in the one sentence whose entire job is to tell a reader with no repository
+ * where a figure came from. Same fallback rule as the axes above — an unlisted table shows its raw
+ * key, which is ugly on purpose, and `web/app/__tests__/render.test.ts` fails on it rather than
+ * letting it ship.
+ */
+const TABLE_LABELS: Readonly<Record<string, string>> = {
+  e1_push_strength: "push-strength",
+  e2_density: "crowd-size",
+  e3_robot_speed: "robot-speed",
+  e4_recovery: "passing-distance",
+  e5_propagation: "distance-from-the-robot",
+  e6_perception: "perception-noise",
+  e7_politeness: "politeness",
+  confounding_squeeze: "forecast-horizon",
+  detection_floor: "detection-floor",
+};
+
 const PRESETS: Readonly<Record<string, () => RunConfig>> = {
   "corridor-11": () => makeRunConfig({ nTicks: 800 }),
   // The same room with nobody responding to the robot, which is how a robot-free crowd is shown:
@@ -1076,11 +1097,14 @@ function describeProvenance(tableName: string, table: FactTable, match: RegExpEx
   const rowIndex = match[4];
   const columnName = match[5] as string;
   const reducer = match[6];
+  const sweep = TABLE_LABELS[tableName] ?? tableName;
 
   if (reducer === "min" || reducer === "max") {
+    // The column is deliberately not named. It is a code identifier, and the reader is looking
+    // straight at the figure it produced, so naming it costs a guardrail and buys nothing.
     return (
-      ` — the ${reducer === "min" ? "smallest" : "largest"} value of ${columnName} across the ` +
-      `whole ${tableName} sweep, each point itself a mean of ${table.nSeeds} runs.`
+      ` — the ${reducer === "min" ? "smallest" : "largest"} of these readings across the ` +
+      `whole ${sweep} sweep, each point itself a mean of ${table.nSeeds} runs.`
     );
   }
 
@@ -1107,7 +1131,7 @@ function describeProvenance(tableName: string, table: FactTable, match: RegExpEx
 
   const sd = row[`${columnName}_sd`];
   const n = row[`${columnName}_n`];
-  const parts: string[] = [` — from the ${tableName} sweep${where}`];
+  const parts: string[] = [` — from the ${sweep} sweep${where}`];
   if (n !== undefined && Number.isFinite(n) && n < table.nSeeds) {
     parts.push(`, averaged over ${n} of ${table.nSeeds} runs because the rest were censored`);
   } else {
@@ -1138,7 +1162,7 @@ for (const host of Array.from(document.querySelectorAll<HTMLElement>("[data-mirn
     continue;
   }
 
-  const caption = (parsed.config as { caption?: string }).caption;
+  // The caption is already in the HTML, emitted at build time so it survives without scripts.
   host.replaceChildren();
 
   if (parsed.kind === "scene") {
@@ -1154,12 +1178,6 @@ for (const host of Array.from(document.querySelectorAll<HTMLElement>("[data-mirn
     host.classList.add("widget-error");
   }
 
-  if (caption !== undefined) {
-    const element = document.createElement("p");
-    element.className = "widget-caption";
-    element.textContent = caption;
-    host.append(element);
-  }
 }
 
 wireFactProvenance();

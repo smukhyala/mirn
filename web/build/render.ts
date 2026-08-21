@@ -24,6 +24,7 @@
  * that ids stay stable across a whole build without this module holding state between pages.
  */
 import { canonicalRef } from "./quantities.js";
+import { lintBareNumbers } from "./lints.js";
 import katex from "katex";
 import MarkdownIt from "markdown-it";
 import { load as loadYaml } from "js-yaml";
@@ -90,6 +91,33 @@ export function renderBody(source: string, context: RenderContext): RenderResult
     return `\n\nMIRNBLOCK${blocks.length - 1}ENDBLOCK\n\n`;
   }
 
+  /**
+   * Resolve `{{lit:}}` and `{{q:}}` wherever they appear.
+   *
+   * Shared by the prose pass and the caption pass. Captions are stashed as opaque blocks in step 1
+   * and restored in step 4, which is after the prose pass, so without this a token written in a
+   * caption reached the reader as literal braces.
+   */
+  function resolveTokens(source: string): string {
+    let out = source.replace(/\{\{lit:([^}]*)\}\}/g, (_all, literal: string) =>
+      escapeHtml(literal),
+    );
+    out = out.replace(/\{\{q:([^}]*)\}\}/g, (_all, ref: string) => {
+      const resolved = resolveQuantity(ref, sources);
+      if (resolved.kind === "problem") {
+        problems.push({ rule: resolved.problem.rule, message: resolved.problem.message });
+        return `<span class="quantity quantity-broken">?</span>`;
+      }
+      return `<span class="quantity" data-quantity="${escapeHtml(canonicalRef(ref))}">${escapeHtml(resolved.text)}</span>`;
+    });
+    return out;
+  }
+
+  /** Token bodies are not prose; the bare-number rule must not see inside them. */
+  function stripTokens(source: string): string {
+    return source.replace(/\{\{(?:lit|q):[^}]*\}\}/g, " ");
+  }
+
   function renderWidget(kind: string, yamlish: string): string {
     const id = `mirn-widget-${widgetIndex}`;
     widgetIndex++;
@@ -107,7 +135,27 @@ export function renderBody(source: string, context: RenderContext): RenderResult
       config = {};
     }
     const payload = JSON.stringify({ kind, config });
-    return `<div class="widget" id="${id}" data-mirn-widget='${escapeAttribute(payload)}'><noscript><p class="widget-fallback">This is an interactive figure. It needs JavaScript; the argument around it does not.</p></noscript></div>`;
+    // The caption is emitted HERE, as real HTML, rather than appended by the mount function.
+  // Appending it meant it vanished with JavaScript off — and some captions are the only place a
+  // measured number appears at all, so "you lose the figures and keep the argument" was losing
+  // part of the argument too. Being in the prose also puts caption text in front of the lints,
+  // which strip fenced blocks and so never saw these hand-typed numbers.
+  const captionText = (config as { caption?: unknown }).caption;
+  let caption = "";
+  if (typeof captionText === "string" && captionText.trim().length > 0) {
+    // The same treatment prose gets: tokens resolved against the measured facts, then the
+    // bare-number rule applied to whatever is left. A caption is prose that happens to sit inside
+    // a fenced block, and exempting it meant several of them quoted measured numbers by hand.
+    const resolvedCaption = resolveTokens(escapeHtml(captionText.trim()));
+    for (const problem of lintBareNumbers(stripTokens(captionText))) {
+      problems.push({
+        rule: problem.rule,
+        message: `in a figure caption: ${problem.message}`,
+      });
+    }
+    caption = `<p class="widget-caption">${resolvedCaption}</p>`;
+  }
+  return `<div class="widget"><div class="widget-mount" id="${id}" data-mirn-widget='${escapeAttribute(payload)}'><noscript><p class="widget-fallback">This is an interactive figure. It needs JavaScript; the argument around it does not.</p></noscript></div>${caption}</div>`;
   }
 
   // ---------------------------------------------------------------- 1. extract
@@ -176,15 +224,7 @@ export function renderBody(source: string, context: RenderContext): RenderResult
 
   // ---------------------------------------------------------------- 3. tokens
 
-  html = html.replace(/\{\{lit:([^}]*)\}\}/g, (_all, literal: string) => escapeHtml(literal));
-  html = html.replace(/\{\{q:([^}]*)\}\}/g, (_all, ref: string) => {
-    const resolved = resolveQuantity(ref, sources);
-    if (resolved.kind === "problem") {
-      problems.push({ rule: resolved.problem.rule, message: resolved.problem.message });
-      return `<span class="quantity quantity-broken">?</span>`;
-    }
-    return `<span class="quantity" data-quantity="${escapeHtml(canonicalRef(ref))}">${escapeHtml(resolved.text)}</span>`;
-  });
+  html = resolveTokens(html);
 
   // ---------------------------------------------------------------- 4. restore
 

@@ -129,3 +129,69 @@ def test_diagnostic_estimators_declare_their_assumption_unmet() -> None:
     for name in ("cvm_residual", "noisy_oracle_residual"):
         estimator = ESTIMATORS.create(name)
         assert estimator.identification().startswith("UNMET:")
+
+
+# --- ConstantVelocityResidual.end_step ---------------------------------------------------------
+
+
+def _parked_pair(n_steps: int = 24, parked_from: int = 14):
+    """One paired run whose crowd arrives and stops, built from the parity fixture's generator.
+
+    Reused rather than re-derived so that the behaviour these tests pin is exactly the behaviour
+    frozen into `tests/golden/parity/estimator.cvm_residual.per_run.json`.
+    """
+    from mirn.fixtures import _crowd_arms, _rollout_pair
+
+    control_paths, treated_paths, robot_path = _crowd_arms(
+        seed=3003, n_agents=4, n_steps=n_steps, amplitude=1.2, parked_from=parked_from
+    )
+    return _rollout_pair("parked", control_paths, treated_paths, robot_path)
+
+
+def test_cvm_residual_reads_exactly_zero_once_the_crowd_has_parked() -> None:
+    """The estimator's flattering blind spot, pinned so it cannot be quoted as a good score.
+
+    A constant-velocity forecast of a stationary person is exactly right, so measured at the end
+    of an episode where everyone has arrived and stopped, this estimator reports 0.0 — a perfect
+    score from a method the project argues is broken. `end_step` exists to move the window off
+    that dead zone, and a reader who does not know the dead zone exists will believe the 0.0.
+    """
+    pair = _parked_pair()
+    at_the_end = ConstantVelocityResidual(horizon_steps=6, divergence="ade")
+    assert at_the_end.estimate([pair], seed=0).value == 0.0
+
+
+def test_cvm_residual_end_step_moves_the_window_back_onto_moving_people() -> None:
+    """`end_step` must actually select the window, not merely be accepted and ignored."""
+    pair = _parked_pair()
+    while_walking = ConstantVelocityResidual(horizon_steps=6, divergence="ade", end_step=13)
+    assert while_walking.estimate([pair], seed=0).value > 0.0
+
+
+def test_cvm_residual_end_step_none_is_the_last_timestep() -> None:
+    """The default has to be the old behaviour, or every existing result silently shifts."""
+    pair = _parked_pair()
+    default = ConstantVelocityResidual(horizon_steps=6, divergence="ade")
+    explicit = ConstantVelocityResidual(horizon_steps=6, divergence="ade", end_step=23)
+    assert default.estimate([pair], seed=0).value == explicit.estimate([pair], seed=0).value
+
+
+def test_cvm_residual_rejects_an_end_step_past_the_trajectory() -> None:
+    """An out-of-range window must be refused where the parameter is, not deep inside a divergence.
+
+    numpy slicing past the end truncates rather than raising, so `positions[a+1 : a+1+h]` returns
+    fewer rows than the forecast and the error finally surfaces from `between_paths` as
+    "requires equal-length paths, got 5 != 6" — which names neither `end_step` nor the agent.
+    """
+    pair = _parked_pair()
+    with pytest.raises(ValueError, match="end_step must lie in"):
+        ConstantVelocityResidual(horizon_steps=6, end_step=99).estimate([pair], seed=0)
+    with pytest.raises(ValueError, match="end_step must be >= 0"):
+        ConstantVelocityResidual(horizon_steps=6, end_step=-1)
+
+
+def test_cvm_residual_rejects_a_window_too_short_to_fit_a_velocity() -> None:
+    """A window ending at or before horizon_steps + 1 leaves no two points to fit a velocity."""
+    pair = _parked_pair()
+    with pytest.raises(ValueError, match="horizon_steps \\+ 2"):
+        ConstantVelocityResidual(horizon_steps=6, end_step=6).estimate([pair], seed=0)

@@ -2,9 +2,10 @@
 
 This reproduces standard forecast-residual practice: for each pedestrian in the **factual** arm
 only, fit a constant-velocity model from two consecutive observed positions ending `horizon_steps`
-before the trajectory's end, roll that model forward `horizon_steps`, and report the divergence
-between the rolled-forward forecast and the actually-observed continuation as "perturbation". The
-counterfactual arm is never consulted — which is exactly the defect `paired.py` exists to fix.
+before `end_step` (the trajectory's last timestep by default), roll that model forward
+`horizon_steps`, and report the divergence between the rolled-forward forecast and the
+actually-observed continuation as "perturbation". The counterfactual arm is never consulted —
+which is exactly the defect `paired.py` exists to fix.
 """
 
 from __future__ import annotations
@@ -31,25 +32,36 @@ _RESIDUAL_IDENTIFICATION = (
 
 
 def _constant_velocity_residual(
-    trajectory: Trajectory, horizon_steps: int, divergence_name: str
+    trajectory: Trajectory, horizon_steps: int, divergence_name: str, end_step: int | None
 ) -> float:
     """The forecast-vs-observed divergence for one pedestrian's factual-arm trajectory.
 
-    The two positions immediately before and at index `anchor_index = (T - 1) - horizon_steps`
+    The two positions immediately before and at index `anchor_index = end_step - horizon_steps`
     fix a constant velocity; that velocity is rolled forward `horizon_steps` steps to produce a
     forecast path, which is compared against the actually-observed path over the same window via
-    the named divergence's `between_paths`.
+    the named divergence's `between_paths`. `end_step=None` means the last timestep.
     """
     positions = trajectory.positions
     n_steps = positions.shape[0]
-    anchor_index = (n_steps - 1) - horizon_steps
+
+    if end_step is None:
+        window_end = n_steps - 1
+    else:
+        window_end = end_step
+    if window_end < 0 or window_end > n_steps - 1:
+        raise ValueError(
+            f"ConstantVelocityResidual end_step must lie in [0, {n_steps - 1}] for agent "
+            f"'{trajectory.agent_id}', got {window_end}"
+        )
+
+    anchor_index = window_end - horizon_steps
 
     if anchor_index < 1:
         raise ValueError(
-            "ConstantVelocityResidual requires trajectories with at least "
-            f"horizon_steps + 2 = {horizon_steps + 2} timesteps to fit a constant-velocity "
-            f"anchor and roll it forward, got {n_steps} timesteps for agent "
-            f"'{trajectory.agent_id}'"
+            "ConstantVelocityResidual needs at least horizon_steps + 2 = "
+            f"{horizon_steps + 2} timesteps up to and including end_step to fit a "
+            f"constant-velocity anchor and roll it forward, got a window ending at "
+            f"{window_end} of {n_steps} timesteps for agent '{trajectory.agent_id}'"
         )
 
     velocity = (positions[anchor_index] - positions[anchor_index - 1]) / trajectory.dt
@@ -69,15 +81,35 @@ def _constant_velocity_residual(
 
 @ESTIMATORS.register("cvm_residual")
 class ConstantVelocityResidual(PerturbationEstimator):
-    """Standard-practice forecast-residual estimator: the estimator this project critiques."""
+    """Standard-practice forecast-residual estimator: the estimator this project critiques.
+
+    `end_step` moves the measurement window off the end of the episode, and it exists because
+    the end of an episode is where this estimator flatters itself. Once everybody has arrived
+    and stopped, a constant-velocity forecast of a stationary person is exactly right, the
+    residual is exactly 0.0, and the estimator reports a perfect score precisely where it is
+    testing nothing. The browser's crowds park like that; these synthetic ones cross at constant
+    speed and never stop, which is why Python could get away without the parameter until the
+    two implementations had to agree on the same number. Default `None` keeps the old behaviour
+    (anchor at the last timestep).
+    """
 
     name = "cvm_residual"
 
-    def __init__(self, horizon_steps: int = 16, divergence: str = "ade") -> None:
+    def __init__(
+        self,
+        horizon_steps: int = 16,
+        divergence: str = "ade",
+        end_step: int | None = None,
+    ) -> None:
         if horizon_steps < 1:
             raise ValueError(f"horizon_steps must be >= 1, got {horizon_steps}")
+        if end_step is not None and end_step < 0:
+            raise ValueError(f"end_step must be >= 0 or None, got {end_step}")
         self.horizon_steps = horizon_steps
         self.divergence_name = divergence
+        # Not bounded above here: the upper bound is per-trajectory (T - 1), so it is checked in
+        # _constant_velocity_residual where T is known, and names the agent when it fires.
+        self.end_step = end_step
         # Constructed once up front so an unknown divergence name fails at __init__ time, not on
         # the first call to estimate().
         DIVERGENCES.create(divergence)
@@ -99,7 +131,10 @@ class ConstantVelocityResidual(PerturbationEstimator):
             agent_values = np.empty(len(pedestrians), dtype=np.float64)
             for agent_index in range(len(pedestrians)):
                 agent_values[agent_index] = _constant_velocity_residual(
-                    pedestrians[agent_index], self.horizon_steps, self.divergence_name
+                    pedestrians[agent_index],
+                    self.horizon_steps,
+                    self.divergence_name,
+                    self.end_step,
                 )
             per_pair_values[pair_index] = np.mean(agent_values)
 

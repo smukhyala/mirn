@@ -183,7 +183,15 @@ const LIVE_VALUES: Readonly<Record<string, LiveMetric>> = (() => {
   return {
     deviation: { headlineM: dev.meanM, fieldsM: { mean: dev.meanM, max: dev.maxM } },
     "deviation-summary": { headlineM: dev.meanM, fieldsM: { mean: dev.meanM, max: dev.maxM } },
-    perturbation: { headlineM: dev.meanM, fieldsM: { mean: dev.meanM, max: dev.maxM } },
+    // The site's own ladder defines perturbation as the TOTAL — "once you have added the
+    // deviations up ... perturbation is the total" — and this was rendering the per-person mean
+    // under a sentence reading "the robot's whole effect on the crowd". Person-metres, which is
+    // what e2-density already calls the same quantity.
+    perturbation: {
+      headlineM: dev.meanM * dev.perAgentM.length,
+      fieldsM: { perPerson: dev.meanM, max: dev.maxM },
+      unit: "person-metres",
+    },
     "detection-floor": {
       headlineM: floor.floor,
       fieldsM: { floor: floor.floor, mean: floor.mean },
@@ -410,7 +418,10 @@ for (let i = 0; i < ordered.length; i++) {
 
 // The contents page is written to web/index.html rather than into web/generated/, because Vite
 // requires an index.html at its root and because "the first thing you see" should not be a
-// redirect. It is generated, so it is gitignored and rebuilt by prebuild.
+// redirect. It is generated, so it is gitignored, and every path that serves the site rebuilds it
+// first: `npm run dev` and `npm run build` both run `npm run notes` before vite. There is no
+// prebuild hook — an earlier version of this comment claimed one, and npm would have run it
+// silently for years without anybody noticing it did not exist.
 writeFileSync("web/index.html", contentsPage(ordered));
 
 writeFileSync(
@@ -436,9 +447,10 @@ if (errors.length > 0) {
     console.error(`  - ${error}`);
   }
   console.error(
-    "\nThese are build errors on purpose. The bare-number and comparative lints are the " +
-      "mechanical form of promises the site makes in prose; the vocabulary check is the " +
-      "mechanical form of 'no term is used before it is defined'.\n",
+    "\nThese are build errors on purpose. Four prose lints run over every page — bare number, " +
+      "comparative near a live figure, term used before the page that defines it, and synonym " +
+      "for a term the site never defines — plus the front-matter closure check against the " +
+      "vocabulary ladder and the renderer's own checks on widgets, controls and references.\n",
   );
   process.exit(1);
 }

@@ -39,6 +39,7 @@ def _small_counterfactual_scenes():
 # --- split_half_null ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_split_half_null_samples_are_finite_and_non_negative() -> None:
     scenes = _counterfactual_scenes()
     for divergence in ("ade", "fde"):
@@ -80,6 +81,7 @@ def test_split_half_null_is_deterministic_under_fixed_seed() -> None:
 # --- minimum_detectable_perturbation ------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_mdp_95_is_greater_than_the_null_median() -> None:
     scenes = _counterfactual_scenes(n_scenes=6, n_pedestrians=12)
     null_samples = split_half_null(scenes, "ade", seed=3, n_splits=200)
@@ -90,6 +92,7 @@ def test_mdp_95_is_greater_than_the_null_median() -> None:
 # --- calibration_report -------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_calibration_report_columns_and_single_row() -> None:
     scenes = _counterfactual_scenes()
     report = calibration_report(scenes, "ade", seed=5)
@@ -112,6 +115,7 @@ def test_calibration_report_columns_and_single_row() -> None:
     assert report.loc[0, "seed"] == 5
 
 
+@pytest.mark.slow
 def test_calibration_report_is_deterministic_under_fixed_seed() -> None:
     scenes = _counterfactual_scenes()
     first = calibration_report(scenes, "ade", seed=7)
@@ -126,6 +130,7 @@ def test_calibration_report_rejects_frechet() -> None:
         calibration_report(scenes, "frechet", seed=1)
 
 
+@pytest.mark.slow
 def test_split_half_null_threads_solver_settings_to_the_divergence() -> None:
     """The detection floor must not be set by a constructor default a caller cannot see.
 
@@ -149,6 +154,7 @@ def test_split_half_null_threads_solver_settings_to_the_divergence() -> None:
     assert not np.allclose(loose, tight)
 
 
+@pytest.mark.slow
 def test_calibration_report_records_the_solver_settings_it_used() -> None:
     """A published floor has to be reproducible from the CSV row alone."""
     adapter = SyntheticAdapter(n_scenes=1, n_pedestrians=6, n_steps=8, seed=0)
@@ -167,3 +173,113 @@ def test_solverless_divergences_report_empty_settings_rather_than_missing_column
     """A CSV whose columns depend on a parameter value is a CSV nothing can concatenate."""
     settings = solver_settings_for("ade", None)
     assert settings == {"epsilon": "", "max_iter": "", "tol": ""}
+
+
+# --- injectable permutations and stride ---------------------------------------------------------
+
+
+def _fixed_permutations(rows: list[list[int]]):
+    """A `PermutationSource` that hands back a recorded split, the way a parity fixture does."""
+
+    def source(n_pedestrians: int, split_index: int) -> np.ndarray:
+        assert len(rows[split_index]) == n_pedestrians
+        return np.asarray(rows[split_index], dtype=np.intp)
+
+    return source
+
+
+def test_injected_permutations_replace_the_rng_and_are_reproducible() -> None:
+    """The capability the cross-language fixture is built on.
+
+    numpy's PCG64 cannot be reproduced in JavaScript without reimplementing a numpy internal, so
+    the browser is handed the splits instead of drawing them. That only isolates the arithmetic
+    if the splits genuinely override the generator: if `seed` were still steering anything, the
+    two seeds below would give two different nulls and the parity fixture would be comparing two
+    different questions.
+    """
+    scenes = _counterfactual_scenes(n_scenes=1, n_pedestrians=6, n_steps=8)
+    rows = [[0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], [2, 0, 4, 1, 5, 3]]
+
+    first = split_half_null(
+        scenes, "ade", seed=1, n_splits=3, permutations=_fixed_permutations(rows)
+    )
+    second = split_half_null(
+        scenes, "ade", seed=999, n_splits=3, permutations=_fixed_permutations(rows)
+    )
+
+    assert np.array_equal(first, second)
+
+
+def test_a_permutation_that_is_not_a_permutation_is_rejected() -> None:
+    """A repeated index would overlap the two halves and quietly lower the floor.
+
+    Nothing downstream can tell a floor computed on overlapping halves from a real one — it is
+    just a smaller number — so the bad split has to be refused at the door rather than diagnosed
+    from a page.
+    """
+    scenes = _counterfactual_scenes(n_scenes=1, n_pedestrians=4, n_steps=8)
+    repeated = [[0, 1, 1, 3]]
+
+    with pytest.raises(ValueError, match="not a permutation of range"):
+        split_half_null(
+            scenes, "ade", seed=1, n_splits=1, permutations=_fixed_permutations(repeated)
+        )
+
+
+def test_wrong_length_permutation_is_rejected_rather_than_truncated() -> None:
+    """A short split would silently drop pedestrians out of both halves."""
+    scenes = _counterfactual_scenes(n_scenes=1, n_pedestrians=4, n_steps=8)
+
+    def short_source(n_pedestrians: int, split_index: int) -> np.ndarray:
+        del n_pedestrians, split_index
+        return np.asarray([0, 1, 2], dtype=np.intp)
+
+    with pytest.raises(ValueError, match="must have shape"):
+        split_half_null(scenes, "ade", seed=1, n_splits=1, permutations=short_source)
+
+
+def test_stride_of_one_is_exactly_the_unstrided_null() -> None:
+    """The default must not move any existing floor."""
+    scenes = _counterfactual_scenes(n_scenes=2, n_pedestrians=6, n_steps=12)
+    unstrided = split_half_null(scenes, "ade", seed=7, n_splits=8)
+    stride_one = split_half_null(scenes, "ade", seed=7, n_splits=8, stride_steps=1)
+    assert np.array_equal(unstrided, stride_one)
+
+
+def test_a_larger_stride_shifts_the_null_upward() -> None:
+    """Subsampling is not free, and the docstring promises which way it moves.
+
+    Sparser clouds have larger nearest-neighbour distances, so the whole null rises with the
+    stride. That is why the stride is recorded on the result and why two floors measured at
+    different strides must never be shown side by side — this test is what keeps that claim from
+    being folklore.
+    """
+    scenes = _counterfactual_scenes(n_scenes=2, n_pedestrians=8, n_steps=24)
+    rows: list[list[int]] = []
+    rng = np.random.default_rng(11)
+    for _ in range(12):
+        row: list[int] = []
+        for index in rng.permutation(16):
+            row.append(int(index))
+        rows.append(row)
+
+    means: list[float] = []
+    for stride in (1, 2, 4, 8):
+        samples = split_half_null(
+            scenes,
+            "ade",
+            seed=0,
+            n_splits=12,
+            permutations=_fixed_permutations(rows),
+            stride_steps=stride,
+        )
+        means.append(float(np.mean(samples)))
+
+    for index in range(1, len(means)):
+        assert means[index] > means[index - 1]
+
+
+def test_stride_must_be_a_positive_number_of_steps() -> None:
+    scenes = _counterfactual_scenes(n_scenes=1, n_pedestrians=4, n_steps=8)
+    with pytest.raises(ValueError, match="stride_steps must be >= 1"):
+        split_half_null(scenes, "ade", seed=1, n_splits=1, stride_steps=0)
