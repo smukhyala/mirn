@@ -18,11 +18,14 @@ echo "==> ruff"
 echo "==> typecheck"
 npm run typecheck
 
-echo "==> vitest"
-npx vitest run
-
+# Notes before vitest: the render suite boots the real widget code against the compiled pages, so
+# web/generated has to exist. The other order works on any machine that has built once before,
+# which is why it survived here and failed on CI's first clean checkout.
 echo "==> notes (lints, vocabulary ladder, quantity references)"
 npm run notes
+
+echo "==> vitest"
+npx vitest run
 
 echo "==> vite build"
 npx vite build
@@ -30,18 +33,9 @@ npx vite build
 echo "==> pytest"
 "$PY" -m pytest -q
 
-echo "==> parity fixtures are current"
-FRESH="$(mktemp -d)"
-"$PY" -m mirn.cli fixtures --out "$FRESH" > /dev/null
-if ! diff -r tests/golden/parity "$FRESH" > /dev/null; then
-  echo "error: committed parity fixtures are stale. The oracle's answers have changed and the" >&2
-  echo "       fixtures were not regenerated. Run:" >&2
-  echo "         .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity" >&2
-  diff -r tests/golden/parity "$FRESH" || true
-  rm -rf "$FRESH"
-  exit 1
-fi
-rm -rf "$FRESH"
+# Covered by tests/test_fixtures.py, which compares the mathematics and ignores the environment
+# stamp a fixture records. A whole-file diff fails on any machine whose numpy differs from the one
+# that last regenerated, which is a false alarm dressed as a stale fixture.
 
 echo
 echo "all checks passed"

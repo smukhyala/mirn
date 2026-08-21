@@ -15,6 +15,16 @@ from mirn.fixtures import SCHEMA_VERSION, build_subject, subjects, write_fixture
 
 _COMMITTED = Path(__file__).parent / "golden" / "parity"
 
+#: Fields that describe the machine rather than the mathematics. Recorded, never compared.
+_ENVIRONMENT_KEYS = ("numpy", "scipy", "generatedByCommit")
+
+
+def _without_environment(body: dict[str, object]) -> dict[str, object]:
+    stripped = dict(body)
+    for key in _ENVIRONMENT_KEYS:
+        stripped.pop(key, None)
+    return stripped
+
 
 def test_every_subject_declares_a_tolerance_and_at_least_one_case() -> None:
     for subject in subjects():
@@ -51,6 +61,13 @@ def test_committed_fixtures_are_current(tmp_path: Path) -> None:
     This is the Python half of the two-file rule: changing a formula without regenerating the
     fixture fails here, and changing the fixture without changing the formula fails in TypeScript.
     Neither can be done alone.
+
+    The comparison excludes the environment stamp, and that exclusion is the point rather than a
+    convenience. A fixture records which numpy produced it, which is useful provenance and is
+    exactly the field that differs between a laptop and a CI runner — so a byte-for-byte check
+    failed on CI's first ever run with a "stale fixture" message about a version string. What has
+    to match is the mathematics: the cases, their inputs, their expected values and the declared
+    tolerance.
     """
     fresh = tmp_path / "fresh"
     write_fixtures(fresh)
@@ -62,11 +79,25 @@ def test_committed_fixtures_are_current(tmp_path: Path) -> None:
             f"no committed fixture for '{subject}'. Regenerate with:\n"
             f"    .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity"
         )
-        assert committed_path.read_bytes() == (fresh / name).read_bytes(), (
-            f"committed fixture for '{subject}' is stale. Regenerate with:\n"
+        committed = _without_environment(json.loads(committed_path.read_text()))
+        regenerated = _without_environment(json.loads((fresh / name).read_text()))
+        assert committed == regenerated, (
+            f"committed fixture for '{subject}' is stale — the code now produces different "
+            f"answers from the ones on disk. Regenerate with:\n"
             f"    .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity"
         )
 
+
+def test_the_environment_stamp_is_recorded_but_not_compared() -> None:
+    """Provenance without brittleness.
+
+    Keeping the stamp is worth something: it says which numpy computed a number somebody may later
+    disagree with. Comparing it is worth nothing and costs a false failure on every machine that
+    is not the one which last regenerated.
+    """
+    body = build_subject("divergence.ade.between_paths")
+    assert isinstance(body["numpy"], str)
+    assert "numpy" not in _without_environment(body)
 
 def _cases_of(subject: str) -> list[dict[str, object]]:
     body = build_subject(subject)

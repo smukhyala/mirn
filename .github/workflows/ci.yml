@@ -18,11 +18,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npx vitest run
       - name: Build the notes
-        # This is where the prose lints, the vocabulary ladder and the quantity references are
-        # checked. A number the facts file cannot support fails here.
+        # Before the tests, not after: web/app/__tests__/render.test.ts boots the real widget code
+        # against the real compiled pages, so it needs web/generated to exist. Running it second
+        # passed on every machine that had built once before and failed on the first clean
+        # checkout — which is what CI is.
+        #
+        # This is also where the prose lints, the vocabulary ladder and the quantity references
+        # are checked. A number the facts file cannot support fails here.
         run: npm run notes
+      - run: npx vitest run
       - run: npx vite build
 
   oracle:
@@ -53,8 +58,8 @@ jobs:
       - run: npm ci
       - run: pip install -e ".[dev]"
       - name: Fixtures are current
-        run: |
-          python -m mirn.cli fixtures --out /tmp/fresh
-          diff -r tests/golden/parity /tmp/fresh
+        # Not `diff -r`: a fixture records which numpy produced it, and that field differs between
+        # any two machines. The test compares the mathematics and ignores the environment stamp.
+        run: python -m pytest -q tests/test_fixtures.py
       - name: The browser reproduces them
         run: npx vitest run web/engine/measure/__tests__/parity.test.ts
