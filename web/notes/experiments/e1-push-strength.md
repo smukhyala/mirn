@@ -50,8 +50,9 @@ caption: >
 
 The canvas will not settle this for you. One run at one dial setting is one roll of the dice, and
 the thing being asked about is what happens to the whole crowd across many of them. So commit to
-an answer before you scroll. Nothing is scored and nothing is recorded; the only thing a guess
-buys you is that you will notice when you are wrong.
+an answer before you scroll. Nothing is scored, and your answer goes no further than this browser
+— it is kept only so it can be shown back to you beside the result. The only thing a guess buys
+you is that you will notice when you are wrong.
 
 ```mirn:predict
 id: shape-of-the-rise

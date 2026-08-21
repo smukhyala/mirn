@@ -483,3 +483,5 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   .masthead { padding-left: 1.25rem; padding-right: 1.25rem; }
   .widget-transport { font-size: 0.68rem; gap: 0.6rem; }
 }
+
+.widget-prediction-echo:empty { display: none; }

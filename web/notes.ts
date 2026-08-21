@@ -120,6 +120,20 @@ function emitSceneConfig(config: RunConfig): void {
   }
 }
 
+/**
+ * Where a chosen prediction gets echoed back.
+ *
+ * The echo is read at mount, which meant a reader who answered and then scrolled saw nothing until
+ * they reloaded — the one moment the echo is for is the moment it was missing.
+ */
+const predictionEchoes: HTMLElement[] = [];
+
+function showPrediction(label: string): void {
+  for (const echo of predictionEchoes) {
+    echo.textContent = `You predicted: ${label}`;
+  }
+}
+
 /** Spans the build wrote from `{{q:...}}`, indexed by their reference. */
 const liveSpans = new Map<string, HTMLElement[]>();
 
@@ -581,13 +595,16 @@ function mountSweep(host: HTMLElement, config: SweepConfig): void {
   }
   host.append(canvas, legend, note);
 
+  // Always created, even when empty, so a prediction made after this figure mounted still has
+  // somewhere to land. CSS hides it while it has no text.
+  const echo = document.createElement("p");
+  echo.className = "widget-prediction-echo";
   const predicted = recallPrediction();
   if (predicted !== null) {
-    const echo = document.createElement("p");
-    echo.className = "widget-prediction-echo";
     echo.textContent = `You predicted: ${predicted}`;
-    host.append(echo);
   }
+  predictionEchoes.push(echo);
+  host.append(echo);
 
   const context = canvas.getContext("2d");
   if (context === null) {
@@ -691,6 +708,7 @@ function mountPredict(host: HTMLElement, config: PredictConfig): void {
     }
     answered.textContent =
       `You said: ${option.label} Nothing below is hidden from you — but you are on the hook now.`;
+    showPrediction(option.label);
   }
 
   for (const option of options) {
