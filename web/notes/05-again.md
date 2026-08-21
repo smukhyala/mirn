@@ -72,14 +72,14 @@ series:
   - key: runToRunBandM
     label: how much two robot-free runs differ
 caption: >
-  Every point on the first line is the mean of eight runs with different seeds. The second line
+  Every point on either line is a mean across eight different crowds. The second line
   has no robot in it anywhere — every run behind it is robot-free — so everything it reports is
   the room disagreeing with itself.
 ```
 
 Read the second line. It is not zero at any crowd size on the plot, and it climbs at every step
-across it. At several crowd sizes the two lines nearly touch: in those rooms, the room disagrees
-with itself by about as much as the robot moved the average person.
+across it. At every crowd size on the plot the two lines nearly touch: in each of those rooms, the
+room disagrees with itself by about as much as the robot moved the average person.
 
 That is the honest condition of this instrument. It is also not repaired by measuring more
 carefully. It is repaired by arithmetic — the reading you can defend is the average over many

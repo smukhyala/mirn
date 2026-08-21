@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import MEASURED from "../data/experiment-facts.json";
 import {
   collectQuantityWidgets,
   formatQuantity,
@@ -266,6 +267,60 @@ describe("collecting the widgets a page declares", () => {
     const body = "```mirn:quantity\nid: [unclosed\n```\n";
     expect(() => collectQuantityWidgets(body)).not.toThrow();
     expect(collectQuantityWidgets(body).size).toBe(0);
+  });
+});
+
+/**
+ * The one place the REAL measured file is read, on purpose. Everything above runs on the fixture,
+ * because the resolver's behaviour should not depend on what the last measurement happened to
+ * produce. This block asserts the opposite kind of thing: that the generated file cannot make the
+ * provenance panel say something untrue.
+ */
+describe("the measured file's own counts", () => {
+  const tables = MEASURED as unknown as Record<
+    string,
+    { axis: string; nSeeds: number; rows: Record<string, number | null>[] }
+  >;
+
+  it("never reports a column averaged over more runs than the table says it did", () => {
+    // The panel a reader opens under a cited number says "averaged over n of N runs because the
+    // rest were censored" when n is below the table's declared run count, and "averaged over N
+    // runs" otherwise. So a column count ABOVE the declared count does not read as a
+    // contradiction — it silently prints the declared one, which is then the wrong number in a
+    // sentence whose only job is to say where the figure came from. That is the shape of the
+    // fault this file already had once: the propagation table pooled sixteen runs and declared
+    // eight.
+    const offenders: string[] = [];
+    for (const [tableName, table] of Object.entries(tables)) {
+      for (const row of table.rows) {
+        for (const columnName of Object.keys(row)) {
+          if (!columnName.endsWith("_n")) {
+            continue;
+          }
+          const count = row[columnName];
+          const declared = table.nSeeds;
+          if (typeof count !== "number" || !Number.isInteger(count)) {
+            offenders.push(`${tableName}.${columnName} is ${String(count)}, not a whole count`);
+          } else if (count < 0 || count > declared) {
+            offenders.push(`${tableName}.${columnName} = ${count}, outside 0..${declared}`);
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("declares a run count on every table, so no panel can quote an absent one", () => {
+    const offenders: string[] = [];
+    for (const [tableName, table] of Object.entries(tables)) {
+      if (!Number.isInteger(table.nSeeds) || table.nSeeds < 1) {
+        offenders.push(`${tableName} declares nSeeds ${String(table.nSeeds)}`);
+      }
+      if (table.rows.length === 0) {
+        offenders.push(`${tableName} has no rows`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

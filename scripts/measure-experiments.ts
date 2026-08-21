@@ -149,29 +149,65 @@ sweep("e1_push_strength", "repulsionScale", [0, 0.5, 1, 1.5, 2, 2.5, 3],
   (r) => { const d = deviation(r.pair); return { meanDeviationM: d.meanM, maxDeviationM: d.maxM }; });
 
 // ---- E2: denser crowd — bigger effect, or harder to see? -------------------------------------
+// Hand-rolled rather than swept because the band is a second measurement of the same
+// configuration rather than another column of the same run, so it carries its own count.
 {
   const rows: Point[] = [];
   for (const n of [4, 8, 12, 18, 24, 32, 44]) {
-    const means: number[] = [], maxes: number[] = [], bands: number[] = [];
+    const means: number[] = [];
+    const maxes: number[] = [];
+    const bands: number[] = [];
     for (const s of SEEDS) {
       const c = cfg(s, { crowd: { nPedestrians: n } });
       const d = deviation(runPair(c).pair);
-      means.push(d.meanM); maxes.push(d.maxM);
-      if (s < 2) bands.push(replicateBand(c, 6).value);
+      means.push(d.meanM);
+      maxes.push(d.maxM);
+      // Every seed, not the first two. The band was measured on two of these eight runs while
+      // the row went on announcing the full seed count, so a reader who opened the provenance
+      // under a band figure was told that eight runs stood behind a two-run number. Measuring it
+      // on all eight adds nine seconds to this script, measured — no reason to publish a count
+      // the file cannot back. It also moved the answer: the two-run band ran low in the emptiest
+      // rooms, which is where the page had its sharpest claim.
+      bands.push(replicateBand(c, 6).value);
     }
+    const deviationN = finiteCount(means);
+    const bandN = finiteCount(bands);
+    // A ratio is supported only as well as the thinner of the two averages underneath it.
+    const ratioN = Math.min(deviationN, bandN);
     rows.push({
       nPedestrians: n,
-      meanDeviationM: meanOf(means), meanDeviationM_sd: sdOf(means),
+      meanDeviationM: meanOf(means),
+      meanDeviationM_sd: sdOf(means),
+      meanDeviationM_n: deviationN,
       maxDeviationM: meanOf(maxes),
+      maxDeviationM_n: finiteCount(maxes),
       totalPersonMetres: meanOf(means) * n,
+      totalPersonMetres_n: deviationN,
       runToRunBandM: meanOf(bands),
+      runToRunBandM_n: bandN,
       signalToBand: meanOf(means) / meanOf(bands),
+      signalToBand_n: ratioN,
     });
   }
   facts["e2_density"] = { axis: "nPedestrians", nSeeds: SEEDS.length, rows };
-  console.log("\n== e2_density ==");
-  console.log(Object.keys(rows[0]!).filter(k=>!k.endsWith("_sd")).map(k=>k.padStart(17)).join(""));
-  for (const r of rows) console.log(Object.keys(rows[0]!).filter(k=>!k.endsWith("_sd")).map(k=>(r[k] as number).toFixed(3).padStart(17)).join(""));
+  console.log(`\n== e2_density (${SEEDS.length} seeds) ==`);
+  const keys = Object.keys(rows[0]!).filter((k) => !k.endsWith("_sd") && !k.endsWith("_n"));
+  console.log(keys.map((k) => k.padStart(17)).join(""));
+  for (const row of rows) {
+    console.log(keys.map((k) => (row[k] as number).toFixed(3).padStart(17)).join(""));
+  }
+  // The same shout the sweeps make: a censored run must not hide inside an average.
+  for (const row of rows) {
+    for (const k of keys) {
+      const n = row[`${k}_n`];
+      if (n !== undefined && n < SEEDS.length) {
+        console.log(
+          `    NOTE e2_density nPedestrians=${row["nPedestrians"]} ${k}: averaged ${n} of ` +
+            `${SEEDS.length} runs; the rest were censored`,
+        );
+      }
+    }
+  }
 }
 
 // ---- E3: hurry up or slow down? ---------------------------------------------------------------
@@ -211,8 +247,11 @@ sweep("e4_recovery", "passingOffsetM", [0, 0.5, 1, 1.5, 2, 3],
   const buckets: number[][] = edges.slice(0, -1).map(() => []);
   const counts: number[] = edges.slice(0, -1).map(() => 0);
   // More seeds than the other experiments: the far bins are sparse by construction, since
-  // few people in a 13 m room manage to stay 5 m from a robot crossing the middle of it.
-  for (const s of [...SEEDS, 8, 9, 10, 11, 12, 13, 14, 15]) {
+  // few people in a 13 m room manage to stay 5 m from a robot crossing the middle of it. The
+  // count is read off this list rather than restated, because it was restated once as the eight
+  // of SEEDS and the table then reported half the runs it had actually pooled.
+  const propagationSeeds = [...SEEDS, 8, 9, 10, 11, 12, 13, 14, 15];
+  for (const s of propagationSeeds) {
     const r = runPair(cfg(s, { crowd: { nPedestrians: 40 } }));
     const robot = r.treated.robotPositions!;
     const d = deviation(r.pair);
@@ -242,8 +281,8 @@ sweep("e4_recovery", "passingOffsetM", [0, 0.5, 1, 1.5, 2, 3],
       nPeople: counts[b]!,
     });
   }
-  facts["e5_propagation"] = { axis: "closestApproachFromM", nSeeds: SEEDS.length, rows };
-  console.log("\n== e5_propagation (binned by closest approach) ==");
+  facts["e5_propagation"] = { axis: "closestApproachFromM", nSeeds: propagationSeeds.length, rows };
+  console.log(`\n== e5_propagation (binned by closest approach, ${propagationSeeds.length} seeds) ==`);
   const keys = Object.keys(rows[0]!);
   console.log(keys.map((k) => k.padStart(22)).join(""));
   for (const r of rows) console.log(keys.map((k) => (r[k] as number).toFixed(3).padStart(22)).join(""));

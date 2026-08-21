@@ -1,7 +1,7 @@
 import { fail, requireFinite } from "../core/errors.js";
 import type { TreatmentSpec } from "./pairedRun.js";
 
-export type DisturbanceKind = "impulse" | "goal-shift" | "sensor-dropout";
+export type DisturbanceKind = "impulse" | "goal-shift";
 
 /**
  * One scheduled event.
@@ -59,7 +59,6 @@ export interface RunConfig {
    */
   readonly perception: {
     readonly positionSigmaM: number;
-    readonly latencyTicks: number;
   };
   /** Scheduled by tick, never by wall clock — so a shove is a variable, not an accident. */
   readonly disturbances: readonly DisturbanceSpec[];
@@ -118,7 +117,7 @@ export const DEFAULT_CONFIG: RunConfig = Object.freeze({
     startXY: Object.freeze([2, 6.5] as [number, number]),
     goalXY: Object.freeze([20, 6.5] as [number, number]),
   }),
-  perception: Object.freeze({ positionSigmaM: 0, latencyTicks: 0 }),
+  perception: Object.freeze({ positionSigmaM: 0 }),
   disturbances: Object.freeze([] as DisturbanceSpec[]),
   pedestriansSeeRobot: true,
   treatment: Object.freeze({ kind: "robot-presence" as const }),
@@ -198,12 +197,6 @@ export function makeRunConfig(overrides: RunConfigOverrides = {}): RunConfig {
   if (merged.perception.positionSigmaM < 0) {
     fail(
       `RunConfig.perception.positionSigmaM must be >= 0, got ${merged.perception.positionSigmaM}`,
-    );
-  }
-  if (!Number.isInteger(merged.perception.latencyTicks) || merged.perception.latencyTicks < 0) {
-    fail(
-      `RunConfig.perception.latencyTicks must be a non-negative integer, got ` +
-        `${merged.perception.latencyTicks}`,
     );
   }
   const seenDisturbanceIds = new Set<string>();

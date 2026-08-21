@@ -57,7 +57,15 @@ export function applyDisturbances(
       }
       continue;
     }
-    // sensor-dropout is handled in perception, not here: it changes what the robot believes, not
-    // what is true. Listed so the switch is exhaustive over the declared kinds.
+    // Impulse and goal-shift are the whole of DisturbanceKind, so nothing reaches here and there
+    // is nothing left to apply. The assignment is what makes that true tomorrow as well: adding a
+    // kind to the union without a branch above would otherwise compile, and the new disturbance
+    // would silently do nothing — a control the reader turns that changes no number, which is the
+    // hardest kind of wrong for this site. `never` accepts nothing, so the union member and its
+    // branch land together or the build stops. A comment saying so was here first, and comments
+    // do not fail builds. Compile-time only, deliberately: a throw would be a runtime change on a
+    // line that cannot be reached, inside the loop the whole simulator steps through.
+    const unhandledKind: never = spec.kind;
+    void unhandledKind;
   }
 }

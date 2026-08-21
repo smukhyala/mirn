@@ -76,64 +76,99 @@
         "nPedestrians": 4,
         "meanDeviationM": 0.15267416555074775,
         "meanDeviationM_sd": 0.08172478077640628,
+        "meanDeviationM_n": 8,
         "maxDeviationM": 0.5719517546542133,
+        "maxDeviationM_n": 8,
         "totalPersonMetres": 0.610696662202991,
-        "runToRunBandM": 0.08189478686139867,
-        "signalToBand": 1.864272091081186
+        "totalPersonMetres_n": 8,
+        "runToRunBandM": 0.17215130505245227,
+        "runToRunBandM_n": 8,
+        "signalToBand": 0.8868603436043073,
+        "signalToBand_n": 8
       },
       {
         "nPedestrians": 8,
         "meanDeviationM": 0.2322815690676452,
         "meanDeviationM_sd": 0.1003298276308545,
+        "meanDeviationM_n": 8,
         "maxDeviationM": 0.6573123347943184,
+        "maxDeviationM_n": 8,
         "totalPersonMetres": 1.8582525525411615,
-        "runToRunBandM": 0.10760385527541154,
-        "signalToBand": 2.158673297282162
+        "totalPersonMetres_n": 8,
+        "runToRunBandM": 0.20573135851025343,
+        "runToRunBandM_n": 8,
+        "signalToBand": 1.1290528130939674,
+        "signalToBand_n": 8
       },
       {
         "nPedestrians": 12,
         "meanDeviationM": 0.2516499355592955,
         "meanDeviationM_sd": 0.07244854336243992,
+        "meanDeviationM_n": 8,
         "maxDeviationM": 0.6767972995533049,
+        "maxDeviationM_n": 8,
         "totalPersonMetres": 3.019799226711546,
-        "runToRunBandM": 0.2384049035752009,
-        "signalToBand": 1.055556877335439
+        "totalPersonMetres_n": 8,
+        "runToRunBandM": 0.24120600007724896,
+        "runToRunBandM_n": 8,
+        "signalToBand": 1.043298821251137,
+        "signalToBand_n": 8
       },
       {
         "nPedestrians": 18,
         "meanDeviationM": 0.3172345255309179,
         "meanDeviationM_sd": 0.04248046626896459,
+        "meanDeviationM_n": 8,
         "maxDeviationM": 0.8650492833462377,
+        "maxDeviationM_n": 8,
         "totalPersonMetres": 5.710221459556522,
-        "runToRunBandM": 0.2867739436817205,
-        "signalToBand": 1.1062180944967737
+        "totalPersonMetres_n": 8,
+        "runToRunBandM": 0.29304255077739244,
+        "runToRunBandM_n": 8,
+        "signalToBand": 1.0825544778031322,
+        "signalToBand_n": 8
       },
       {
         "nPedestrians": 24,
         "meanDeviationM": 0.35684916186463583,
         "meanDeviationM_sd": 0.06995994742323228,
+        "meanDeviationM_n": 8,
         "maxDeviationM": 0.9601505694212452,
+        "maxDeviationM_n": 8,
         "totalPersonMetres": 8.56437988475126,
-        "runToRunBandM": 0.36105789262985494,
-        "signalToBand": 0.9883433353732728
+        "totalPersonMetres_n": 8,
+        "runToRunBandM": 0.3438204214158933,
+        "runToRunBandM_n": 8,
+        "signalToBand": 1.0378940273387154,
+        "signalToBand_n": 8
       },
       {
         "nPedestrians": 32,
         "meanDeviationM": 0.4206311092755934,
         "meanDeviationM_sd": 0.04625663111733822,
+        "meanDeviationM_n": 8,
         "maxDeviationM": 1.0029495241276758,
+        "maxDeviationM_n": 8,
         "totalPersonMetres": 13.460195496818988,
-        "runToRunBandM": 0.39544559176747807,
-        "signalToBand": 1.0636889575517747
+        "totalPersonMetres_n": 8,
+        "runToRunBandM": 0.39407436829231346,
+        "runToRunBandM_n": 8,
+        "signalToBand": 1.0673901758654367,
+        "signalToBand_n": 8
       },
       {
         "nPedestrians": 44,
         "meanDeviationM": 0.3688109348009912,
         "meanDeviationM_sd": 0.03504801971788176,
+        "meanDeviationM_n": 8,
         "maxDeviationM": 0.8886638785243401,
+        "maxDeviationM_n": 8,
         "totalPersonMetres": 16.227681131243614,
-        "runToRunBandM": 0.47003267566499574,
-        "signalToBand": 0.7846495656481809
+        "totalPersonMetres_n": 8,
+        "runToRunBandM": 0.4624094947562695,
+        "runToRunBandM_n": 8,
+        "signalToBand": 0.7975851252695124,
+        "signalToBand_n": 8
       }
     ]
   },
@@ -349,7 +384,7 @@
   },
   "e5_propagation": {
     "axis": "closestApproachFromM",
-    "nSeeds": 8,
+    "nSeeds": 16,
     "rows": [
       {
         "closestApproachFromM": 0,

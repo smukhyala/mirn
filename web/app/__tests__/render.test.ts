@@ -141,6 +141,40 @@ describe("the built pages boot", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("says the pooled table gathered people, rather than claiming an average nobody took", async () => {
+    // The propagation table is binned by how close the robot came, so a point on it is a group of
+    // people collected from every run — not a mean over runs. The panel said "averaged over N
+    // runs" under every cited cell on that page anyway, including the head count, while the
+    // figure-note under the same plot said pooled. Raising the declared run count made that
+    // sentence numerically right and left it wrong in kind, on a surface the reader opens.
+    const { document, window } = await boot("e5-propagation");
+    const cited = Array.from(document.querySelectorAll<HTMLElement>("[data-quantity]"));
+    expect(cited.length, "e5-propagation cites nothing, so this test proves nothing").toBeGreaterThan(
+      0,
+    );
+    for (const span of cited) {
+      click(span, window);
+      const text = span.nextElementSibling?.textContent ?? "";
+      expect(text, `provenance for ${span.getAttribute("data-quantity")}`).toContain(
+        "gathering the people",
+      );
+      expect(text, `provenance for ${span.getAttribute("data-quantity")}`).not.toContain("averaged");
+    }
+  });
+
+  it("still says averaged on a table whose points really are means over runs", async () => {
+    // The other side of the same branch. A test that only pinned the pooled wording would pass
+    // just as well if every provenance panel on the site stopped saying where its number came
+    // from.
+    const { document, window } = await boot("e1-push-strength");
+    const cited = document.querySelector<HTMLElement>('[data-quantity*="["]');
+    expect(cited).not.toBeNull();
+    click(cited, window);
+    const text = cited?.nextElementSibling?.textContent ?? "";
+    expect(text).toContain("averaged over");
+    expect(text).not.toContain("gathering the people");
+  });
+
   it("renders the prediction question with real labels, not [object Object]", async () => {
     const { document } = await boot("e1-push-strength");
     const options = Array.from(document.querySelectorAll(".predict-option")).map(

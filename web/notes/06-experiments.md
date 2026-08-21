@@ -95,7 +95,8 @@ measurement, and the spread is the uncertainty you are entitled to before you be
 
 The propagation question is the exception. It sorts people by how close the robot came to them
 rather than turning a dial, so its points pool people across runs and carry no spread of their
-own, and a point with no spread beside it is one to believe less.
+own, and a point with no spread beside it is one to believe less. It pools sixteen runs rather
+than eight, because the groups furthest from the robot are thin however many rooms you fill.
 
 :::caveat
 In this crowd, the size of every answer in this part is a property of a social-force model that

@@ -1149,8 +1149,15 @@ function describeProvenance(tableName: string, table: FactTable, match: RegExpEx
 
   const sd = row[`${columnName}_sd`];
   const n = row[`${columnName}_n`];
+  // The propagation table is binned by how close the robot came, so a point on it is a group of
+  // people gathered from every run rather than a mean of the runs. Saying "averaged over N runs"
+  // there describes an average nobody took — the figure-note under the plot already says pooled,
+  // and this sentence said the opposite about the same point.
+  const isPooled = table.axis.startsWith("closestApproach");
   const parts: string[] = [` — from the ${sweep} sweep${where}`];
-  if (n !== undefined && Number.isFinite(n) && n < table.nSeeds) {
+  if (isPooled) {
+    parts.push(`, gathering the people from ${table.nSeeds} runs with different crowds`);
+  } else if (n !== undefined && Number.isFinite(n) && n < table.nSeeds) {
     parts.push(`, averaged over ${n} of ${table.nSeeds} runs because the rest were censored`);
   } else {
     parts.push(`, averaged over ${table.nSeeds} runs with different crowds`);

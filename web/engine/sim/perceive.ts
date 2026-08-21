@@ -30,11 +30,10 @@ export function perceive(
   scratchY: Float64Array,
 ): PerceivedWorld {
   const sigma = config.perception.positionSigmaM;
-  const latency = config.perception.latencyTicks;
-  // Latency is applied by addressing the tape at an earlier tick rather than by keeping a history
-  // buffer: the belief is stale in the same reproducible way on every run.
-  const sourceTick = tick - latency < 0 ? 0 : tick - latency;
 
+  // The tape is addressed at (tick, uid, channel), so the error attached to a given person at a
+  // given instant is the same draw in both arms, whichever subset of the crowd each robot is
+  // looking at.
   for (let i = 0; i < state.n; i++) {
     const uid = state.uid[i] as number;
     if (sigma === 0) {
@@ -44,10 +43,10 @@ export function perceive(
     }
     scratchX[i] =
       (state.x[i] as number) +
-      sigma * gaussian(tape, sourceTick, uid, Channel.PerceptX, Channel.PerceptMiss);
+      sigma * gaussian(tape, tick, uid, Channel.PerceptX, Channel.PerceptMiss);
     scratchY[i] =
       (state.y[i] as number) +
-      sigma * gaussian(tape, sourceTick, uid, Channel.PerceptY, Channel.PerceptMiss);
+      sigma * gaussian(tape, tick, uid, Channel.PerceptY, Channel.PerceptMiss);
   }
 
   return { n: state.n, x: scratchX, y: scratchY };

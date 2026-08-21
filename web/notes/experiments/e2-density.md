@@ -9,7 +9,7 @@ uses: [run, deviation, seed, perturbation, uncertainty]
 reader_can: >
   Say what happens to one person's deviation as the room fills, and what happens to the room's
   total, without pretending those are the same question. Explain why a robot can be reaching more
-  people and be harder to catch doing it. Refuse a deviation figure that arrives without the
+  people and be no easier to catch doing it. Refuse a deviation figure that arrives without the
   run-to-run band beside it.
 ---
 
@@ -79,9 +79,9 @@ series:
   - key: runToRunBandM
     label: how far apart two robot-free runs land
 caption: >
-  Two measurements of the same room at each crowd size, both in metres. Every point on the first
-  line is the mean of eight runs with a different crowd each time. The second line is built from
-  robot-free runs only, and the robot therefore appears in one of these curves and not the other.
+  Two measurements of the same room at each crowd size, both in metres. Every point on either
+  line is a mean across eight different crowds. The second line is built from robot-free runs
+  only, and the robot therefore appears in one of these curves and not the other.
 ```
 
 Now divide one curve by the other. The metres cancel and what is left is a plain count: how much
@@ -89,15 +89,15 @@ effect there is per unit of ordinary variation. It is the only form in which a d
 means anything by itself, and this page is where that stops being a pedantic remark.
 
 At {{lit:4 people}} the effect, counted in bands, is {{q:e2_density[nPedestrians=4].signalToBand}}.
-At {{lit:8 people}} it is {{q:e2_density[nPedestrians=8].signalToBand}}. From {{lit:12 people}}
-onwards it sits near one: {{q:e2_density[nPedestrians=12].signalToBand}} at {{lit:12 people}},
+At {{lit:8 people}} it is {{q:e2_density[nPedestrians=8].signalToBand}}. It stays where it started
+as the room fills: {{q:e2_density[nPedestrians=12].signalToBand}} at {{lit:12 people}},
 {{q:e2_density[nPedestrians=32].signalToBand}} at {{lit:32 people}}. At {{lit:44 people}} it is
 {{q:e2_density[nPedestrians=44].signalToBand}}.
 
-The two emptiest rooms stand clear of the rest. Everything from {{lit:12 people}} up sits near one,
-and the sweep records no run-to-run spread for this ratio, so the small movements across that
-stretch are not worth reading. What the plot supports is a step down off the left-hand end, not a
-steady slide.
+Every point on that line sits near one, and the sweep records no run-to-run spread for this ratio,
+so the movements between neighbouring points are not worth reading. What the plot supports is a
+flat line at about one, all the way across: at every crowd size on the sweep, the robot's effect on
+the average person and the room's own churn come out about the same size.
 
 ```mirn:sweep
 experiment: e2_density
@@ -114,21 +114,23 @@ caption: >
 ## Both answers are true
 
 Take this section and the one before it as a single finding, not as two rival ones. The robot is
-reaching more people, and in the fuller rooms it is harder to catch doing it. Those two sentences
-do not contradict each other, and neither one has to give way.
+reaching more people, and it is no easier to catch doing it in a full room than in an empty one.
+Those two sentences do not contradict each other, and neither one has to give way.
 
-In a nearly empty corridor the robot is the only thing that happens. Nobody has anybody else to
-dodge, so two runs of that room look almost identical, and whatever deviation you find is the
-robot's doing by elimination. Fill the corridor and people spend the entire crossing shoving each
-other. Two runs of the packed room already look quite different from one another before you put a
-robot anywhere near them.
+In a nearly empty corridor the robot is the only thing that happens, and two runs of that room do
+land closer together than two runs of any other room on the sweep. That still does not hand you the
+robot's effect by elimination, because the robot's effect in that room is the smallest reading on
+the sweep as well. Fill the corridor and people spend the entire crossing shoving each other. Two
+runs of the packed room already look quite different from one another before you put a robot
+anywhere near them.
 
 The robot's contribution grew. Taken from one end of the sweep to the other, the pile of everything
 else it has to be picked out of grew faster — though not at every step along the way.
 
 That is worth saying in the other direction too, because it is the part that stings: the rooms
-where a robot matters most to the people in them are the rooms where its effect is hardest to
-demonstrate. Crowded corridors are not an edge case for this measurement. They are the deployment.
+where a robot matters most to the people in them are not rooms where its effect is any easier to
+demonstrate. The effect climbs most of the way across the dial and the ratio does not follow it up.
+Crowded corridors are not an edge case for this measurement. They are the deployment.
 
 :::caveat
 In this crowd, how hard two people push each other apart is one constant in a social-force model,
