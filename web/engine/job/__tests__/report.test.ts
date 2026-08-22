@@ -127,7 +127,7 @@ function meanFrechetOf(run: RunResult): number {
 function fullContext() {
   const config = makeRunConfig();
   const run = runPair(config);
-  const zeroConfig = makeRunConfig({ pedestriansSeeRobot: false });
+  const zeroConfig = makeRunConfig({ ...config, pedestriansSeeRobot: false });
   const band = replicateBand(config, 8);
   const floor = splitHalfNull(run.control.positions, 20, seededPermutations(0));
   return buildContext({
