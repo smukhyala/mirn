@@ -66,4 +66,24 @@ describe("pedestrianTimeLost", () => {
     expect(lost.nUsed).toBe(18);
     expect(lost.meanS).toBe(-0.08333333333333333);
   });
+
+  /**
+   * The survivor-drop branch, closed.
+   *
+   * At the default 800 ticks (40 s) every one of the 18 pedestrians reaches their goal in both
+   * arms, so the test above never exercises the `treatedSettled < 0 || controlSettled < 0` half
+   * of the join -- the one that drops a person instead of averaging them in as a zero. A shorter
+   * episode is a legal `RunConfig` (nTicks has no floor beyond >= 1) and does not contort the
+   * scenario: it is the same crowd, cut off before everyone arrives. At 300 ticks (15 s) only 6
+   * of the 18 have settled in both arms; the other 12 are dropped rather than counted as 0 s lost,
+   * which is the whole point of carrying nUsed separately from nAgents.
+   */
+  it("drops a person who has not settled in both arms instead of averaging them in as zero", () => {
+    const config = makeRunConfig({ nTicks: 300 });
+    const lost = pedestrianTimeLost(runPair(config), config.dt);
+    expect(lost.nAgents).toBe(18);
+    expect(lost.nUsed).toBe(6);
+    expect(lost.nUsed).toBeLessThan(lost.nAgents);
+    expect(lost.meanS).toBe(0.19166666666666668);
+  });
 });
