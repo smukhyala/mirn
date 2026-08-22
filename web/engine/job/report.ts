@@ -1,17 +1,25 @@
+import { SIM_CONSTANTS, type RunConfig } from "../contracts/config.js";
 import type { PairedRun } from "../contracts/pairedRun.js";
 import { pairedAgents } from "../contracts/pairedRun.js";
 import { fail } from "../core/errors.js";
-import type { Deviation } from "../measure/metrics.js";
-import type { RunResult } from "../sim/run.js";
+import { deviation, type Deviation } from "../measure/metrics.js";
+import type { RunToRunBand } from "../measure/null/band.js";
+import type { SplitHalfNull } from "../measure/null/splitHalf.js";
+import type { ArmResult, RunResult } from "../sim/run.js";
 
 /**
  * The measurement report layer.
  *
- * Nothing here computes a divergence or a quantile: those live in `web/engine/measure/`, which
- * has a Python oracle. This file joins, gates and packages, and it has no oracle and must not
- * acquire one. The `Deviation` import above is type-only — erased at compile time under
- * `verbatimModuleSyntax`/`isolatedModules` — so it carries no runtime dependency on `measure/`;
- * it exists only so `perAgentDeviationByUid` can name the shape it is given.
+ * Nothing here computes a divergence or a quantile from raw positions: those live in
+ * `web/engine/measure/`, which has a Python oracle. This file joins, gates and packages, and it
+ * has no oracle and must not acquire one.
+ *
+ * `deviation` is the one deliberate exception to "no runtime import from `measure/`": every column
+ * extractor is handed a `ReportContext`, and that record's `deviation` field has to be an already
+ * computed `Deviation`, not a recipe for making one — `buildContext` is the single place that
+ * calls it, once per run, so no other file in `job/` ever needs to. `RunToRunBand` and
+ * `SplitHalfNull` stay type-only, same as `Deviation` did before this file needed a real value
+ * instead of just its shape.
  */
 
 /**
@@ -97,4 +105,218 @@ function settledStep(path: Float64Array): number {
     }
   }
   return -1;
+}
+
+/** How the ruler was set. Task 15's `spec.ts` re-exports this and validates it. */
+export interface MeasurementParams {
+  readonly kind: "measurementParams";
+  /** Default 60 steps, which is 3.00 s. Not 16: at 16 the forecaster reads below the band. */
+  readonly forecastHorizonSteps: number;
+  /** Required, never defaulted. With no end step the forecaster reads exactly 0 on this crowd. */
+  readonly forecastEndStep: number;
+  readonly nearMissThresholdM: number;
+  readonly recoveryToleranceFraction: number;
+  readonly recoveryDwellSteps: number;
+}
+
+/** First step at which a path is further than `thresholdM` from where it began. -1 if never. */
+export function startedMovingStep(path: Float64Array, thresholdM: number): number {
+  const nSteps = path.length / 2;
+  const x0 = path[0] as number;
+  const y0 = path[1] as number;
+  for (let s = 0; s < nSteps; s++) {
+    const dx = (path[2 * s] as number) - x0;
+    const dy = (path[2 * s + 1] as number) - y0;
+    if (Math.sqrt(dx * dx + dy * dy) > thresholdM) {
+      return s;
+    }
+  }
+  return -1;
+}
+
+export interface GatedClearance {
+  readonly kind: "gatedClearance";
+  readonly minM: number;
+  readonly minAtStep: number;
+  readonly nearMissEpisodes: number;
+  readonly thresholdM: number;
+  /** Earliest step any robot-person pair qualified. -1 if none ever did. */
+  readonly firstMeasuredStep: number;
+  readonly nStepsMeasured: number;
+}
+
+/**
+ * Surface-to-surface gap between the robot and the nearest person, measured only from the moment
+ * both of them have left where they were standing.
+ *
+ * "Has left" means further than its own body radius from its step-0 position. Before that a
+ * pedestrian who spawned on the robot's start tile reports a gap of -0.55 m at step 0, which is
+ * an artifact of where the crowd is placed and not something the robot did.
+ *
+ * Episodes rather than ticks, matching `clearance()`: counting ticks below a threshold makes the
+ * safety number scale with 1/dt. A step where no pair yet qualifies breaks an episode.
+ */
+export function clearanceAfterBothMove(
+  robotPath: Float64Array | null,
+  pedestrianPaths: readonly Float64Array[],
+  robotRadiusM: number,
+  pedRadiusM: number,
+  thresholdM: number,
+): GatedClearance {
+  const empty: GatedClearance = {
+    kind: "gatedClearance",
+    minM: Number.NaN,
+    minAtStep: -1,
+    nearMissEpisodes: 0,
+    thresholdM,
+    firstMeasuredStep: -1,
+    nStepsMeasured: 0,
+  };
+  if (robotPath === null) {
+    return empty;
+  }
+  const robotStart = startedMovingStep(robotPath, robotRadiusM);
+  if (robotStart < 0) {
+    return empty;
+  }
+
+  const gateOf: number[] = [];
+  for (const path of pedestrianPaths) {
+    const pedStart = startedMovingStep(path, pedRadiusM);
+    if (pedStart < 0) {
+      gateOf.push(-1);
+    } else if (pedStart > robotStart) {
+      gateOf.push(pedStart);
+    } else {
+      gateOf.push(robotStart);
+    }
+  }
+
+  const nSteps = robotPath.length / 2;
+  const contactRadius = robotRadiusM + pedRadiusM;
+  let minM = Number.POSITIVE_INFINITY;
+  let minAtStep = -1;
+  let firstMeasuredStep = -1;
+  let nStepsMeasured = 0;
+  let episodes = 0;
+  let inside = false;
+
+  for (let s = 0; s < nSteps; s++) {
+    let closest = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < pedestrianPaths.length; i++) {
+      const gate = gateOf[i] as number;
+      if (gate < 0 || s < gate) {
+        continue;
+      }
+      const path = pedestrianPaths[i] as Float64Array;
+      const dx = (path[2 * s] as number) - (robotPath[2 * s] as number);
+      const dy = (path[2 * s + 1] as number) - (robotPath[2 * s + 1] as number);
+      const gap = Math.sqrt(dx * dx + dy * dy) - contactRadius;
+      if (gap < closest) {
+        closest = gap;
+      }
+    }
+    if (closest === Number.POSITIVE_INFINITY) {
+      inside = false;
+      continue;
+    }
+    nStepsMeasured++;
+    if (firstMeasuredStep < 0) {
+      firstMeasuredStep = s;
+    }
+    if (closest < minM) {
+      minM = closest;
+      minAtStep = s;
+    }
+    if (closest < thresholdM) {
+      if (!inside) {
+        episodes++;
+        inside = true;
+      }
+    } else {
+      inside = false;
+    }
+  }
+
+  if (nStepsMeasured === 0) {
+    return empty;
+  }
+  return {
+    kind: "gatedClearance",
+    minM,
+    minAtStep,
+    nearMissEpisodes: episodes,
+    thresholdM,
+    firstMeasuredStep,
+    nStepsMeasured,
+  };
+}
+
+/**
+ * When the robot got there, in seconds, or NaN if it never did.
+ *
+ * `arrivedTick` is set after the robot moves on that tick, and that position is recorded as
+ * sample `arrivedTick + 1`, so the arrival second is `(arrivedTick + 1) * dt`. Non-arrival is NaN
+ * here and is rendered as censored by the column, never as a number and never as zero.
+ */
+export function arrivalSecondsOf(arm: ArmResult, dt: number): number {
+  if (arm.arrivedTick < 0) {
+    return Number.NaN;
+  }
+  return (arm.arrivedTick + 1) * dt;
+}
+
+/** Everything a column extractor is allowed to look at. Built once per run, never per column. */
+export interface ReportContext {
+  readonly kind: "reportContext";
+  readonly config: RunConfig;
+  readonly params: MeasurementParams;
+  readonly run: RunResult;
+  readonly deviation: Deviation;
+  readonly band: RunToRunBand | null;
+  readonly floor: SplitHalfNull | null;
+  readonly zeroRun: RunResult | null;
+  readonly frechetMeanM: number | null;
+  /**
+   * The shortest crossing that counts as arriving: straight-line start-to-goal minus the goal
+   * radius the robot stops inside. 16.90 m at the default config, where start and goal are
+   * 18.00 m apart and the robot stops within 1.1 m. It is a bound, and the tile says so.
+   */
+  readonly straightLineM: number;
+}
+
+export interface BuildContextInit {
+  readonly config: RunConfig;
+  readonly params: MeasurementParams;
+  readonly run: RunResult;
+  readonly band: RunToRunBand | null;
+  readonly floor: SplitHalfNull | null;
+  readonly zeroRun: RunResult | null;
+  readonly frechetMeanM: number | null;
+}
+
+export function buildContext(init: BuildContextInit): ReportContext {
+  const startX = init.config.robot.startXY[0];
+  const startY = init.config.robot.startXY[1];
+  const goalX = init.config.robot.goalXY[0];
+  const goalY = init.config.robot.goalXY[1];
+  const dx = goalX - startX;
+  const dy = goalY - startY;
+  const straightLine = Math.sqrt(dx * dx + dy * dy) - SIM_CONSTANTS.goalReachedM;
+  let straightLineM = straightLine;
+  if (straightLine < 0) {
+    straightLineM = 0;
+  }
+  return Object.freeze({
+    kind: "reportContext" as const,
+    config: init.config,
+    params: init.params,
+    run: init.run,
+    deviation: deviation(init.run.pair),
+    band: init.band,
+    floor: init.floor,
+    zeroRun: init.zeroRun,
+    frechetMeanM: init.frechetMeanM,
+    straightLineM,
+  });
 }
