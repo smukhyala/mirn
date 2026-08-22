@@ -1,0 +1,62 @@
+{
+  "trueEffectM": {
+    "value": 0.35157013372697155,
+    "availability": "measured"
+  },
+  "forecastReportM": {
+    "value": 0.2854565210301339,
+    "availability": "measured"
+  },
+  "runToRunBandM": {
+    "value": 0.31058715139377074,
+    "availability": "measured"
+  },
+  "worstMomentM": {
+    "value": 0.7611531942454374,
+    "availability": "measured"
+  },
+  "worstMomentNullM": {
+    "value": 0.7649744339753771,
+    "availability": "measured"
+  },
+  "forecastZeroM": {
+    "value": 0.3341109929554126,
+    "availability": "measured"
+  },
+  "detectionFloorM": {
+    "value": 0.7972496245057101,
+    "availability": "measured"
+  },
+  "robotPathM": {
+    "value": 17.780036918665008,
+    "availability": "measured"
+  },
+  "robotArrivalS": {
+    "value": 16.400000000000002,
+    "availability": "measured"
+  },
+  "minClearanceM": {
+    "value": -0.04979741026062734,
+    "availability": "measured"
+  },
+  "nearMissEpisodes": {
+    "value": 2,
+    "availability": "measured"
+  },
+  "extraPathM": {
+    "value": null,
+    "availability": "notApplicable"
+  },
+  "pedestrianTimeLostS": {
+    "value": -0.08333333333333333,
+    "availability": "measured"
+  },
+  "recoveryS": {
+    "value": null,
+    "availability": "censored"
+  },
+  "frechetMeanM": {
+    "value": 0.6636971415416648,
+    "availability": "measured"
+  }
+}
