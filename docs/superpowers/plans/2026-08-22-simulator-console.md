@@ -68,7 +68,7 @@ No UI changes. Every existing test stays green. The acceptance gate is a byte-id
 - Test: `web/engine/job/__tests__/stats.test.ts`
 
 **Interfaces:**
-- Consumes: nothing. This file imports nothing at all, and must stay that way — `web/engine/measure/` has a Python oracle and `web/engine/job/` deliberately does not (CLAUDE.md guardrails 8 and 9), so the two must not grow a shared dependency that drags one into the other's parity obligations.
+- Consumes: nothing yet. Commit 2 (Task 13) adds `fail` from `web/engine/core/errors.ts` and type-only imports from `./columns.ts`. The standing rule is narrower than "imports nothing" — `web/engine/measure/` has a Python oracle and `web/engine/job/` deliberately does not (CLAUDE.md guardrails 8 and 9), so the two must not grow a shared dependency that drags one into the other's parity obligations.
 - Produces: `meanOf(values: readonly number[]): number`, `sdOf(values: readonly number[]): number`, `finiteCount(values: readonly number[]): number` — all exported from `web/engine/job/stats.ts`. Tasks 3, 4 and 5 import them.
 
 Background the implementer needs: these three functions exist today as private helpers at `scripts/measure-experiments.ts:41-55`. Their committed output — `web/data/experiment-facts.json`, 729 lines of numbers the site quotes — is what Task 4 diffs byte for byte. So they are **lifted verbatim**, including the `filter`/`reduce` chains that the repo's "explicit loops with named intermediates" convention would otherwise forbid. Rewriting them as loops is a change nobody can prove is safe from inside this task.
@@ -154,7 +154,7 @@ Create `web/engine/job/stats.ts`:
 /**
  * The numeric helpers the experiment script and the console both average with.
  *
- * This file imports nothing, deliberately. `web/engine/measure/` is checked against a Python
+ * This file must never import from `web/engine/measure/`. That directory is checked against a Python
  * oracle and `web/engine/job/` is not (CLAUDE.md, guardrails 8 and 9), so a shared dependency
  * between them would drag one into the other's parity obligations for no benefit.
  *
