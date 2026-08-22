@@ -6,6 +6,7 @@ import { deviation, type Deviation } from "../measure/metrics.js";
 import type { RunToRunBand } from "../measure/null/band.js";
 import type { SplitHalfNull } from "../measure/null/splitHalf.js";
 import type { ArmResult, RunResult } from "../sim/run.js";
+import { COLUMNS, type ColumnKey, type Reading } from "./columns.js";
 
 /**
  * The measurement report layer.
@@ -319,4 +320,35 @@ export function buildContext(init: BuildContextInit): ReportContext {
     frechetMeanM: init.frechetMeanM,
     straightLineM,
   });
+}
+
+/**
+ * Every requested column, extracted from one context.
+ *
+ * The context is built once per run and the extractors only read it, so ordering the keys
+ * differently cannot change a number. `runReport` re-checks the NaN rule on the way out: a
+ * descriptor that returns a finite value alongside a censored availability would otherwise be
+ * averaged as though it were a measurement.
+ */
+export function runReport(
+  ctx: ReportContext,
+  keys: readonly ColumnKey[],
+): Readonly<Partial<Record<ColumnKey, Reading>>> {
+  const report: Partial<Record<ColumnKey, Reading>> = {};
+  for (const key of keys) {
+    const column = COLUMNS[key];
+    if (column === undefined) {
+      fail(`'${String(key)}' is not a column; the catalogue in columns.ts is closed`);
+    }
+    const reading = column.extract(ctx);
+    const isMeasured = reading.availability.kind === "measured";
+    if (isMeasured === Number.isNaN(reading.value)) {
+      fail(
+        `column '${key}' returned a ${reading.availability.kind} reading whose value is ` +
+          `${reading.value}; a value is NaN if and only if it was not measured`,
+      );
+    }
+    report[key] = reading;
+  }
+  return Object.freeze(report);
 }
