@@ -18,6 +18,8 @@ import { paired, cvmResidual } from "../web/engine/measure/estimator/index.js";
 import { replicateBand } from "../web/engine/measure/null/band.js";
 import { clearance, deviation, recovery, robotCost } from "../web/engine/measure/metrics.js";
 import { seededPermutations, splitHalfNull } from "../web/engine/measure/null/splitHalf.js";
+import { finiteCount, meanOf, sdOf } from "../web/engine/job/stats.js";
+import { aggregateSweep, runSweep } from "../web/engine/job/sweep.js";
 
 const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7];
 const BASE_SEED = 20260816;
@@ -27,31 +29,6 @@ const ACTIVE_STEP = 200;
 
 function cfg(seedIndex: number, o: RunConfigOverrides = {}) {
   return makeRunConfig({ seed: BASE_SEED + seedIndex * 7919, nTicks: N_TICKS, ...o });
-}
-
-/**
- * Mean over the FINITE values, which is a survivorship trap and is why every swept column now
- * also reports how many runs it actually averaged.
- *
- * A censored measurement — recovery that never came inside its tolerance, an arrival that never
- * happened — comes back NaN and gets dropped here. Recovery time was being averaged over as few
- * as two of eight runs and presented as a property of the eight, with nothing on the page or in
- * the facts file to say so. Dropping the value is right; dropping it silently is not.
- */
-function meanOf(values: readonly number[]): number {
-  const finite = values.filter((v) => Number.isFinite(v));
-  if (finite.length === 0) return Number.NaN;
-  return finite.reduce((a, b) => a + b, 0) / finite.length;
-}
-
-function finiteCount(values: readonly number[]): number {
-  return values.filter((v) => Number.isFinite(v)).length;
-}
-function sdOf(values: readonly number[]): number {
-  const finite = values.filter((v) => Number.isFinite(v));
-  if (finite.length < 2) return Number.NaN;
-  const m = meanOf(finite);
-  return Math.sqrt(finite.reduce((a, b) => a + (b - m) ** 2, 0) / (finite.length - 1));
 }
 
 /** First step after which a pedestrian never moves again. -1 if they never settle. */
@@ -101,27 +78,25 @@ function bystanderDeviation(r: RunResult, radiusM: number): { meanM: number; n: 
 type Point = Record<string, number>;
 const facts: Record<string, unknown> = {};
 
-function sweep(name: string, axis: string, values: readonly number[], build: (v: number, seed: number) => RunConfigOverrides, measure: (r: RunResult, v: number, seedIndex: number) => Point): void {
-  const rows: Point[] = [];
-  for (const v of values) {
-    const collected: Record<string, number[]> = {};
-    for (const s of SEEDS) {
-      const r = runPair(cfg(s, build(v, s)));
-      const point = measure(r, v, s);
-      for (const [k, val] of Object.entries(point)) {
-        (collected[k] ??= []).push(val);
-      }
-    }
-    const row: Point = { [axis]: v };
-    for (const [k, vals] of Object.entries(collected)) {
-      row[k] = meanOf(vals);
-      row[`${k}_sd`] = sdOf(vals);
-      // How many runs this cell actually averaged. Equal to the seed count unless the measurement
-      // was censored for some of them, which a page citing the cell has to be able to say.
-      row[`${k}_n`] = finiteCount(vals);
-    }
-    rows.push(row);
-  }
+function sweep(
+  name: string,
+  axis: string,
+  values: readonly number[],
+  build: (v: number, seed: number) => RunConfigOverrides,
+  measure: (r: RunResult, v: number, seedIndex: number) => Point,
+): void {
+  // The (values x seeds) loop, the per-cell collection and the k / k_sd / k_n row shape live in
+  // web/engine/job/sweep.ts now, because the console runs the same grid from a Worker and two
+  // copies of an averaging rule is how a table comes to disagree with the file it was built from.
+  // What stays here is what is specific to writing the facts file: the config builder above and
+  // the console tables below.
+  const points = runSweep({
+    values,
+    seedIndices: SEEDS,
+    config: (v, s) => cfg(s, build(v, s)),
+    measure,
+  });
+  const rows = aggregateSweep(points, axis);
   facts[name] = { axis, nSeeds: SEEDS.length, rows };
   console.log(`\n== ${name} (axis: ${axis}, ${SEEDS.length} seeds) ==`);
   const keys = Object.keys(rows[0]!).filter((k) => !k.endsWith("_sd") && !k.endsWith("_n"));
