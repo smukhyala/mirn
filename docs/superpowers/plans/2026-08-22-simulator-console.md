@@ -127,7 +127,7 @@ describe("sdOf", () => {
 describe("finiteCount", () => {
   it("counts the survivors, so no average can be quoted without its denominator", () => {
     expect(finiteCount([1, Number.NaN, 3, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]))
-      .toBe(3);
+      .toBe(2);
     expect(finiteCount([])).toBe(0);
     expect(finiteCount([Number.NaN])).toBe(0);
   });
