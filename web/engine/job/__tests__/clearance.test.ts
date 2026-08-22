@@ -65,6 +65,84 @@ describe("clearanceAfterBothMove", () => {
     expect(gated.nStepsMeasured).toBe(0);
     expect(gated.nearMissEpisodes).toBe(0);
   });
+
+  it("reports nothing measured when the robot itself never leaves its spawn tile", () => {
+    // A synthetic robot path that never moves, distinct from the "no robot at all" case above:
+    // this exercises clearanceAfterBothMove's own robotStart < 0 early return rather than its
+    // robotPath === null one. No pedestrians are needed to reach that branch.
+    const stationaryRobot = new Float64Array([2, 2, 2, 2, 2, 2]);
+    const gated = clearanceAfterBothMove(
+      stationaryRobot,
+      [],
+      SIM_CONSTANTS.robotRadiusM,
+      SIM_CONSTANTS.pedRadiusM,
+      0.5,
+    );
+    expect(Number.isNaN(gated.minM)).toBe(true);
+    expect(gated.minAtStep).toBe(-1);
+    expect(gated.nStepsMeasured).toBe(0);
+    expect(gated.nearMissEpisodes).toBe(0);
+  });
+});
+
+/**
+ * The property the whole task exists for, pinned directly rather than left to an uncommitted
+ * script: two crowd sizes the OLD ruler cannot tell apart at all become distinguishable under the
+ * new one. 18 and 30 pedestrians were measured (outside this suite) to put the same nearest person
+ * on the robot's start tile at step 0, so `clearance()` reports the identical spawn artifact for
+ * both -- exactly the "no knob moves it" failure this task fixes. Deliberately does not pin the
+ * four underlying magnitudes as literals: the simulator is allowed to change what those numbers
+ * are, but this property -- indistinguishable to the old ruler, distinguishable to the new one --
+ * is what must survive that change.
+ */
+describe("clearanceAfterBothMove distinguishes settings the old ruler cannot", () => {
+  it("gates two crowd sizes the ungated ruler reports identically into two different readings", () => {
+    const small = runPair(makeRunConfig());
+    const big = runPair(makeRunConfig({ crowd: { nPedestrians: 30 } }));
+
+    const ungatedSmall = clearance(
+      small.treated.robotPositions as Float64Array,
+      small.treated.positions,
+      SIM_CONSTANTS.robotRadiusM,
+      SIM_CONSTANTS.pedRadiusM,
+      0.5,
+    );
+    const ungatedBig = clearance(
+      big.treated.robotPositions as Float64Array,
+      big.treated.positions,
+      SIM_CONSTANTS.robotRadiusM,
+      SIM_CONSTANTS.pedRadiusM,
+      0.5,
+    );
+
+    // The premise, asserted rather than assumed: if a future change to spawn placement or crowd
+    // size ever breaks this coincidence, THIS assertion is the one that fails and says so --
+    // without it, the rest of the test could pass for the wrong reason (or vacuously).
+    expect(ungatedSmall.minM).toBe(ungatedBig.minM);
+    expect(ungatedSmall.minAtStep).toBe(0);
+    expect(ungatedBig.minAtStep).toBe(0);
+
+    const gatedSmall = clearanceAfterBothMove(
+      small.treated.robotPositions as Float64Array,
+      small.treated.positions,
+      SIM_CONSTANTS.robotRadiusM,
+      SIM_CONSTANTS.pedRadiusM,
+      0.5,
+    );
+    const gatedBig = clearanceAfterBothMove(
+      big.treated.robotPositions as Float64Array,
+      big.treated.positions,
+      SIM_CONSTANTS.robotRadiusM,
+      SIM_CONSTANTS.pedRadiusM,
+      0.5,
+    );
+
+    // Measured spread between these two settings is ~0.163 m. 0.05 m is two orders of magnitude
+    // above any floating-point noise, while staying well under the measured spread, so this still
+    // catches a regression that shrinks the gate's effect without eliminating it outright.
+    const MIN_DISTINGUISHABLE_M = 0.05;
+    expect(Math.abs(gatedSmall.minM - gatedBig.minM)).toBeGreaterThan(MIN_DISTINGUISHABLE_M);
+  });
 });
 
 describe("arrivalSecondsOf", () => {
