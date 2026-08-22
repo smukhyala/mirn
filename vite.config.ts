@@ -26,6 +26,11 @@ function generatedPages(): Record<string, string> {
 export default defineConfig({
   root: "web",
   base: "./",
+  // Vite's default worker output is `iife`, which cannot serve a `{ type: "module" }` worker.
+  // `web/app/worker/client.ts` constructs one, so the format is stated rather than inherited.
+  worker: {
+    format: "es",
+  },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
