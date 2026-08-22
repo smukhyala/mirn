@@ -2240,9 +2240,15 @@ describe("availability", () => {
     }
   });
 
-  it("refuses to report a near-miss count of zero when there is no robot to miss with", () => {
+  it("refuses to report a near-miss count when the robot never leaves its own body radius", () => {
     // A finite zero is the dangerous case: it averages happily and reads as a real measurement.
-    const noRobot = contextWith({ kind: "none" });
+    //
+    // `{ kind: "none" }` will NOT get you there. web/engine/sim/run.ts sets `treatedHasRobot = true`
+    // unconditionally, so every treatment keeps a robot in the treated arm — under "none" it moves
+    // normally and reports two genuine near-miss episodes. Stop the robot instead, which is the
+    // same device Task 10's clearance.test.ts already uses for this.
+    const stationary = makeRunConfig({ robot: { maxSpeed: 0 } });
+    const noRobot = contextFor(stationary);
     const reading = COLUMNS.nearMissEpisodes.extract(noRobot);
     expect(reading.availability.kind).toBe("notApplicable");
     expect(Number.isNaN(reading.value)).toBe(true);
@@ -2647,7 +2653,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     group: "cost" as const,
     needs: "run" as const,
     statistic: "pathScalar" as const,
-    needsAnchor: false,
+    needsAnchor: true,
     zero: Object.freeze({
       kind: "exactZero" as const,
       how: "A treatment that changed nothing about the robot's route leaves this at exactly 0.000 m.",
@@ -2850,7 +2856,7 @@ export const COLUMN_ORDER: readonly ColumnKey[] = Object.freeze([
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run web/engine/job/__tests__/columns.test.ts`
-Expected: 12 passing. If `refuses to report a near-miss count of zero` fails, the `{ kind: "none" }` treatment still has a robot in both arms — check that `nStepsMeasured` is the guard and not `robotPositions === null`.
+Expected: 12 passing. The near-miss guard is `nStepsMeasured`, not `robotPositions === null` — a robot that never moves still has a path.
 
 - [ ] **Step 5: Commit**
 
