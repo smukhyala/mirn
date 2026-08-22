@@ -249,18 +249,29 @@ export function makeSweepJob(init: SweepJobInit): SweepJob {
     }
   }
 
+  // The ruler is validated here unconditionally, not left to `paramsForCell`: that function
+  // returns `job.measurement` untouched whenever the axis is null or a world axis, which is 11 of
+  // the 13 axes plus the single-run case. Without this, an illegal `forecastEndStep` on any of
+  // those paths would freeze straight into the job.
+  const measurement = makeMeasurementParams(init.measurement);
+
+  let floor: FloorParams | null = null;
+  if (init.floor !== null) {
+    floor = makeFloorParams(init.floor);
+  }
+
   const job: SweepJob = Object.freeze({
     kind: "sweepJob" as const,
-    base: init.base,
+    base: Object.freeze({ ...init.base }),
     axis: init.axis,
     axisValues: Object.freeze([...init.axisValues]),
     seedIndices: Object.freeze([...init.seedIndices]),
     baseSeed: init.baseSeed,
     seedStride: init.seedStride,
-    measurement: init.measurement,
+    measurement,
     columns: Object.freeze([...init.columns]),
     bandReplicates: init.bandReplicates === null ? null : Object.freeze({ ...init.bandReplicates }),
-    floor: init.floor,
+    floor,
     zeroReferenceRun: init.zeroReferenceRun,
     frechet: init.frechet,
   });

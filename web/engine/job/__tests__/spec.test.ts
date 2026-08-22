@@ -4,6 +4,7 @@ import {
   BASE_SEED,
   SEED_STRIDE,
   configForCell,
+  makeFloorParams,
   makeMeasurementParams,
   makeSweepJob,
   paramsForCell,
@@ -18,6 +19,13 @@ const PARAMS = makeMeasurementParams({
   recoveryToleranceFraction: 0.25,
   recoveryDwellSteps: 20,
 });
+
+const VALID_FLOOR_INIT = {
+  nSplits: 20,
+  alpha: 0.05,
+  strideSteps: 5,
+  permutationSeed: 1,
+};
 
 function init(overrides: Partial<SweepJobInit> = {}): SweepJobInit {
   return {
@@ -52,6 +60,42 @@ describe("makeMeasurementParams", () => {
     const missing = { ...PARAMS } as Record<string, unknown>;
     delete missing.forecastEndStep;
     expect(() => makeMeasurementParams(missing as never)).toThrow(/forecastEndStep/);
+  });
+});
+
+describe("makeFloorParams", () => {
+  it("accepts a legal set of floor params", () => {
+    const floor = makeFloorParams(VALID_FLOOR_INIT);
+    expect(floor.kind).toBe("floorParams");
+    expect(floor.nSplits).toBe(20);
+    expect(floor.alpha).toBe(0.05);
+    expect(floor.strideSteps).toBe(5);
+    expect(floor.permutationSeed).toBe(1);
+    expect(Object.isFrozen(floor)).toBe(true);
+  });
+
+  it("refuses a non-positive nSplits", () => {
+    expect(() => makeFloorParams({ ...VALID_FLOOR_INIT, nSplits: 0 })).toThrow(
+      /nSplits must be a positive integer, got 0/,
+    );
+  });
+
+  it("refuses an alpha outside (0, 1)", () => {
+    expect(() => makeFloorParams({ ...VALID_FLOOR_INIT, alpha: 5 })).toThrow(
+      /alpha must be between 0 and 1, got 5/,
+    );
+  });
+
+  it("refuses a non-positive strideSteps", () => {
+    expect(() => makeFloorParams({ ...VALID_FLOOR_INIT, strideSteps: 0 })).toThrow(
+      /strideSteps must be a positive integer, got 0/,
+    );
+  });
+
+  it("refuses a non-integer permutationSeed", () => {
+    expect(() => makeFloorParams({ ...VALID_FLOOR_INIT, permutationSeed: 1.5 })).toThrow(
+      /permutationSeed must be an integer, got 1.5/,
+    );
   });
 });
 
@@ -139,5 +183,96 @@ describe("makeSweepJob", () => {
   it("refuses a column that is not in the catalogue", () => {
     const bogus = ["madeUpColumn"] as unknown as SweepJobInit["columns"];
     expect(() => makeSweepJob(init({ columns: bogus }))).toThrow(/'madeUpColumn' is not a column/);
+  });
+
+  it("validates the ruler even when the swept axis never touches it", () => {
+    // `paramsForCell` returns `job.measurement` untouched whenever the axis is a world axis (as
+    // it is here, "crowdSize") or null. If `makeSweepJob` only validated the ruler by calling
+    // `paramsForCell` on every cell, this ill-typed-nothing, perfectly-legal-`number` NaN would
+    // freeze straight into the job.
+    const badMeasurement = { ...PARAMS, forecastEndStep: Number.NaN };
+    expect(() => makeSweepJob(init({ measurement: badMeasurement }))).toThrow(ContractError);
+    expect(() => makeSweepJob(init({ measurement: badMeasurement }))).toThrow(/forecastEndStep/);
+  });
+
+  it("validates the ruler on the degenerate single run too", () => {
+    const badMeasurement = { ...PARAMS, forecastEndStep: Number.NaN };
+    expect(() =>
+      makeSweepJob(
+        init({ axis: null, axisValues: [0], seedIndices: [0], measurement: badMeasurement }),
+      ),
+    ).toThrow(/forecastEndStep/);
+  });
+
+  it("carries a validated floor through the job", () => {
+    const floor = makeFloorParams(VALID_FLOOR_INIT);
+    const job = makeSweepJob(init({ floor }));
+    expect(job.floor).not.toBeNull();
+    expect(job.floor?.nSplits).toBe(20);
+    expect(Object.isFrozen(job.floor)).toBe(true);
+  });
+
+  it("refuses an illegal floor before running anything", () => {
+    const badFloor = { kind: "floorParams" as const, ...VALID_FLOOR_INIT, alpha: 5 };
+    expect(() => makeSweepJob(init({ floor: badFloor }))).toThrow(
+      /alpha must be between 0 and 1, got 5/,
+    );
+  });
+
+  it("freezes the base overrides, not just the arrays", () => {
+    const base = { widthM: 22 };
+    const job = makeSweepJob(init({ base }));
+    expect(Object.isFrozen(job.base)).toBe(true);
+    // Mutating the caller's own object afterwards must not reach into the frozen job.
+    base.widthM = 999;
+    expect(job.base.widthM).toBe(22);
+  });
+
+  it("refuses an empty list of axis values", () => {
+    expect(() => makeSweepJob(init({ axisValues: [] }))).toThrow(/at least one axis value/);
+  });
+
+  it("refuses an empty list of seed indices", () => {
+    expect(() => makeSweepJob(init({ seedIndices: [] }))).toThrow(/at least one seed index/);
+  });
+
+  it("refuses more than one axis value on the degenerate single run", () => {
+    expect(() => makeSweepJob(init({ axis: null, axisValues: [4, 18] }))).toThrow(
+      /single-run case and must carry exactly one axis value, got 2/,
+    );
+  });
+
+  it("refuses a non-finite axis value", () => {
+    expect(() => makeSweepJob(init({ axisValues: [4, Number.NaN] }))).toThrow(
+      /which is not a number/,
+    );
+  });
+
+  it("refuses a negative seed index", () => {
+    expect(() => makeSweepJob(init({ seedIndices: [0, -1] }))).toThrow(
+      /seed index must be a non-negative integer, got -1/,
+    );
+  });
+
+  it("refuses a non-integer seed index", () => {
+    expect(() => makeSweepJob(init({ seedIndices: [0, 1.5] }))).toThrow(
+      /seed index must be a non-negative integer, got 1.5/,
+    );
+  });
+
+  it("refuses a non-integer baseSeed", () => {
+    expect(() => makeSweepJob(init({ baseSeed: 1.5 }))).toThrow(
+      /baseSeed must be an integer, got 1.5/,
+    );
+  });
+
+  it("refuses a non-positive seedStride", () => {
+    expect(() => makeSweepJob(init({ seedStride: 0 }))).toThrow(
+      /seedStride must be a positive integer, got 0/,
+    );
+  });
+
+  it("refuses an empty list of columns", () => {
+    expect(() => makeSweepJob(init({ columns: [] }))).toThrow(/at least one column/);
   });
 });
