@@ -42,12 +42,12 @@ export function* sweepUnits(job: SweepJob): Generator<UnitOutput, void, undefine
     let bandReading: BandReading | null = null;
     if (unit.needsBand && job.bandReplicates !== null) {
       band = replicateBand(config, job.bandReplicates.n);
-      bandReading = {
+      bandReading = Object.freeze({
         axisIndex: unit.key.axisIndex,
         meanM: band.value,
         peakM: band.peakValue,
         nReplicates: band.nReplicates,
-      };
+      });
     }
 
     let floor: SplitHalfNull | null = null;
@@ -85,11 +85,11 @@ export function* sweepUnits(job: SweepJob): Generator<UnitOutput, void, undefine
     });
     const readings = runReport(context, job.columns);
 
-    yield {
+    yield Object.freeze({
       kind: "unitOutput" as const,
       row: Object.freeze({ kind: "runRow" as const, key: unit.key, readings }),
       band: bandReading,
-    };
+    });
   }
 }
 
