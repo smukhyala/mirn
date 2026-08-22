@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { makeRunConfig } from "../../contracts/config.js";
 import type { TreatmentSpec } from "../../contracts/pairedRun.js";
 import { runPair } from "../../sim/run.js";
-import { COLUMNS, COLUMN_ORDER, type ColumnKey } from "../columns.js";
+import { COLUMNS, COLUMN_ORDER, HEADLINE_COLUMNS, type ColumnKey } from "../columns.js";
 import { buildContext, type MeasurementParams, type ReportContext } from "../report.js";
 
 const PARAMS: MeasurementParams = Object.freeze({
@@ -213,5 +213,33 @@ describe("availability", () => {
       }
     }
     expect(nCovered).toBe(readings.length);
+  });
+});
+
+describe("the headline column set", () => {
+  it("contains only keys that exist in COLUMNS", () => {
+    const columnKeys = Object.keys(COLUMNS) as ColumnKey[];
+    const columnKeySet = new Set(columnKeys);
+
+    for (const key of HEADLINE_COLUMNS) {
+      expect(columnKeySet.has(key)).toBe(true);
+    }
+  });
+
+  it("contains only keys that appear in COLUMN_ORDER", () => {
+    const columnOrderSet = new Set(COLUMN_ORDER);
+
+    for (const key of HEADLINE_COLUMNS) {
+      expect(columnOrderSet.has(key)).toBe(true);
+    }
+  });
+
+  it("contains no duplicates", () => {
+    const uniqueSet = new Set(HEADLINE_COLUMNS);
+    expect(uniqueSet.size).toBe(HEADLINE_COLUMNS.length);
+  });
+
+  it("is frozen and immutable", () => {
+    expect(Object.isFrozen(HEADLINE_COLUMNS)).toBe(true);
   });
 });

@@ -4371,7 +4371,7 @@ function wrapCell(cellIndex: number, label: string, seedIndex: number, error: un
 
 Run: `npx vitest run web/engine/job/__tests__/spec.test.ts`
 Then `npx tsc --noEmit`.
-Expected: 12 passing.
+Expected: 13 passing.
 
 - [ ] **Step 5: Commit**
 

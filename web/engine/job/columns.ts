@@ -600,3 +600,22 @@ export const COLUMN_ORDER: readonly ColumnKey[] = Object.freeze([
   "recoveryS",
   "frechetMeanM",
 ] as const);
+
+/**
+ * The subset of COLUMN_ORDER that gets an always-visible tile.
+ *
+ * The design document names six headline readouts. This set has seven because "the robot's
+ * crossing — distance and time to goal" are counted as one in the design, but the tile component
+ * takes a single reading. Both robotPathM and robotArrivalS already carry their own
+ * zero-reference, so rendering them as two tiles is the mechanically honest form: it changes
+ * nothing a reader sees but makes the measurement contract exact.
+ */
+export const HEADLINE_COLUMNS: readonly ColumnKey[] = Object.freeze([
+  "trueEffectM",
+  "forecastReportM",
+  "runToRunBandM",
+  "worstMomentM",
+  "robotPathM",
+  "robotArrivalS",
+  "minClearanceM",
+] as const);
