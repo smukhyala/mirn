@@ -3075,9 +3075,14 @@ describe("the whole column catalogue", () => {
 });
 ```
 
-`fullContext()` is the helper Step 1 already defines — the default config at seed index 0 with the
-band, the floor, the zero-effect run and Fréchet all present, so no column reports `notApplicable`
-for want of an input.
+`fullContext()` does NOT exist yet — Step 1 defines only `defaultContext()`, which deliberately
+leaves band, floor and Fréchet null so the "declines every input" test has something to assert. You
+must write `fullContext()` here: the default config at seed index 0 with the band, the floor, the
+zero-effect run and Fréchet all present, so no column reports `notApplicable` for want of an input.
+
+Build it with `replicateBand`, `splitHalfNull` + `seededPermutations`, and a Fréchet mean over
+`pairedAgents`. Task 16's `runner.ts` will later wire the same four inputs for real; when it does,
+its wiring and this helper must agree, and Task 16's brief carries that reconciliation note.
 
 - [ ] **Step 7: Generate the fixture and confirm it is stable**
 
