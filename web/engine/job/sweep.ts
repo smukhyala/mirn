@@ -1,6 +1,7 @@
 import type { RunConfig } from "../contracts/config.js";
 import { fail } from "../core/errors.js";
 import { runPair, type RunResult } from "../sim/run.js";
+import { finiteCount, meanOf, sdOf } from "./stats.js";
 
 /**
  * One press of Run is (N axis values x M seeds), and a single run is the degenerate 1x1 case of
@@ -84,4 +85,59 @@ export function runSweep(opts: {
     }
   }
   return Object.freeze(points);
+}
+
+/**
+ * Collapse the per-seed points into one row per axis value.
+ *
+ * The row shape is `{ [axisName]: value, k: mean, k_sd: sd, k_n: survivors, ... }`, and the KEY
+ * ORDER is part of the contract: `JSON.stringify` writes keys in insertion order, and
+ * web/data/experiment-facts.json is committed and diffed byte for byte. The axis key goes first;
+ * metrics follow in the order they were first seen in this cell.
+ *
+ * Metric names are identifiers, never digit strings — an integer-like key would be reordered
+ * ahead of everything else by the language's own property-order rules.
+ *
+ * A mean never appears without its count. `k_n` is how many runs the cell actually averaged, and
+ * it is below the seed count whenever a measurement was censored, which anything quoting the cell
+ * has to be able to say.
+ */
+export function aggregateSweep(
+  points: readonly SweepPoint[],
+  axisName: string,
+): readonly Readonly<Record<string, number>>[] {
+  const cellOrder: number[] = [];
+  const cells = new Map<number, Record<string, number[]>>();
+  for (const point of points) {
+    let collected = cells.get(point.axisValue);
+    if (collected === undefined) {
+      collected = {};
+      cells.set(point.axisValue, collected);
+      cellOrder.push(point.axisValue);
+    }
+    for (const key of Object.keys(point.metrics)) {
+      const value = point.metrics[key] as number;
+      const bucket = collected[key];
+      if (bucket === undefined) {
+        collected[key] = [value];
+      } else {
+        bucket.push(value);
+      }
+    }
+  }
+
+  const rows: Readonly<Record<string, number>>[] = [];
+  for (const axisValue of cellOrder) {
+    const collected = cells.get(axisValue) as Record<string, number[]>;
+    const row: Record<string, number> = {};
+    row[axisName] = axisValue;
+    for (const key of Object.keys(collected)) {
+      const values = collected[key] as number[];
+      row[key] = meanOf(values);
+      row[`${key}_sd`] = sdOf(values);
+      row[`${key}_n`] = finiteCount(values);
+    }
+    rows.push(Object.freeze(row));
+  }
+  return Object.freeze(rows);
 }
