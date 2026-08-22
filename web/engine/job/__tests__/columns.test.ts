@@ -15,7 +15,10 @@ const PARAMS: MeasurementParams = Object.freeze({
 });
 
 function contextWith(treatment: TreatmentSpec): ReportContext {
-  const config = makeRunConfig({ treatment });
+  return contextForConfig(makeRunConfig({ treatment }));
+}
+
+function contextForConfig(config: ReturnType<typeof makeRunConfig>): ReportContext {
   return buildContext({
     config,
     params: PARAMS,
@@ -25,6 +28,17 @@ function contextWith(treatment: TreatmentSpec): ReportContext {
     zeroRun: null,
     frechetMeanM: null,
   });
+}
+
+/**
+ * A robot present in the run but never moving, so `clearanceAfterBothMove` never gets a pair to
+ * measure. Distinct from `{ kind: "none" }`, which does NOT remove the robot -- run.ts keeps a
+ * robot in the treated arm under every treatment kind -- so this is the only way to reach the
+ * "nothing to miss with" branch through a real ReportContext, the same stationary-robot case
+ * clearance.test.ts already exercises directly against clearanceAfterBothMove.
+ */
+function stationaryRobotContext(): ReportContext {
+  return contextForConfig(makeRunConfig({ robot: { maxSpeed: 0 } }));
 }
 
 /** A term the operator has never met, spelled the way a program spells it. */
@@ -139,24 +153,27 @@ describe("availability", () => {
 
   it("refuses to report a near-miss count of zero when the robot never left its spawn tile", () => {
     // A finite zero is the dangerous case: it averages happily and reads as a real measurement.
-    // `{ kind: "none" }` alone does not remove the robot: run.ts keeps a robot in the treated arm
-    // under every treatment kind, so `contextWith({ kind: "none" })` still measures two genuine
-    // near-miss episodes. The only way to reach the "nothing to miss with" branch through a real
-    // ReportContext is a robot that never moves off its own spawn tile -- the same stationary-robot
-    // case clearance.test.ts already exercises directly against clearanceAfterBothMove.
-    const config = makeRunConfig({ robot: { maxSpeed: 0 } });
-    const stationary = buildContext({
-      config,
-      params: PARAMS,
-      run: runPair(config),
-      band: null,
-      floor: null,
-      zeroRun: null,
-      frechetMeanM: null,
-    });
-    const reading = COLUMNS.nearMissEpisodes.extract(stationary);
+    const reading = COLUMNS.nearMissEpisodes.extract(stationaryRobotContext());
     expect(reading.availability.kind).toBe("notApplicable");
     expect(Number.isNaN(reading.value)).toBe(true);
+    if (reading.availability.kind === "notApplicable") {
+      // A robot IS present here, just stationary -- asserting "no robot" would be false, and
+      // this project treats a false reader-facing string as a defect, not a wording nit. Check
+      // the actual text, not just that the reading declined to report: a test that only checked
+      // `availability.kind` would keep passing even with the false sentence still in place.
+      expect(reading.availability.why).not.toMatch(/no robot/i);
+      expect(reading.availability.why).toMatch(/left where they were standing/);
+    }
+  });
+
+  it("refuses to report a closest approach for the same reason, with the same honest text", () => {
+    const reading = COLUMNS.minClearanceM.extract(stationaryRobotContext());
+    expect(reading.availability.kind).toBe("notApplicable");
+    expect(Number.isNaN(reading.value)).toBe(true);
+    if (reading.availability.kind === "notApplicable") {
+      expect(reading.availability.why).not.toMatch(/no robot/i);
+      expect(reading.availability.why).toMatch(/left where they were standing/);
+    }
   });
 
   it("rewrites the identifying assumption when the robot is in both arms", () => {
@@ -167,5 +184,34 @@ describe("availability", () => {
     expect(a).not.toBe(b);
     expect(b).toMatch(/whether the robot is there/);
     expect(a).not.toMatch(/whether the robot is there/);
+  });
+
+  it("writes every availability reason in English too, not just label/zero/assumption", () => {
+    // Minor/optional per review: the reader sees `availability.why` on a censored or
+    // notApplicable tile just as much as `label`/`zero.how`/`assumption`, but the English-prose
+    // test above never looked at it. Cover every reason string this file actually produces,
+    // including the two new ones from the minClearanceM/nearMissEpisodes fix above.
+    const stationary = stationaryRobotContext();
+    const readings = [
+      COLUMNS.runToRunBandM.extract(context),
+      COLUMNS.worstMomentNullM.extract(context),
+      COLUMNS.forecastZeroM.extract(context),
+      COLUMNS.detectionFloorM.extract(context),
+      COLUMNS.frechetMeanM.extract(context),
+      COLUMNS.recoveryS.extract(context),
+      COLUMNS.extraPathM.extract(context),
+      COLUMNS.nearMissEpisodes.extract(stationary),
+      COLUMNS.minClearanceM.extract(stationary),
+    ];
+    let nCovered = 0;
+    for (const reading of readings) {
+      if (reading.availability.kind !== "measured") {
+        nCovered++;
+        const why = reading.availability.why;
+        expect(why.length).toBeGreaterThan(20);
+        expect(why).not.toMatch(CODE_IDENTIFIER);
+      }
+    }
+    expect(nCovered).toBe(readings.length);
   });
 });

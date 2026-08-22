@@ -116,6 +116,16 @@ const NO_ZERO_RUN =
   "The reference run in which nobody responds to the robot was not measured for this run.";
 const NO_FRECHET = "The longest-leash ruler was not switched on for this run.";
 const NO_ROBOT = "This run has no robot in the treated arm, so there is nothing to measure.";
+/**
+ * Distinct from `NO_ROBOT`: the robot IS in this run, it just never left its own starting spot
+ * (or nothing near it did), so `clearanceAfterBothMove` never got a pair to measure. Saying
+ * "no robot" here would be false -- a robot that never moves is still a robot -- and this
+ * project treats a reader-facing string that asserts something the simulator did not show as a
+ * defect rather than a wording choice.
+ */
+const NEVER_BOTH_LEFT_START =
+  "The robot is in this run, but a reading only starts once both the robot and a person have " +
+  "left where they were standing, and that moment never came, so there is nothing to measure.";
 
 /**
  * The paired estimator's own sentence is true only when the robot is the treatment.
@@ -394,6 +404,11 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
         );
       }
       const cost = robotCost(ctx.run.treated, ctx.run.control, ctx.config.dt);
+      // Unreachable today: `robotCost` only returns a non-finite `extraPathM` when either arm's
+      // robot is missing, the control-arm case is already caught above, and `runPair` always
+      // puts a robot in the treated arm. Kept because `RobotCost.extraPathM` is typed to allow
+      // it, and `NO_ROBOT` is still the true reason on the one remaining path that produces it
+      // (the TREATED arm having no robot), unlike the near-miss/clearance case below.
       if (!Number.isFinite(cost.extraPathM)) {
         return notApplicable(NO_ROBOT);
       }
@@ -448,15 +463,19 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
       "the robot is, so somebody standing on it before anyone moves is an artefact of the " +
       "placement rather than something the robot did.",
     extract: (ctx: ReportContext): Reading => {
+      const path = ctx.run.treated.robotPositions;
+      if (path === null) {
+        return notApplicable(NO_ROBOT);
+      }
       const gated = clearanceAfterBothMove(
-        ctx.run.treated.robotPositions,
+        path,
         ctx.run.treated.positions,
         SIM_CONSTANTS.robotRadiusM,
         SIM_CONSTANTS.pedRadiusM,
         ctx.params.nearMissThresholdM,
       );
       if (Number.isNaN(gated.minM)) {
-        return notApplicable(NO_ROBOT);
+        return notApplicable(NEVER_BOTH_LEFT_START);
       }
       return measured(gated.minM);
     },
@@ -478,10 +497,15 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     assumption: (): string =>
       "Occasions, not instants. Counting instants below the line would make the number grow " +
       "simply by simulating in finer steps, which is a property of the settings and not of the " +
-      "room. A run with no robot in it reports nothing rather than zero.",
+      "room. A run where the robot and the crowd around it never both leave where they started " +
+      "reports nothing rather than zero.",
     extract: (ctx: ReportContext): Reading => {
+      const path = ctx.run.treated.robotPositions;
+      if (path === null) {
+        return notApplicable(NO_ROBOT);
+      }
       const gated = clearanceAfterBothMove(
-        ctx.run.treated.robotPositions,
+        path,
         ctx.run.treated.positions,
         SIM_CONSTANTS.robotRadiusM,
         SIM_CONSTANTS.pedRadiusM,
@@ -490,7 +514,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
       // A finite zero is the dangerous answer here: it averages happily and reads like a
       // measurement. Nothing to miss with is not the same as nothing missed.
       if (gated.nStepsMeasured === 0) {
-        return notApplicable(NO_ROBOT);
+        return notApplicable(NEVER_BOTH_LEFT_START);
       }
       return measured(gated.nearMissEpisodes);
     },
