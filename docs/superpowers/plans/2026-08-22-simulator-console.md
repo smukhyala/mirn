@@ -9310,7 +9310,6 @@ const EXACT_ZERO: ZeroReference = {
 const GEOMETRIC_BOUND: ZeroReference = {
   kind: "geometricBound",
   how: "the shortest crossing this room allows",
-  value: () => 40,
 };
 
 const BASE: TilePropsInit = {
