@@ -20,7 +20,7 @@ describe("meanOf", () => {
     expect(Number.isNaN(meanOf([Number.NaN, Number.NaN]))).toBe(true);
   });
 
-  it("sums left to right, which is what makes the committed facts file reproducible", () => {
+  it("computes mean as sum of finite values divided by count", () => {
     expect(meanOf([0.1, 0.2, 0.3])).toBe((0.1 + 0.2 + 0.3) / 3);
   });
 });

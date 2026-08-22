@@ -1,9 +1,10 @@
 /**
  * The numeric helpers the experiment script and the console both average with.
  *
- * This file imports nothing, deliberately. `web/engine/measure/` is checked against a Python
- * oracle and `web/engine/job/` is not (CLAUDE.md, guardrails 8 and 9), so a shared dependency
- * between them would drag one into the other's parity obligations for no benefit.
+ * This file must never import from `web/engine/measure/`. That directory is checked against a
+ * Python oracle and `web/engine/job/` deliberately is not (CLAUDE.md, guardrails 8 and 9), so a
+ * shared dependency between them would drag one into the other's parity obligations for no
+ * benefit.
  *
  * These three were lifted verbatim out of scripts/measure-experiments.ts. The filter/reduce form
  * survives the house preference for explicit loops on purpose: web/data/experiment-facts.json is
