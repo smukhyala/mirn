@@ -13,6 +13,16 @@ export interface ArmResult {
   /** Flat (nTicks+1, 2) per agent, in uid order. Same buffers the Scene's trajectories wrap. */
   readonly positions: readonly Float64Array[];
   readonly robotPositions: Float64Array | null;
+  /**
+   * The tick the robot first came within `SIM_CONSTANTS.goalReachedM` of its goal, or -1 for an
+   * arm with no robot or a robot that never got there. The recorded sample for that moment is
+   * `arrivedTick + 1`: `stepWorld` sets the field after moving the robot on tick `t`, and that
+   * position is recorded as sample `t + 1`.
+   *
+   * Kept rather than re-derived. The path-freeze heuristic it replaces answers "when did the
+   * robot stop", which under a heavy deflection weight is a sample in the middle of a re-plan.
+   */
+  readonly arrivedTick: number;
 }
 
 /**
@@ -93,7 +103,12 @@ export function runArm(
     seed: config.seed,
   });
 
-  return { scene, positions, robotPositions };
+  let arrivedTick = -1;
+  if (state.robot !== null) {
+    arrivedTick = state.robot.arrivedTick;
+  }
+
+  return { scene, positions, robotPositions, arrivedTick };
 }
 
 export interface RunResult {
