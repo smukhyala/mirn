@@ -199,6 +199,49 @@ export function makeRunConfig(overrides: RunConfigOverrides = {}): RunConfig {
       `RunConfig.perception.positionSigmaM must be >= 0, got ${merged.perception.positionSigmaM}`,
     );
   }
+  requireFinite(merged.widthM, "RunConfig.widthM");
+  if (merged.widthM <= 0) {
+    fail(`RunConfig.widthM must be > 0, got ${merged.widthM}`);
+  }
+  requireFinite(merged.heightM, "RunConfig.heightM");
+  if (merged.heightM <= 0) {
+    fail(`RunConfig.heightM must be > 0, got ${merged.heightM}`);
+  }
+  requireFinite(merged.crowd.desiredSpeed, "RunConfig.crowd.desiredSpeed");
+  if (merged.crowd.desiredSpeed <= 0) {
+    fail(`RunConfig.crowd.desiredSpeed must be > 0, got ${merged.crowd.desiredSpeed}`);
+  }
+  requireFinite(merged.crowd.relaxationTimeS, "RunConfig.crowd.relaxationTimeS");
+  if (merged.crowd.relaxationTimeS <= 0) {
+    fail(
+      `RunConfig.crowd.relaxationTimeS must be > 0, got ${merged.crowd.relaxationTimeS}; it is a ` +
+        `time constant, and zero would mean a person reaches their desired velocity instantly`,
+    );
+  }
+
+  // The robot is clamped to the room every tick, so a goal outside it is a goal the robot pins
+  // against a wall a metre short of and never reaches. That is not a run with an unusual answer,
+  // it is a run with no answer, so it is refused at construction rather than measured.
+  const roomPoints: readonly (readonly [string, readonly [number, number]])[] = [
+    ["RunConfig.robot.startXY", merged.robot.startXY],
+    ["RunConfig.robot.goalXY", merged.robot.goalXY],
+  ];
+  for (const entry of roomPoints) {
+    const label = entry[0];
+    const point = entry[1];
+    const x = point[0];
+    const y = point[1];
+    requireFinite(x, `${label}[0]`);
+    requireFinite(y, `${label}[1]`);
+    const insideRoom = x > 0 && x < merged.widthM && y > 0 && y < merged.heightM;
+    if (!insideRoom) {
+      fail(
+        `${label} must be inside the room, which is ${merged.widthM} m by ${merged.heightM} m, ` +
+          `got (${x}, ${y})`,
+      );
+    }
+  }
+
   const seenDisturbanceIds = new Set<string>();
   for (const spec of merged.disturbances) {
     if (seenDisturbanceIds.has(spec.id)) {
