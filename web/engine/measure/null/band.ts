@@ -24,8 +24,24 @@ export interface RunToRunBand {
   readonly nReplicates: number;
   readonly nPairs: number;
   readonly quantile: number;
+  /** 95th percentile of the pairwise MEAN gap. The floor for a mean-over-steps readout. */
   readonly value: number;
   readonly samples: Float64Array;
+  /**
+   * 95th percentile of the pairwise PEAK gap: for each replicate pair, the largest the crowd's
+   * average displacement ever got at any single step.
+   *
+   * A maximum is >= a mean for any series, so a max-over-steps readout judged against `value`
+   * clears the floor for free. Both statistics come from the same 28 pairs and the same
+   * simulations; only the reduction differs.
+   */
+  readonly peakValue: number;
+  readonly peakSamples: Float64Array;
+}
+
+interface PairStatistics {
+  readonly meanM: number;
+  readonly peakM: number;
 }
 
 /**
@@ -55,41 +71,72 @@ export function replicateBand(config: RunConfig, nReplicates = 8): RunToRunBand 
     runs.push(runPair(replicateConfig).control.positions);
   }
 
-  const values: number[] = [];
+  const meanValues: number[] = [];
+  const peakValues: number[] = [];
   for (let i = 0; i < runs.length; i++) {
     for (let j = i + 1; j < runs.length; j++) {
-      values.push(meanPathDistance(runs[i] as readonly Float64Array[], runs[j] as readonly Float64Array[]));
+      const statistics = pairStatistics(
+        runs[i] as readonly Float64Array[],
+        runs[j] as readonly Float64Array[],
+      );
+      meanValues.push(statistics.meanM);
+      peakValues.push(statistics.peakM);
     }
   }
 
-  const samples = Float64Array.from(values);
-  const sorted = Float64Array.from(values).sort();
+  const samples = Float64Array.from(meanValues);
+  const sorted = Float64Array.from(meanValues).sort();
+  const peakSamples = Float64Array.from(peakValues);
+  const peakSorted = Float64Array.from(peakValues).sort();
   return {
     kind: "runToRunBand",
     nReplicates,
-    nPairs: values.length,
+    nPairs: meanValues.length,
     quantile: 0.95,
     value: quantileLinear(sorted, 0.95),
     samples,
+    peakValue: quantileLinear(peakSorted, 0.95),
+    peakSamples,
   };
 }
 
-function meanPathDistance(a: readonly Float64Array[], b: readonly Float64Array[]): number {
+/**
+ * Both statistics in one pass over the pair.
+ *
+ * `agentTotal` accumulates in exactly the order the mean-only version did — the per-step series
+ * is fed from the same `gap` local and adds nothing to that running sum — so `meanM` is the same
+ * double it has always been. `Math.hypot` stays banned in this directory: V8's is more accurate
+ * than numpy's `sqrt(sum(d*d))` and disagrees with the oracle in the last bits.
+ */
+function pairStatistics(a: readonly Float64Array[], b: readonly Float64Array[]): PairStatistics {
   const n = Math.min(a.length, b.length);
+  if (n === 0) {
+    return { meanM: 0, peakM: 0 };
+  }
+  const steps = (a[0] as Float64Array).length / 2;
+  const series = new Float64Array(steps);
   let total = 0;
   for (let i = 0; i < n; i++) {
     const pathA = a[i] as Float64Array;
     const pathB = b[i] as Float64Array;
-    const steps = pathA.length / 2;
     let agentTotal = 0;
     for (let s = 0; s < steps; s++) {
       const dx = (pathA[2 * s] as number) - (pathB[2 * s] as number);
       const dy = (pathA[2 * s + 1] as number) - (pathB[2 * s + 1] as number);
-      agentTotal += Math.sqrt(dx * dx + dy * dy);
+      const gap = Math.sqrt(dx * dx + dy * dy);
+      agentTotal += gap;
+      series[s] = (series[s] as number) + gap;
     }
     total += agentTotal / steps;
   }
-  return n === 0 ? 0 : total / n;
+  let peak = 0;
+  for (let s = 0; s < steps; s++) {
+    const stepMean = (series[s] as number) / n;
+    if (stepMean > peak) {
+      peak = stepMean;
+    }
+  }
+  return { meanM: total / n, peakM: peak };
 }
 
 export { paired };
