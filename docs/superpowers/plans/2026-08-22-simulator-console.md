@@ -770,7 +770,22 @@ function sweep(
 
 Everything from `facts[name] = { axis, nSeeds: SEEDS.length, rows };` onward is untouched, and still type-checks: `rows` is now `readonly Readonly<Record<string, number>>[]`, whose indexed access is already `number | undefined` under `noUncheckedIndexedAccess`, which is what the existing `(row[k] as number).toFixed(3)` and `const n = row[\`${k}_n\`]` lines were written against.
 
-- [ ] **Step 3: Typecheck and run the unit tests**
+- [ ] **Step 3: Put the script under the typechecker, then typecheck and run the unit tests**
+
+`tsconfig.json`'s `include` is `["web/**/*.ts", "*.config.ts", "vitest.workspace.ts"]`. `scripts/` is
+not in it, so `npm run typecheck` has never compiled `scripts/measure-experiments.ts`, and
+`npm run measure` runs it through `vite-node`, which transpiles without typechecking. This task is
+the first one to edit that file, so it is the right moment to fix that — otherwise the verification
+below is checking nothing.
+
+Edit `tsconfig.json` so the include line reads:
+
+```json
+  "include": ["web/**/*.ts", "scripts/**/*.ts", "*.config.ts", "vitest.workspace.ts"]
+```
+
+This has been verified clean against the current tree: adding `scripts/**/*.ts` produces no errors
+before your edit, so any error you now see is one you introduced.
 
 Run: `npm run typecheck && npm run test`
 Expected: `tsc --noEmit` prints nothing; vitest reports both projects green, including the three new files from Tasks 1-3. If `typecheck` complains that `rows` is not assignable to `Point[]`, you left a `const rows: Point[]` annotation behind — the new binding takes its type from `aggregateSweep`.
