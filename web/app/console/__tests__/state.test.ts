@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AXES, AXIS_ORDER } from "../../../engine/job/axes.js";
+import { AXES, AXIS_ORDER, type AxisKey } from "../../../engine/job/axes.js";
 import { COLUMNS } from "../../../engine/job/columns.js";
 import type { ColumnKey } from "../../../engine/job/columns.js";
-import { configForCell } from "../../../engine/job/spec.js";
+import { configForCell, type SweepJob } from "../../../engine/job/spec.js";
 import { ContractError } from "../../../engine/core/errors.js";
 import type { RunConfig } from "../../../engine/contracts/config.js";
 import {
@@ -43,6 +43,18 @@ function COLUMN_NEEDS_FOR(key: ColumnKey): string {
   return COLUMNS[key].needs;
 }
 
+/** Whether a job's own `columns` includes the one column that needs the zero-effect reference
+ *  run (`forecastZeroM`), so a test can check that "bought the run" and "reports its column"
+ *  cannot come apart. */
+function hasZeroRunColumn(job: SweepJob): boolean {
+  for (const key of job.columns) {
+    if (COLUMN_NEEDS_FOR(key) === "zeroRun") {
+      return true;
+    }
+  }
+  return false;
+}
+
 describe("console settings", () => {
   it("starts every knob where the catalogue says", () => {
     for (const key of AXIS_ORDER) {
@@ -61,39 +73,61 @@ describe("console settings", () => {
 
   it("rejects an axis value outside the range the catalogue allows", () => {
     expect(() => withAxis(DEFAULT_SETTINGS, "crowdSize", AXES.crowdSize.max + 1)).toThrow(
-      ContractError,
+      /at most/,
     );
     expect(() => withAxis(DEFAULT_SETTINGS, "crowdSize", AXES.crowdSize.min - 1)).toThrow(
-      ContractError,
+      /at least/,
     );
+  });
+
+  it("rejects a sweep axis that is not a member of the catalogue", () => {
+    // A permalink is decoded from a stranger's query string, so nothing stops it from naming an
+    // axis key that does not exist. Without a guard, indexing AXES with it returns undefined and
+    // the next line throws a raw TypeError instead of the ContractError this file promises.
+    expect(() =>
+      makeConsoleSettings({
+        ...DEFAULT_SETTINGS,
+        sweepAxis: "notAnAxis" as unknown as AxisKey,
+        sweepValues: [1, 2],
+      }),
+    ).toThrow(ContractError);
+    expect(() =>
+      makeConsoleSettings({
+        ...DEFAULT_SETTINGS,
+        sweepAxis: "notAnAxis" as unknown as AxisKey,
+        sweepValues: [1, 2],
+      }),
+    ).toThrow(/catalogue/);
   });
 
   it("rejects a sweep whose shape is impossible", () => {
     expect(() =>
       makeConsoleSettings({ ...DEFAULT_SETTINGS, sweepAxis: null, sweepValues: [4, 8] }),
-    ).toThrow(ContractError);
+    ).toThrow(/Nothing is being varied/);
     expect(() =>
       makeConsoleSettings({ ...DEFAULT_SETTINGS, sweepAxis: "crowdSize", sweepValues: [] }),
-    ).toThrow(ContractError);
+    ).toThrow(/needs at least one value/);
     expect(() =>
       makeConsoleSettings({ ...DEFAULT_SETTINGS, sweepAxis: "crowdSize", sweepValues: [18, 4] }),
-    ).toThrow(ContractError);
+    ).toThrow(/must climb/);
     expect(() =>
       makeConsoleSettings({ ...DEFAULT_SETTINGS, sweepAxis: "crowdSize", sweepValues: [4, 4] }),
-    ).toThrow(ContractError);
+    ).toThrow(/must climb/);
   });
 
-  it("rejects counts that cannot produce what they promise", () => {
-    expect(() => makeConsoleSettings({ ...DEFAULT_SETTINGS, seedCount: 0 })).toThrow(ContractError);
+  it("rejects settings that cannot produce what they promise", () => {
+    expect(() => makeConsoleSettings({ ...DEFAULT_SETTINGS, seedCount: 0 })).toThrow(
+      /number of seeds/,
+    );
     // A band is a quantile over pairwise comparisons; one replicate has no pair.
     expect(() => makeConsoleSettings({ ...DEFAULT_SETTINGS, bandReplicates: 1 })).toThrow(
-      ContractError,
+      /nothing to compare against/,
     );
     expect(() => makeConsoleSettings({ ...DEFAULT_SETTINGS, nearMissThresholdM: 0 })).toThrow(
-      ContractError,
+      /near-miss line/,
     );
     expect(() => makeConsoleSettings({ ...DEFAULT_SETTINGS, recoveryDwellSteps: 0 })).toThrow(
-      ContractError,
+      /recovery dwell/,
     );
   });
 });
@@ -129,6 +163,24 @@ describe("the live preview", () => {
     expect(preview.bandReplicates).toBe(null);
     expect(preview.floor).toBe(null);
     expect(preview.frechet).toBe(false);
+  });
+
+  it("never buys the zero-effect reference run without reporting its column, or the reverse", () => {
+    // The panel's own toggle is off here. The preview still overrides it, because a preview that
+    // respected the toggle would go back to reading "not applicable" the moment an operator
+    // switched the zero reference off, which is the same dead-on-load failure the previous test
+    // guards against. What this test adds is the other half: the job must not pay for a run it
+    // then fails to report, which is exactly what happened when `columnsFor` read
+    // `settings.withZeroReference` directly instead of the caller's own decision.
+    const off = makeConsoleSettings({ ...DEFAULT_SETTINGS, withZeroReference: false });
+
+    const preview = jobForPreview(off);
+    expect(preview.zeroReferenceRun).toBe(true);
+    expect(hasZeroRunColumn(preview)).toBe(true);
+
+    const run = jobForRun(off);
+    expect(run.zeroReferenceRun).toBe(false);
+    expect(hasZeroRunColumn(run)).toBe(false);
   });
 });
 

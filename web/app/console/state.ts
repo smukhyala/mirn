@@ -41,6 +41,13 @@ import {
  * axis is, above) or the control panel becomes the place that catches the combination before it
  * reaches `makeRunConfig` — but that decision belongs to whichever task adds the slider, not to
  * this one, which has nothing to clamp.
+ *
+ * Validation messages below quote the axis's human `label` ("How many people are in the room"),
+ * not a dotted code path (`crowd.nPedestrians`) the way `config.ts` does. That is a deliberate
+ * departure from `config.ts`'s house voice, not an oversight: `config.ts`'s messages are
+ * engine-facing, read by whoever is debugging a `RunConfig`, while these are reader-facing —
+ * guardrail 12 forbids a bare code identifier on any surface a reader sees, and a permalink
+ * validation error is exactly such a surface.
  */
 
 /** Only used when an axis catalogue somehow omits the forecast axes; the axes overwrite both. */
@@ -154,6 +161,24 @@ export function makeConsoleSettings(init: ConsoleSettingsInit): ConsoleSettings 
       );
     }
   } else {
+    // `init.sweepAxis` is typed `AxisKey`, but a permalink is decoded from a stranger's query
+    // string, so a caller can hand this a string that is not actually a member of `AXES`. Without
+    // this guard, the lookup below silently returns `undefined` (`AXES` is a finite Record, not an
+    // index signature, so `noUncheckedIndexedAccess` does not add `| undefined` to its type) and
+    // `entry.label` throws a raw `TypeError` — a crash wearing a different name, not the
+    // `ContractError` this whole file promises to throw instead of coercing or crashing.
+    let sweepAxisIsKnown = false;
+    for (const key of AXIS_ORDER) {
+      if (key === init.sweepAxis) {
+        sweepAxisIsKnown = true;
+      }
+    }
+    if (!sweepAxisIsKnown) {
+      fail(
+        `The sweep axis must be one of the catalogue's knobs (${AXIS_ORDER.join(", ")}), got ` +
+          `'${String(init.sweepAxis)}'`,
+      );
+    }
     const entry = AXES[init.sweepAxis];
     if (sweepValues.length < 1) {
       fail(`${entry.label} is being varied, so it needs at least one value to vary over`);
@@ -282,11 +307,21 @@ export function measurementParamsFor(settings: ConsoleSettings): MeasurementPara
   return Object.freeze(params);
 }
 
+/**
+ * Every boolean here names a run this job is actually buying, never a settings flag read on the
+ * side. `hasZeroRun` in particular must be the caller's own `zeroReferenceRun` decision, not
+ * `settings.withZeroReference` read directly: `jobForPreview` always buys the zero-effect
+ * reference run regardless of the panel's toggle (see its own doc comment), and reading the
+ * settings flag here instead once meant the preview paid for that run and then silently omitted
+ * `forecastZeroM` from what it reported — it paid and did not deliver. Threading the same boolean
+ * both places is what keeps `zeroReferenceRun` and "does `forecastZeroM` appear in `columns`"
+ * unable to disagree.
+ */
 function columnsFor(
-  settings: ConsoleSettings,
   hasBand: boolean,
   hasFloor: boolean,
   hasFrechet: boolean,
+  hasZeroRun: boolean,
 ): readonly ColumnKey[] {
   const chosen: ColumnKey[] = [];
   for (const key of COLUMN_ORDER) {
@@ -298,7 +333,7 @@ function columnsFor(
       chosen.push(key);
       continue;
     }
-    if (descriptor.needs === "zeroRun" && settings.withZeroReference) {
+    if (descriptor.needs === "zeroRun" && hasZeroRun) {
       chosen.push(key);
       continue;
     }
@@ -336,7 +371,7 @@ export function jobForPreview(settings: ConsoleSettings): SweepJob {
     baseSeed: BASE_SEED,
     seedStride: SEED_STRIDE,
     measurement: measurementParamsFor(settings),
-    columns: columnsFor(settings, false, false, false),
+    columns: columnsFor(false, false, false, true),
     bandReplicates: null,
     floor: null,
     zeroReferenceRun: true,
@@ -368,7 +403,7 @@ export function jobForRun(settings: ConsoleSettings): SweepJob {
     baseSeed: BASE_SEED,
     seedStride: SEED_STRIDE,
     measurement: measurementParamsFor(settings),
-    columns: columnsFor(settings, hasBand, settings.withFloor, settings.withFrechet),
+    columns: columnsFor(hasBand, settings.withFloor, settings.withFrechet, settings.withZeroReference),
     bandReplicates: hasBand ? { n: settings.bandReplicates, scope: "perCell" } : null,
     floor: settings.withFloor
       ? {
