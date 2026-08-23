@@ -1,28 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../../engine/job/axes.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "../state.js";
-import { AXIS_QUERY_KEY, decodeSettings, encodeSettings } from "../permalink.js";
+import { AXIS_QUERY_KEY, SETTING_QUERY_KEYS, decodeSettings, encodeSettings } from "../permalink.js";
 
 /**
- * Every field here is set away from `DEFAULT_SETTINGS`, on purpose.
+ * Every field here is set away from `DEFAULT_SETTINGS`, on purpose — all thirteen axes included,
+ * both forecast axes among them.
  *
  * A round trip compared against the original passes trivially wherever the two happen to agree —
  * if `encode` silently dropped a field, `decode` would fall back to the default, and the
  * assertion for that field would pass whether or not the field was ever written, for any field
- * whose "awkward" value happened to already equal the default. `recoveryToleranceFraction`,
- * `recoveryDwellSteps`, `bandReplicates`, `withFrechet`, `withZeroReference`, and four of the
- * axis values used to sit at exactly their default here, which was checked by deliberately
+ * whose "awkward" value happened to already equal the default. This was checked by deliberately
  * deleting the line in `encodeSettings` that writes `recovery_tol` and watching every test in
- * this file still pass. Every value below now differs from `DEFAULT_SETTINGS`'s own, so the same
- * deletion fails the round-trip test instead.
+ * this file still pass, back when `recoveryToleranceFraction` (and several other fields) sat at
+ * exactly their default here. An earlier version of this fixture only moved five of the thirteen
+ * axes off default, which a review caught: a swapped `AXIS_QUERY_KEY` mapping between two
+ * default-valued axes, or a regression specific to either forecast axis, would have sailed
+ * through both the round-trip test and the wire-format test below undetected. Every value below
+ * now differs from `DEFAULT_SETTINGS`'s own, so a per-key bug anywhere in the table fails one of
+ * the two tests below by name rather than by coincidence.
  */
 function awkward(): ConsoleSettings {
   const axisValues = { ...DEFAULT_SETTINGS.axisValues };
+  axisValues.pushStrength = 2;
   axisValues.crowdSize = 44;
-  axisValues.robotSpeed = 1.5;
-  axisValues.reactionTime = 0.35;
+  axisValues.holdingLine = 1.2;
   axisValues.crowdFidget = 2.2;
   axisValues.walkingPace = 0.9;
+  axisValues.robotSpeed = 1.5;
+  axisValues.reactionTime = 0.35;
+  axisValues.politeness = 3;
+  axisValues.perceptionError = 0.4;
+  axisValues.passingOffset = 1.5;
+  axisValues.episodeSeconds = 60;
+  axisValues.forecastHorizon = 1.5;
+  axisValues.forecastWindowEnd = 25;
   return makeConsoleSettings({
     ...DEFAULT_SETTINGS,
     axisValues,
@@ -56,6 +68,23 @@ describe("the permalink key table", () => {
       seen.push(queryKey);
     }
   });
+
+  it("gives no axis the same name as a non-axis setting", () => {
+    // The two describe blocks above only ever check axis keys against each other. The full
+    // namespace a hand-edited link actually shares is all 13 axis keys plus all 11 setting keys —
+    // 24 strings that must be pairwise distinct, or an axis and a setting would silently steal
+    // each other's value.
+    const seen: string[] = [];
+    for (const key of AXIS_ORDER) {
+      const queryKey = AXIS_QUERY_KEY[key];
+      expect(seen).not.toContain(queryKey);
+      seen.push(queryKey);
+    }
+    for (const settingKey of SETTING_QUERY_KEYS) {
+      expect(seen).not.toContain(settingKey);
+      seen.push(settingKey);
+    }
+  });
 });
 
 describe("encoding and decoding", () => {
@@ -87,11 +116,19 @@ describe("encoding and decoding", () => {
     // differently-formatted number fails here even when a coincidence would hide it above.
     const query = encodeSettings(awkward());
     const parts = query.split("&");
+    expect(parts).toContain("space=2");
     expect(parts).toContain("people=44");
-    expect(parts).toContain("robot_speed=1.5");
-    expect(parts).toContain("reaction=0.35");
+    expect(parts).toContain("hold_line=1.2");
     expect(parts).toContain("fidget=2.2");
     expect(parts).toContain("pace=0.9");
+    expect(parts).toContain("robot_speed=1.5");
+    expect(parts).toContain("reaction=0.35");
+    expect(parts).toContain("berth=3");
+    expect(parts).toContain("mis_sees=0.4");
+    expect(parts).toContain("offset=1.5");
+    expect(parts).toContain("episode=60");
+    expect(parts).toContain("horizon=1.5");
+    expect(parts).toContain("window_end=25");
     expect(parts).toContain("notice=0");
     expect(parts).toContain("near_miss=0.3");
     expect(parts).toContain("recovery_tol=0.25");

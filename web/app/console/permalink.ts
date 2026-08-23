@@ -118,42 +118,50 @@ function readFlag(
   return fallback;
 }
 
-function readBounded(
-  params: URLSearchParams,
-  name: string,
-  fallback: number,
-  low: number,
-  high: number,
-  wholeNumber: boolean,
-  label: string,
-  notices: string[],
-): number {
-  const raw = params.get(name);
+/**
+ * `readBounded`'s field description, gathered into one record rather than six positional
+ * parameters. Several of those (`low`, `high`, `fallback`) share a type, and a review flagged the
+ * positional form as an invitation to transpose two of them on a future edit; no call site had
+ * actually done so, but there was nothing stopping one.
+ */
+interface BoundedFieldSpec {
+  readonly name: string;
+  readonly fallback: number;
+  readonly low: number;
+  readonly high: number;
+  readonly wholeNumber: boolean;
+  readonly label: string;
+}
+
+function readBounded(params: URLSearchParams, spec: BoundedFieldSpec, notices: string[]): number {
+  const raw = params.get(spec.name);
   if (raw === null) {
-    return fallback;
+    return spec.fallback;
   }
   const parsed = Number(raw);
   if (raw.length === 0 || !Number.isFinite(parsed)) {
-    notices.push(`${label} was not a number in the link, so it was left at ${String(fallback)}.`);
-    return fallback;
+    notices.push(
+      `${spec.label} was not a number in the link, so it was left at ${String(spec.fallback)}.`,
+    );
+    return spec.fallback;
   }
   let value = parsed;
-  if (wholeNumber) {
+  if (spec.wholeNumber) {
     value = Math.round(value);
   }
-  if (value < low) {
+  if (value < spec.low) {
     notices.push(
-      `${label} was ${String(parsed)} in the link, below the lowest this bench allows, so it was ` +
-        `brought up to ${String(low)}.`,
+      `${spec.label} was ${String(parsed)} in the link, below the lowest this bench allows, so ` +
+        `it was brought up to ${String(spec.low)}.`,
     );
-    return low;
+    return spec.low;
   }
-  if (value > high) {
+  if (value > spec.high) {
     notices.push(
-      `${label} was ${String(parsed)} in the link, above the highest this bench allows, so it ` +
-        `was brought down to ${String(high)}.`,
+      `${spec.label} was ${String(parsed)} in the link, above the highest this bench allows, so ` +
+        `it was brought down to ${String(spec.high)}.`,
     );
-    return high;
+    return spec.high;
   }
   return value;
 }
@@ -294,53 +302,63 @@ export function decodeSettings(query: string): DecodeResult {
   );
   const nearMissThresholdM = readBounded(
     params,
-    NEAR_MISS,
-    DEFAULT_SETTINGS.nearMissThresholdM,
-    0.05,
-    5,
-    false,
-    "The near-miss line",
+    {
+      name: NEAR_MISS,
+      fallback: DEFAULT_SETTINGS.nearMissThresholdM,
+      low: 0.05,
+      high: 5,
+      wholeNumber: false,
+      label: "The near-miss line",
+    },
     notices,
   );
   const recoveryToleranceFraction = readBounded(
     params,
-    RECOVERY_TOLERANCE,
-    DEFAULT_SETTINGS.recoveryToleranceFraction,
-    0.01,
-    1,
-    false,
-    "The recovery tolerance",
+    {
+      name: RECOVERY_TOLERANCE,
+      fallback: DEFAULT_SETTINGS.recoveryToleranceFraction,
+      low: 0.01,
+      high: 1,
+      wholeNumber: false,
+      label: "The recovery tolerance",
+    },
     notices,
   );
   const recoveryDwellSteps = readBounded(
     params,
-    RECOVERY_DWELL,
-    DEFAULT_SETTINGS.recoveryDwellSteps,
-    1,
-    400,
-    true,
-    "The recovery dwell",
+    {
+      name: RECOVERY_DWELL,
+      fallback: DEFAULT_SETTINGS.recoveryDwellSteps,
+      low: 1,
+      high: 400,
+      wholeNumber: true,
+      label: "The recovery dwell",
+    },
     notices,
   );
   const seedCount = readBounded(
     params,
-    SEEDS,
-    DEFAULT_SETTINGS.seedCount,
-    1,
-    32,
-    true,
-    "The number of seeds",
+    {
+      name: SEEDS,
+      fallback: DEFAULT_SETTINGS.seedCount,
+      low: 1,
+      high: 32,
+      wholeNumber: true,
+      label: "The number of seeds",
+    },
     notices,
   );
 
   let bandReplicates = readBounded(
     params,
-    BAND,
-    DEFAULT_SETTINGS.bandReplicates,
-    0,
-    32,
-    true,
-    "The number of band replicates",
+    {
+      name: BAND,
+      fallback: DEFAULT_SETTINGS.bandReplicates,
+      low: 0,
+      high: 32,
+      wholeNumber: true,
+      label: "The number of band replicates",
+    },
     notices,
   );
   if (bandReplicates === 1) {
