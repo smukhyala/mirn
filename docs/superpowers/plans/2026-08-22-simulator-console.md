@@ -4797,7 +4797,7 @@ git commit -m "Run a sweep as numbers only, and prove a run rebuilt from its key
 - Test: `web/app/worker/__tests__/clone.test.ts`
 
 **Interfaces:**
-- Consumes: `makeSweepJob(init: SweepJobInit): SweepJob`, `BASE_SEED`, `SEED_STRIDE`, `type SweepJob`, `type MeasurementParams`, `type FloorParams` from `web/engine/job/spec.ts` (Task 14). `SweepJobInit` carries every `SweepJob` field except `kind`, mirroring `makePairedRun(init)` in `web/engine/contracts/pairedRun.ts:31`. Also `HEADLINE_COLUMNS` and `type ColumnKey` from `web/engine/job/columns.ts` (Task 11), and `type RunRow` from `web/engine/job/runner.ts` (Task 15).
+- Consumes: `makeSweepJob(init: SweepJobInit): SweepJob`, `BASE_SEED`, `SEED_STRIDE`, `type SweepJob`, `type MeasurementParams`, `type FloorParams` from `web/engine/job/spec.ts` (Task 14). `SweepJobInit` carries every `SweepJob` field except `kind`, mirroring `makePairedRun(init)` in `web/engine/contracts/pairedRun.ts:31`. Also `HEADLINE_COLUMNS` and `type ColumnKey` from `web/engine/job/columns.ts` (Task 11), and `type RunRow` from `web/engine/job/stats.ts` (Task 15).
 - Produces: `web/app/worker/protocol.ts` exporting **types only** — `ToWorker`, `FromWorker`. Tasks 18, and the console Run handler in Tasks 21-29, import these and nothing else from this file.
 - The `web/app/**/*.test.ts` glob in `vitest.workspace.ts:16` already matches `web/app/worker/__tests__/`, so the workspace file is **not** modified by any task in this slice. The `ui` project runs `environment: "node"` with no `setupFiles`, so `Math.random` is not banned here (that ban is the `engine` project's `web/engine/__tests__/setup.ts`).
 
@@ -4944,7 +4944,7 @@ Expected: FAIL with `ENOENT: no such file or directory, open '/Users/sanjay/proj
 ```ts
 // web/app/worker/protocol.ts
 import type { SweepJob } from "../../engine/job/spec.js";
-import type { RunRow } from "../../engine/job/runner.js";
+import type { RunRow } from "../../engine/job/stats.js";
 
 /**
  * The two message unions that cross the Worker boundary, and nothing else.
@@ -5609,7 +5609,7 @@ Expected: FAIL with `Failed to load url ../client.js (resolved id: ../client.js)
 // web/app/worker/client.ts
 import { fail } from "../../engine/core/errors.js";
 import { configForCell, type SweepJob } from "../../engine/job/spec.js";
-import type { RunRow } from "../../engine/job/runner.js";
+import type { RunRow } from "../../engine/job/stats.js";
 import { runPair, type RunResult } from "../../engine/sim/run.js";
 import type { FromWorker, ToWorker } from "./protocol.js";
 
@@ -5860,7 +5860,7 @@ git commit -m "Put the sweep on a worker, in slices a cancel can land between"
 - Test: `web/app/console/__tests__/state.test.ts`
 
 **Interfaces:**
-- Consumes: `AXES`, `AXIS_ORDER`, `type AxisKey` from `web/engine/job/axes.ts` (Task 12) — each `AxisEntry` carrying `kind: "worldAxis" | "measurementAxis"`, `key`, `label`, `unit`, `min`, `max`, `step`, `defaultValue`, `note`, `writes: readonly string[]`, `movesColumns`, and `apply` (`(base: RunConfigOverrides, value: number) => RunConfigOverrides` on a world axis, `(params: MeasurementParams, value: number) => MeasurementParams` on a measurement axis). `COLUMNS`, `COLUMN_ORDER`, `type ColumnKey` from `web/engine/job/columns.ts` (Task 11). `makeSweepJob`, `configForCell`, `BASE_SEED`, `SEED_STRIDE`, `type SweepJob`, `type MeasurementParams` from `web/engine/job/spec.ts` (Task 14). `type RunRow` from `web/engine/job/runner.ts` (Task 15). `type RunConfigOverrides` from `web/engine/contracts/config.ts:126`. `ContractError` / `fail` from `web/engine/core/errors.ts`.
+- Consumes: `AXES`, `AXIS_ORDER`, `type AxisKey` from `web/engine/job/axes.ts` (Task 12) — each `AxisEntry` carrying `kind: "worldAxis" | "measurementAxis"`, `key`, `label`, `unit`, `min`, `max`, `step`, `defaultValue`, `note`, `writes: readonly string[]`, `movesColumns`, and `apply` (`(base: RunConfigOverrides, value: number) => RunConfigOverrides` on a world axis, `(params: MeasurementParams, value: number) => MeasurementParams` on a measurement axis). `COLUMNS`, `COLUMN_ORDER`, `type ColumnKey` from `web/engine/job/columns.ts` (Task 11). `makeSweepJob`, `configForCell`, `BASE_SEED`, `SEED_STRIDE`, `type SweepJob`, `type MeasurementParams` from `web/engine/job/spec.ts` (Task 14). `type RunRow` from `web/engine/job/stats.ts` (Task 15). `type RunConfigOverrides` from `web/engine/contracts/config.ts:126`. `ContractError` / `fail` from `web/engine/core/errors.ts`.
 - Produces: `ConsoleSettings`, `ConsoleSettingsInit`, `makeConsoleSettings`, `DEFAULT_SETTINGS`, `CellRef`, `makeCellRef`, `BandReading`, `RunGroup`, `ConsoleUi`, `ConsoleState`, `baseOverridesFor`, `measurementParamsFor`, `jobForPreview`, `jobForRun`, `sameSettings`, `ledgerIsStale`, `STALE_LEDGER_NOTICE`. Task 20 imports `DEFAULT_SETTINGS`, `makeConsoleSettings` and the `ConsoleSettings` type; Tasks 21-29 import the rest.
 - Note for the sweep-curve task in 21-29, from reading `web/ui/plot.ts`: it exports exactly `PlotSeries { key, label, values, sd?, accent? }`, `PlotView { x, xLabel, yLabel, series }`, and `drawSweep(context, view, width, height)`. Dots, dashes, greyscale ramp, gridlines, axis labels and the one accent series all already exist, so the wireframe's `*====*` and `.....` series need nothing added. The wireframe's `::::` shaded floor region does **not** exist: the `sd` field draws a ribbon from `value - sd` to `value + sd` with the lower edge clamped at zero (`plot.ts:150-160`), which cannot fill from the axis up to the band. The minimum addition is one optional field, `readonly fillFromZero?: boolean` on `PlotSeries`, plus a branch in that same block that walks the upper edge at `values[i]` and returns along `sy(0)`. `niceCeiling` already tops out on `values` alone, which is correct for a zero-fill series.
 - No change to `vitest.workspace.ts`: `web/app/**/*.test.ts` on line 16 already matches `web/app/console/__tests__/`.
@@ -6126,7 +6126,7 @@ import { fail } from "../../engine/core/errors.js";
 import type { RunConfigOverrides } from "../../engine/contracts/config.js";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
 import { COLUMNS, COLUMN_ORDER, type ColumnKey } from "../../engine/job/columns.js";
-import type { RunRow } from "../../engine/job/runner.js";
+import type { RunRow } from "../../engine/job/stats.js";
 import {
   BASE_SEED,
   SEED_STRIDE,
@@ -7255,7 +7255,7 @@ The clock is injected as `generatedAtIso` rather than read from `new Date()` ins
 import { describe, expect, it } from "vitest";
 import { makeSweepJob } from "../../../engine/job/spec.js";
 import type { SweepJob } from "../../../engine/job/spec.js";
-import type { RunRow } from "../../../engine/job/runner.js";
+import type { RunRow } from "../../../engine/job/stats.js";
 import type { Reading } from "../../../engine/job/columns.js";
 import { DISCLOSURE_CLAUSES, INVENTED_CROWD_DISCLOSURE, makeCsvOptions, toCsv } from "../csv.js";
 
@@ -7434,7 +7434,8 @@ Expected: FAIL with `Error: Failed to resolve import "../csv.js" from "web/app/c
 import { fail } from "../../engine/core/errors.js";
 import { AXES } from "../../engine/job/axes.js";
 import { COLUMNS, type ColumnKey, type UnitKey } from "../../engine/job/columns.js";
-import { accumulate, type RunRow } from "../../engine/job/runner.js";
+import {accumulate,  } from "../../engine/job/runner.js";
+import type { RunRow } from "../../engine/job/stats.js";
 import type { Aggregate } from "../../engine/job/stats.js";
 import { seedFor, type SweepJob } from "../../engine/job/spec.js";
 
@@ -10710,7 +10711,7 @@ import { describe, expect, it } from "vitest";
 import { ContractError } from "../../../engine/core/errors.js";
 import { makeSweepJob } from "../../../engine/job/spec.js";
 import { HEADLINE_COLUMNS } from "../../../engine/job/columns.js";
-import type { RunRow } from "../../../engine/job/runner.js";
+import type { RunRow } from "../../../engine/job/stats.js";
 import { labelForCell, labelForJob, makeGroupBuilder, makeRunGroup } from "../group.js";
 
 const MEASUREMENT = {
@@ -10790,7 +10791,8 @@ Expected: FAIL with `Failed to resolve import "../group.js" from "web/app/consol
 import { ContractError } from "../../engine/core/errors.js";
 import { AXES } from "../../engine/job/axes.js";
 import type { SweepJob } from "../../engine/job/spec.js";
-import type { BandReading, RunRow } from "../../engine/job/runner.js";
+import type { BandReading } from "../../engine/job/runner.js";
+import type { RunRow } from "../../engine/job/stats.js";
 
 /**
  * One press of Run, finished.
@@ -10936,7 +10938,8 @@ import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
 import type { SweepJob } from "../../../engine/job/spec.js";
-import type { BandReading, RunRow } from "../../../engine/job/runner.js";
+import type { BandReading } from "../../../engine/job/runner.js";
+import type { RunRow } from "../../../engine/job/stats.js";
 
 /**
  * The Run button is the verb on this page, and the previous draft of this work shipped it wired to
@@ -11083,7 +11086,8 @@ Add these imports at the top:
 
 ```ts
 import { makeSweepJob, type SweepJob } from "./engine/job/spec.js";
-import type { BandReading, RunRow } from "./engine/job/runner.js";
+import type { BandReading } from "./engine/job/runner.js";
+import type { RunRow } from "./engine/job/stats.js";
 import { makeSweepClient } from "./app/worker/client.js";
 import { describeCost } from "./app/console/cost.js";
 import { makeGroupBuilder, type GroupBuilder, type RunGroup } from "./app/console/group.js";
@@ -11326,7 +11330,7 @@ The ledger never groups or averages anything itself. `accumulate` from `runner.t
 import { describe, expect, it } from "vitest";
 import { makeSweepJob } from "../../../engine/job/spec.js";
 import { HEADLINE_COLUMNS, type ColumnKey } from "../../../engine/job/columns.js";
-import type { RunRow } from "../../../engine/job/runner.js";
+import type { RunRow } from "../../../engine/job/stats.js";
 import { makeConsoleSettings } from "../state.js";
 import { makeRunGroup } from "../group.js";
 import {
@@ -11962,7 +11966,8 @@ import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
 import type { SweepJob } from "../../../engine/job/spec.js";
-import type { BandReading, RunRow } from "../../../engine/job/runner.js";
+import type { BandReading } from "../../../engine/job/runner.js";
+import type { RunRow } from "../../../engine/job/stats.js";
 import { STALE_MESSAGE } from "../table.js";
 
 interface Captured {
@@ -12668,7 +12673,7 @@ Run: `npx vitest run web/ui/plot.test.ts`
 import { describe, expect, it } from "vitest";
 import { makeSweepJob } from "../../../engine/job/spec.js";
 import { HEADLINE_COLUMNS } from "../../../engine/job/columns.js";
-import type { RunRow } from "../../../engine/job/runner.js";
+import type { RunRow } from "../../../engine/job/stats.js";
 import { makeRunGroup } from "../group.js";
 import { sweepPlotView } from "../curve.js";
 
