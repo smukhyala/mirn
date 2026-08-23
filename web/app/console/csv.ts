@@ -89,7 +89,11 @@ function formatValue(unit: UnitKey, value: number): string {
     return value.toFixed(2);
   }
   if (unit === "count" || unit === "people") {
-    return String(Math.round(value));
+    // A count of a single run is a whole number, but a MEAN of counts across seeds is not, and
+    // rounding it to a whole number overstates precision the data never had — the same failure
+    // class as a mean with no denominator. web/build/quantities.ts's formatQuantity already
+    // solved this for its own count columns ("let the value decide"); this mirrors that rule.
+    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
   }
   if (unit === "ratio") {
     return value.toFixed(3);
@@ -339,8 +343,8 @@ function cellRows(job: SweepJob, rows: readonly RunRow[]): readonly string[] {
 function runRows(job: SweepJob, rows: readonly RunRow[]): readonly string[] {
   const header: string[] = [
     csvField(job.axis === null ? "setting" : AXES[job.axis].label),
-    "seed index",
-    "seed",
+    csvField("seed index"),
+    csvField("seed"),
   ];
   for (const key of job.columns) {
     const descriptor = COLUMNS[key];

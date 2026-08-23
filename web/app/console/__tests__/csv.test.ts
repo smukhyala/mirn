@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeSweepJob } from "../../../engine/job/spec.js";
+import { makeFloorParams, makeSweepJob } from "../../../engine/job/spec.js";
 import type { SweepJob } from "../../../engine/job/spec.js";
 import type { RunRow } from "../../../engine/job/stats.js";
 import type { Reading } from "../../../engine/job/columns.js";
@@ -204,5 +204,82 @@ describe("the CSV discloses before it reports", () => {
     expect(fields[3]).toBe("1"); // runs used
     expect(fields[4]).toBe("2"); // runs attempted
     expect(cell4).not.toContain("censored");
+  });
+
+  it("keeps the fraction in a count column's mean, rather than rounding it into a whole number", () => {
+    // Two seeds recorded 1 and 2 near-miss episodes; the mean is 1.5. Individual readings are
+    // whole numbers, but a mean over seeds is not, and rounding it to "2" claims a certainty the
+    // data does not have — the same failure class as a mean with no denominator.
+    const countJob = makeSweepJob({
+      base: { crowd: { nPedestrians: 18 } },
+      axis: "crowdSize",
+      axisValues: [4],
+      seedIndices: [0, 1],
+      baseSeed: 20260816,
+      seedStride: 7919,
+      measurement: {
+        kind: "measurementParams",
+        forecastHorizonSteps: 60,
+        forecastEndStep: 200,
+        nearMissThresholdM: 0.5,
+        recoveryToleranceFraction: 0.2,
+        recoveryDwellSteps: 20,
+      },
+      columns: ["nearMissEpisodes"],
+      bandReplicates: null,
+      floor: null,
+      zeroReferenceRun: false,
+      frechet: false,
+    });
+    const countRows: readonly RunRow[] = [
+      {
+        kind: "runRow",
+        key: { axisIndex: 0, axisValue: 4, seedIndex: 0 },
+        readings: { nearMissEpisodes: measured(1) },
+      },
+      {
+        kind: "runRow",
+        key: { axisIndex: 0, axisValue: 4, seedIndex: 1 },
+        readings: { nearMissEpisodes: measured(2) },
+      },
+    ];
+    const text = toCsv(countJob, countRows, makeCsvOptions({ generatedAtIso: AT }));
+    const dataLines = text.split("\n").filter((line) => line.length > 0 && !line.startsWith("#"));
+    const fields = (dataLines[1] as string).split(",");
+    expect(fields[1]).toBe("1.5");
+  });
+
+  it("spells out the detection floor's parameters when one was measured, not just 'not measured'", () => {
+    const jobWithFloor = makeSweepJob({
+      base: { crowd: { nPedestrians: 18 } },
+      axis: "crowdSize",
+      axisValues: [4],
+      seedIndices: [0],
+      baseSeed: 20260816,
+      seedStride: 7919,
+      measurement: {
+        kind: "measurementParams",
+        forecastHorizonSteps: 60,
+        forecastEndStep: 200,
+        nearMissThresholdM: 0.5,
+        recoveryToleranceFraction: 0.2,
+        recoveryDwellSteps: 20,
+      },
+      columns: ["trueEffectM"],
+      bandReplicates: null,
+      floor: makeFloorParams({ nSplits: 20, alpha: 0.05, strideSteps: 4, permutationSeed: 7 }),
+      zeroReferenceRun: false,
+      frechet: false,
+    });
+    const floorRows: readonly RunRow[] = [
+      {
+        kind: "runRow",
+        key: { axisIndex: 0, axisValue: 4, seedIndex: 0 },
+        readings: { trueEffectM: measured(0.2) },
+      },
+    ];
+    const text = toCsv(jobWithFloor, floorRows, makeCsvOptions({ generatedAtIso: AT }));
+    const header = text.split("\n").filter((line) => line.startsWith("#")).join("\n");
+    expect(header).toContain("detection floor: 20 splits at the 95th percentile, every 4 steps, permutation seed 7");
   });
 });
