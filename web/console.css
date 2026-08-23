@@ -89,6 +89,46 @@
 .gauge-caption { margin: 0.2rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.64rem; color: var(--mirn-ink-faint); }
 .gauge-number { color: var(--mirn-ink-muted); }
 
+/* ---------------------------------------------------------------- Run: the button, its cost, its progress */
+
+/*
+ * The task-27 brief put this block in web/style.css. CLAUDE.md's own "Code conventions" section is
+ * explicit that console styling goes in this file, never style.css, so it lands here instead — the
+ * brief and the project's own operating contract disagreed, and the contract wins.
+ */
+
+/* The one inverted element on the page. One solid mass tells the eye where the verb is. It does
+ * not spend --mirn-perturbation: that token belongs to the perturbation alone (CLAUDE.md). */
+.run {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: var(--mirn-ink);
+  color: var(--mirn-paper);
+  border: 1px solid var(--mirn-ink);
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+.run:hover { background: var(--mirn-ink-muted); }
+.run-cost, .run-status {
+  margin: 0.4rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  color: var(--mirn-ink-faint);
+}
+.run-status:empty { display: none; }
+
+/* A hairline filling left to right. Not a bar, and no radius. Matches .ledger-region's own
+ * max-width, centering and side padding so it lines up with the stage and the ledger around it. */
+.progress-rule { height: 1px; background: var(--mirn-grid); max-width: 76rem; margin: 1.6rem auto; padding: 0 2rem; }
+.progress-rule > span {
+  display: block;
+  height: 1px;
+  width: calc(var(--mirn-progress, 0) * 100%);
+  background: var(--mirn-perturbation);
+}
+.kept-line { margin: 0.3rem 0; font-family: var(--mirn-font-mono); font-size: 0.72rem; }
+.kept-empty { color: var(--mirn-ink-muted); font-size: 0.82rem; }
+
 @media (max-width: 60rem) {
   .console-main { grid-template-columns: minmax(0, 1fr); }
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

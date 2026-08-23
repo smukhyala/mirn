@@ -355,9 +355,16 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
   zeroLabel.className = "toggle";
   zeroLabel.append(zeroToggle, doc.createTextNode("zero-effect reference run"));
 
+  // No id: Task 27 puts the actual Run button, and the authoritative cost line beside it, in a
+  // `.run-block` appended after this panel (web/console.ts's `bootConsole`). `id="run-cost"` there
+  // is the one this page's tests and CSS address; this element used to carry the same id, which is
+  // invalid HTML (two elements, one id) and left `document.getElementById("run-cost")` resolving
+  // to whichever one happened to be first in the document rather than the one Task 27 wires up.
+  // This quick, rougher estimate stays as a live read of the panel while a setting is still being
+  // dragged; it does not disappear or renumber when the accurate `describeCost` model looks at the
+  // same job differently.
   const cost = doc.createElement("p");
   cost.className = "panel-note";
-  cost.id = "run-cost";
 
   runGroup.append(
     axisLabel,

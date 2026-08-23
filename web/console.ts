@@ -4,6 +4,8 @@
 import "./app/console/boot.js";
 import { SIM_CONSTANTS } from "./engine/contracts/config.js";
 import { COLUMNS, HEADLINE_COLUMNS } from "./engine/job/columns.js";
+import type { SweepJob } from "./engine/job/spec.js";
+import type { RunRow } from "./engine/job/stats.js";
 import { mountPanel, type PanelValues } from "./app/console/panel.js";
 import {
   DEBOUNCE_MS,
@@ -15,8 +17,11 @@ import {
   stampsFor,
   type Preview,
 } from "./app/console/preview.js";
-import type { ConsoleSettings } from "./app/console/state.js";
+import { jobForRun, type ConsoleSettings } from "./app/console/state.js";
 import { makeTileProps, renderTile, zeroRenderingFor, type BandGauge } from "./app/console/tile.js";
+import { describeCost } from "./app/console/cost.js";
+import { makeGroupBuilder, type GroupBuilder, type RunGroup } from "./app/console/group.js";
+import { makeSweepClient, spawnSweepWorker, sweepPortFor, type SweepClient } from "./app/worker/client.js";
 import { anchorFor } from "./ui/labels.js";
 import { drawArena, fitCanvas, type ArenaView } from "./ui/arena.js";
 import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
@@ -31,7 +36,10 @@ import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
  * Editing a setting re-simulates the preview and repaints the arena and every tile. Nothing here
  * ever buys the run-to-run band — 267 ms is not a keystroke budget — so every tile's gauge is
  * handed `{ kind: "bandNotMeasured" }`, always, regardless of what has actually been measured.
- * Buying the band, and committing a result to the ledger, is Run's job, wired by a later task.
+ * The preview's tiles do not repaint when a press of Run finishes, either: `#readouts-note` in
+ * console.html says why two of the seven are never shown here, and that stays true after Run as
+ * much as before it — a finished press lands in the kept list at the bottom of the page, not back
+ * into this preview.
  */
 
 function el<T extends HTMLElement>(doc: Document, id: string): T {
@@ -88,6 +96,47 @@ function buildTransport(
   return { playpause, scrub, clock };
 }
 
+/**
+ * The button, and the cost and status text beside it — built here, not written into
+ * `console.html`, for the same reason `buildTransport` above is.
+ *
+ * `mountPanel` appends its own root into `#settings` (`host.append(root)`), so anything already
+ * sitting in that host when the panel mounts ends up ABOVE it in the DOM, not below — the
+ * opposite of "the button commits the settings above it". An earlier attempt at this exact button
+ * put it directly into `console.html`'s static markup and was reverted for exactly that reason
+ * (`git log -- web/console.html`): a button already in the aside pushed the panel below it.
+ *
+ * The fix is to build this detached — nothing here is attached to the document yet — and let
+ * `bootConsole` decide when to attach it: after `mountPanel` has already appended its own root,
+ * so this lands after the panel and the button really does sit below the settings it commits.
+ */
+function buildRunBlock(doc: Document): {
+  readonly block: HTMLDivElement;
+  readonly button: HTMLButtonElement;
+  readonly cost: HTMLParagraphElement;
+  readonly status: HTMLParagraphElement;
+} {
+  const block = doc.createElement("div");
+  block.className = "run-block";
+
+  const button = doc.createElement("button");
+  button.id = "run";
+  button.type = "button";
+  button.className = "run";
+  button.textContent = "Run";
+
+  const cost = doc.createElement("p");
+  cost.className = "run-cost";
+  cost.id = "run-cost";
+
+  const status = doc.createElement("p");
+  status.className = "run-status";
+  status.id = "run-status";
+
+  block.append(button, cost, status);
+  return { block, button, cost, status };
+}
+
 function paintTiles(doc: Document, host: HTMLElement, preview: Preview): void {
   const stamps = stampsFor(preview);
   // The gauge is empty during a preview, always: a floor measured at other settings beside this
@@ -128,6 +177,25 @@ function paintTiles(doc: Document, host: HTMLElement, preview: Preview): void {
   }
 }
 
+/** Every finished press of Run, in the order they finished. Task 28's ledger reads this. */
+export const keptGroups: RunGroup[] = [];
+let running: GroupBuilder | null = null;
+let groupCounter = 0;
+
+/**
+ * `ConsoleSettings` -> `SweepJob`, the same translation `web/app/console/state.ts`'s own
+ * `jobForRun` already performs and `state.test.ts` already covers. This is a thin, deliberately
+ * boring wrapper rather than a second implementation: `PanelValues` and `ConsoleSettings` already
+ * disagree with each other on names and sentinels for the same concepts (`bandReplicates: number
+ * | null` on the panel, `bandReplicates: number` with 0 meaning off on `ConsoleSettings`), and
+ * `web/app/console/preview.ts`'s `settingsFromPanel` is the one place that translation happens.
+ * Giving the SAME `ConsoleSettings` -> `SweepJob` step a second name and a second body here would
+ * be exactly that kind of drift for a third pair of types.
+ */
+export function jobFromSettings(settings: ConsoleSettings): SweepJob {
+  return jobForRun(settings);
+}
+
 export function bootConsole(doc: Document): void {
   const settingsHost = el<HTMLElement>(doc, "settings");
   const tilesHost = el<HTMLDivElement>(doc, "readouts");
@@ -138,6 +206,9 @@ export function bootConsole(doc: Document): void {
     throw new Error("2d canvas context unavailable");
   }
   const { playpause, scrub, clock } = buildTransport(doc, transportHost);
+  const { block: runBlock, button: runButton, cost: runCost, status: runStatus } = buildRunBlock(doc);
+  const progressRule = el<HTMLDivElement>(doc, "progress-rule");
+  const kept = el<HTMLElement>(doc, "ledger");
 
   let preview: Preview | null = null;
   let playing = true;
@@ -162,8 +233,147 @@ export function bootConsole(doc: Document): void {
     paintTiles(doc, tilesHost, next);
   };
 
+  const setProgress = (fraction: number): void => {
+    let clamped = fraction;
+    if (clamped < 0) {
+      clamped = 0;
+    }
+    if (clamped > 1) {
+      clamped = 1;
+    }
+    progressRule.style.setProperty("--mirn-progress", String(clamped));
+    progressRule.setAttribute("aria-valuenow", String(Math.round(clamped * 100)));
+  };
+
+  const setIdle = (): void => {
+    running = null;
+    runButton.textContent = "Run";
+    setProgress(0);
+  };
+
+  const priceThePress = (settings: ConsoleSettings): void => {
+    // A run in progress has its own status text ("simulating · 14 of 56", "Cancelling — ..."),
+    // which this must not overwrite: the operator can still nudge a slider while a sweep runs,
+    // and the price of a press they have not made yet is not news worth interrupting one they have.
+    if (running !== null) {
+      return;
+    }
+    // Recomputed from the panel every time it moves, so the figure beside the button is never a
+    // price for a sweep the operator has already changed.
+    try {
+      runCost.textContent = describeCost(jobFromSettings(settings));
+      runStatus.textContent = "";
+    } catch (error) {
+      runCost.textContent = "";
+      runStatus.textContent = `These settings cannot be run: ${(error as Error).message}`;
+    }
+  };
+
+  // A run finishing is itself a moment the price can go stale at: the operator could have nudged
+  // a slider while it ran, and priceThePress's own early return (above) skips every update made
+  // while `running !== null`. Called once the completion handlers below have reset `running` to
+  // null, so it prices whatever the panel reads right now rather than what it read when Run was
+  // last pressed. Each caller overwrites `runStatus` immediately afterward with its own message
+  // ("Finished. Kept below.", "Cancelled. Nothing was kept.", ...), so this never has the last
+  // word on the status line — only on the cost line.
+  const refreshPrice = (): void => {
+    priceThePress(settingsFromPanel(panel.read()));
+  };
+
+  const renderKept = (): void => {
+    // Task 28 replaces this with the real ledger table. Until then a kept group is one
+    // addressable line, so the Run path is complete and testable on its own. This reuses the
+    // `#ledger` div console.html already ships for that later table, rather than adding a second,
+    // redundant "kept results" area next to it.
+    while (kept.firstChild !== null) {
+      kept.removeChild(kept.firstChild);
+    }
+    for (const group of keptGroups) {
+      const line = doc.createElement("p");
+      line.className = "kept-line";
+      line.setAttribute("data-group-id", group.id);
+      line.textContent = `${group.label} · ${group.rows.length} runs kept`;
+      kept.appendChild(line);
+    }
+  };
+
+  // Spawned lazily, on the first press of Run, not here: booting the page must not require a
+  // `Worker` to exist. Nothing before the first press needs the worker thread running, and
+  // `web/app/console/__tests__/boot.test.ts` boots the real, unmocked module to check the preview
+  // tiles alone — spawning one eagerly made that throw in an environment with no `Worker` global.
+  let client: SweepClient | null = null;
+
+  const ensureClient = (): SweepClient => {
+    if (client === null) {
+      client = makeSweepClient(sweepPortFor(spawnSweepWorker()), {
+        onProgress: (unitsDone: number, unitsTotal: number, phase: string): void => {
+          setProgress(unitsTotal === 0 ? 0 : unitsDone / unitsTotal);
+          runStatus.textContent = `${phase} · ${unitsDone} of ${unitsTotal}`;
+        },
+        onRow: (row: RunRow): void => {
+          running?.addRow(row);
+        },
+        onBand: (axisIndex: number, meanM: number, peakM: number, nReplicates: number): void => {
+          running?.addBand({ kind: "bandReading", axisIndex, meanM, peakM, nReplicates });
+        },
+        onDone: (): void => {
+          // `running` is read into a local before `setIdle()` clears the module-level variable to
+          // null, and `job`/`rows`/`bands` were captured inside the builder back when the button
+          // was pressed — never re-read from the panel here. A ledger row describes the run that
+          // produced it, not whatever the panel says now; the panel may already read differently
+          // if the operator nudged a slider while this sweep was running.
+          const builder = running;
+          if (builder !== null) {
+            groupCounter++;
+            keptGroups.push(builder.finish({ id: `group-${groupCounter}`, completedAtMs: Date.now() }));
+            renderKept();
+          }
+          setIdle();
+          refreshPrice();
+          runStatus.textContent = "Finished. Kept below.";
+        },
+        onCancelled: (): void => {
+          setIdle();
+          refreshPrice();
+          runStatus.textContent = "Cancelled. Nothing was kept.";
+        },
+        onFailed: (message: string): void => {
+          setIdle();
+          refreshPrice();
+          runStatus.textContent = `The sweep stopped: ${message}`;
+        },
+      });
+    }
+    return client;
+  };
+
+  runButton.addEventListener("click", () => {
+    if (running !== null) {
+      // Cancel is a flag the worker checks BETWEEN units, never mid-unit, so this is never
+      // instant: worst case is one unit that also draws an 8-replicate band at 44 people, about
+      // 740 ms. "Cancelling" is said here because it is already true the moment the flag is set —
+      // never "Cancelled", which onCancelled alone is allowed to say, once the worker confirms it.
+      ensureClient().cancel();
+      runStatus.textContent = "Cancelling — this finishes the run already in progress first.";
+      return;
+    }
+    let job: SweepJob;
+    try {
+      job = jobFromSettings(settingsFromPanel(panel.read()));
+    } catch (error) {
+      runStatus.textContent = `These settings cannot be run: ${(error as Error).message}`;
+      return;
+    }
+    running = makeGroupBuilder(job);
+    runButton.textContent = "Cancel";
+    setProgress(0);
+    runStatus.textContent = "starting";
+    ensureClient().start(job);
+  });
+
   const scheduleRecompute = (values: PanelValues): void => {
     const settings = settingsFromPanel(values);
+    priceThePress(settings);
     if (debounceTimer !== null) {
       clearTimeout(debounceTimer);
       debounceTimer = null;
@@ -223,6 +433,9 @@ export function bootConsole(doc: Document): void {
   };
 
   const panel = mountPanel(settingsHost, { onInput: scheduleRecompute });
+  // mountPanel appends its own root last, so the run block — built detached above specifically so
+  // it could be attached only now — lands after it: the button sits below the settings it commits.
+  settingsHost.append(runBlock);
 
   scrub.addEventListener("input", () => {
     sample = Number(scrub.value);
@@ -235,9 +448,12 @@ export function bootConsole(doc: Document): void {
     base = { ...base, wallStartMs: performance.now(), sampleAtStart: sample };
   });
 
-  // mountPanel does not call onInput for the settings it starts at, so the very first preview has
-  // to be pulled from the handle's own read() rather than waiting on a push that never comes.
-  recompute(settingsFromPanel(panel.read()));
+  // mountPanel does not call onInput for the settings it starts at, so the very first preview and
+  // the very first price both have to be pulled from the handle's own read() rather than waiting
+  // on a push that never comes.
+  const initialSettings = settingsFromPanel(panel.read());
+  priceThePress(initialSettings);
+  recompute(initialSettings);
   render();
   requestAnimationFrame(frame);
 }

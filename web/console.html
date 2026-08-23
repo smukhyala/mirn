@@ -27,6 +27,11 @@
     <canvas id="arena" aria-label="Two crowds, one with a robot and one without"></canvas>
     <div class="transport" id="transport"></div>
     <div class="readouts" id="readouts"></div>
+    <p class="region-note" id="readouts-note">
+      Two of the seven measurements below need the run-to-run band. This live preview does not
+      measure it, so those two are left out here rather than shown with no zero to judge them
+      against.
+    </p>
     <section class="sweep" aria-labelledby="sweep-title">
       <h2 class="region-title" id="sweep-title">Sweep curve</h2>
       <canvas id="sweep" role="img" aria-label="Each measurement against the setting being varied"></canvas>
@@ -37,12 +42,15 @@
   <aside class="settings" id="settings" aria-label="Settings"></aside>
 </main>
 
+<div class="progress-rule" id="progress-rule" role="progressbar"
+     aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+
 <section class="ledger-region" aria-labelledby="ledger-title">
   <h2 class="region-title" id="ledger-title">Kept results</h2>
   <div class="ledger-bar" id="ledger-bar"></div>
   <p class="region-note">The link carries the settings, not the results. Pressing Run reproduces
     them exactly.</p>
-  <div class="ledger" id="ledger"></div>
+  <div class="ledger" id="ledger"><p class="kept-empty" id="kept-empty">No results kept yet.</p></div>
 </section>
 
 <script type="module" src="./console.ts"></script>

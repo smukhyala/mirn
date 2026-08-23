@@ -19,6 +19,7 @@ import { aggregate, type Aggregate, type RunRow } from "./stats.js";
  * than assumes.
  */
 export interface BandReading {
+  readonly kind: "bandReading";
   readonly axisIndex: number;
   readonly meanM: number;
   readonly peakM: number;
@@ -43,6 +44,7 @@ export function* sweepUnits(job: SweepJob): Generator<UnitOutput, void, undefine
     if (unit.needsBand && job.bandReplicates !== null) {
       band = replicateBand(config, job.bandReplicates.n);
       bandReading = Object.freeze({
+        kind: "bandReading" as const,
         axisIndex: unit.key.axisIndex,
         meanM: band.value,
         peakM: band.peakValue,
