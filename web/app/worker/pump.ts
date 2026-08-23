@@ -75,7 +75,7 @@ export function phraseFor(job: SweepJob, unit: Unit): string {
 export async function pumpSweep(job: SweepJob, port: PumpPort, deps: PumpDeps): Promise<void> {
   try {
     const plan = planSweep(job);
-    const unitsTotal = plan.units.length;
+    const unitsTotal = plan.unitsTotal;
     let unitsDone = 0;
     let sliceStartedMs = deps.nowMs();
 

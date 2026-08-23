@@ -14,7 +14,10 @@ import type { FromWorker, ToWorker } from "./protocol.js";
  *
  * Second, cancelling is not instant and is not pretended to be. `cancel()` posts a flag the
  * worker reads between units and then ignores everything until `cancelled` comes back, so a row
- * still in flight from an abandoned sweep never reaches the ledger.
+ * still in flight from an abandoned sweep never reaches the ledger. A genuine failure arriving
+ * during that window is never relabelled as a cancellation: this console's whole subject is
+ * measurement honesty, and there is no log an operator can check afterwards, so `failed` always
+ * surfaces with its real message, whichever phase it lands in.
  *
  * `RunRow` is imported from `web/engine/job/stats.ts`, not `web/engine/job/runner.ts`:
  * `runner.ts` imports `RunRow` for its own `UnitOutput` field but never re-exports the name, so
@@ -67,7 +70,15 @@ export function makeSweepClient(port: SweepPort, handlers: SweepHandlers): Sweep
       return;
     }
     if (phase === "cancelling") {
-      if (message.kind === "cancelled" || message.kind === "done" || message.kind === "failed") {
+      // A cancel in flight does not license swallowing a real failure. If the unit failed for
+      // its own reason — not because it was cancelled — the operator is told that, with the
+      // worker's actual message, never a substituted "cancelled".
+      if (message.kind === "failed") {
+        phase = "idle";
+        handlers.onFailed(message.message);
+        return;
+      }
+      if (message.kind === "cancelled" || message.kind === "done") {
         phase = "idle";
         handlers.onCancelled();
       }

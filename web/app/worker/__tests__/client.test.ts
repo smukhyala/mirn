@@ -151,6 +151,20 @@ describe("the main-thread client", () => {
     expect(client.isRunning()).toBe(false);
   });
 
+  it("surfaces a real failure with its message, even mid-cancel, rather than reporting it as a cancellation", () => {
+    const h = harness();
+    const client = makeSweepClient(h.port, handlersInto(h.seen));
+    client.start(job);
+    client.cancel();
+    expect(h.sent[1]?.kind).toBe("cancel");
+    // The unit in flight when cancel was requested failed for its own reason — not because it
+    // was cancelled. The operator must be told THAT, not "cancelled": there is no log to check
+    // afterwards, and this console's whole subject is measurement honesty.
+    h.deliver({ kind: "failed", message: "the robot's goal is outside the room" });
+    expect(h.seen).toEqual(["failed the robot's goal is outside the room"]);
+    expect(client.isRunning()).toBe(false);
+  });
+
   it("ignores a message that arrives when nothing is running", () => {
     const h = harness();
     makeSweepClient(h.port, handlersInto(h.seen));
