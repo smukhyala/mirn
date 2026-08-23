@@ -53,6 +53,15 @@ describe("a completed group of runs", () => {
     expect(group.kind).toBe("runGroup");
     expect(group.rows.length).toBe(2);
     expect(group.bands.length).toBe(1);
+    // Field values, not just a count: a builder that dropped, zeroed or reordered a band's fields
+    // on the way to `finish()` would still pass a length-only check.
+    expect(group.bands[0]).toEqual({
+      kind: "bandReading",
+      axisIndex: 0,
+      meanM: 0.172,
+      peakM: 0.34,
+      nReplicates: 8,
+    });
     expect(group.job).toBe(JOB);
     expect(Object.isFrozen(group)).toBe(true);
   });

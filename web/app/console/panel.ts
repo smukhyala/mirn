@@ -355,16 +355,17 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
   zeroLabel.className = "toggle";
   zeroLabel.append(zeroToggle, doc.createTextNode("zero-effect reference run"));
 
-  // No id: Task 27 puts the actual Run button, and the authoritative cost line beside it, in a
-  // `.run-block` appended after this panel (web/console.ts's `bootConsole`). `id="run-cost"` there
-  // is the one this page's tests and CSS address; this element used to carry the same id, which is
-  // invalid HTML (two elements, one id) and left `document.getElementById("run-cost")` resolving
-  // to whichever one happened to be first in the document rather than the one Task 27 wires up.
-  // This quick, rougher estimate stays as a live read of the panel while a setting is still being
-  // dragged; it does not disappear or renumber when the accurate `describeCost` model looks at the
-  // same job differently.
-  const cost = doc.createElement("p");
-  cost.className = "panel-note";
+  // This group used to end in its own live "N runs — about X s" line (a rough estimate, always
+  // visible here regardless of which page mounts this panel). Task 27 added an accurate,
+  // `describeCost`-driven line beside the actual Run button in web/console.ts's `.run-block`,
+  // appended after this panel — and left this one in place, reachable at the same id, so the page
+  // briefly showed two differently-worded, identically-formatted answers to "how long will this
+  // take" side by side (they can disagree by ~20% away from default settings: `describeCost`'s
+  // quadratic fit against this file's linear one). A reader is never supposed to have to guess
+  // which of two adjacent numbers is right, so this line is gone rather than merely disambiguated
+  // — `web/console.ts`'s line is the only one now, and it sits next to the button it prices.
+  // `estimateRunSeconds` stays exported: it is still a correct, tested pure function, just no
+  // longer wired to a DOM node here.
 
   runGroup.append(
     axisLabel,
@@ -380,8 +381,6 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
     frechetLabel,
     sep(doc),
     zeroLabel,
-    sep(doc),
-    cost,
   );
   root.append(worldGroup, sep(doc), rulerGroup, sep(doc), runGroup);
   host.append(root);
@@ -442,13 +441,7 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
         : "";
 
     const values = read();
-    cost.textContent = `${runsIn(values)} runs — about ${estimateRunSeconds(values).toFixed(1)} s`;
     options.onInput(values);
-  }
-
-  function runsIn(values: PanelValues): number {
-    const cells = values.sweepAxis === null ? 1 : values.sweepValues.length;
-    return cells * values.seedCount;
   }
 
   for (const key of AXIS_ORDER) {
@@ -476,9 +469,6 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
     }
     refresh();
   });
-
-  const initial = read();
-  cost.textContent = `${runsIn(initial)} runs — about ${estimateRunSeconds(initial).toFixed(1)} s`;
 
   return Object.freeze({ kind: "panelHandle" as const, root, read });
 }

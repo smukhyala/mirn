@@ -112,6 +112,22 @@ describe("pressing Run", () => {
     expect(document.getElementById("run-cost")?.textContent).toMatch(/^\d+ runs? — about /);
   });
 
+  it("says how long a press costs in exactly one place, not two disagreeing ones", async () => {
+    // panel.ts (Task 24) used to carry its own live "N runs — about X s" line, computed from a
+    // linear estimate, right beside this one's quadratic-fitted, `describeCost`-driven figure —
+    // two adjacent, identically-worded numbers that disagree by up to ~20% away from default
+    // settings. Removed rather than merely relabelled, per this task's fix round: this console's
+    // whole subject is that a number must say what it means, and two of them saying different
+    // things about the same press said the opposite.
+    const { document } = await boot();
+    const settings = document.getElementById("settings");
+    const costLike = Array.from(settings?.querySelectorAll("p") ?? []).filter((node) =>
+      /^\d+ runs? — about \d/.test(node.textContent ?? ""),
+    );
+    expect(costLike.length).toBe(1);
+    expect(costLike[0]?.id).toBe("run-cost");
+  });
+
   it("builds the run block after the panel, so the button sits below the settings it commits", async () => {
     const { document, window } = await boot();
     const settings = document.getElementById("settings");
@@ -165,15 +181,17 @@ describe("pressing Run", () => {
     expect(document.getElementById("run-status")?.textContent).toBe("Cancelled. Nothing was kept.");
   });
 
-  it("does not double-cancel a sweep that is already cancelling", async () => {
+  it("keeps routing clicks to cancel while already cancelling, and leaves de-duplication to the client", async () => {
     const { document, window } = await boot();
     const button = document.getElementById("run");
     click(button, window);
     click(button, window);
     click(button, window);
-    // The real client (web/app/worker/client.ts) already no-ops a second cancel; this pins that
-    // console.ts's own click handler routes every click while running through client.cancel()
-    // rather than, say, only the first.
+    // Three clicks: one starts the sweep, two land while `running !== null` and each calls
+    // client.cancel() again — console.ts does not itself guard against a repeat cancel. That is
+    // deliberate, not a gap: the real client (web/app/worker/client.ts) already no-ops a cancel
+    // outside its "running" phase, so a second guard here would just duplicate that one. This
+    // pins the delegation, not a rejection at the button.
     expect(cancelled.length).toBe(2);
   });
 
@@ -223,23 +241,30 @@ describe("pressing Run", () => {
   });
 
   it("keeps a run's own band, assembled from the wire's four numbers, in the group it belongs to", async () => {
-    // onBand crosses the worker boundary as four separate numbers (protocol.ts's flat "band"
-    // message), never a BandReading object — console.ts has to assemble one before handing it to
-    // the group builder. This is the test that would go red if that assembly silently dropped a
-    // field or mismatched an argument's position.
+    // onBand crosses the worker boundary as four separate positional numbers (protocol.ts's flat
+    // "band" message), never a BandReading object — console.ts has to assemble one before handing
+    // it to the group builder. Nothing downstream validates a BandReading's field values:
+    // makeRunGroup checks id/label/rows, never bands, and renderKept reads only group.label and
+    // group.rows.length. So the only way to catch a transposed or dropped field is to read the
+    // committed group's own band back out and check its numbers directly — four DISTINCT values
+    // below, so swapping any two of them is a different, wrong answer, not an accidental match.
     const { document, window } = await boot();
     click(document.getElementById("run"), window);
     const captured = handlers[0] as Captured;
     captured.onRow(row(0, 18, 0));
     captured.onBand(2, 0.41, 0.9, 6);
     captured.onDone();
-    // The group itself is not exposed to the DOM by this task (Task 28's job), so this is checked
-    // through the one seam that is exposed: the line renders at all, meaning finish() accepted the
-    // band without throwing — makeRunGroup does not validate band shape, but a malformed band
-    // (missing `kind`, wrong argument order swapped into the wrong field) would still be visible as
-    // a thrown ContractError from a caller that goes on to serialise it, which onDone does not
-    // swallow.
     expect(document.querySelectorAll("[data-group-id]").length).toBe(1);
+
+    const { keptGroups } = await import("../../../console.js");
+    const band = keptGroups[0]?.bands[0];
+    expect(band).toEqual({
+      kind: "bandReading",
+      axisIndex: 2,
+      meanM: 0.41,
+      peakM: 0.9,
+      nReplicates: 6,
+    });
   });
 
   it("keeps the settings a run was launched with, even if the panel changes before it finishes", async () => {
