@@ -1,4 +1,4 @@
-import { PALETTE, SERIES } from "./theme.js";
+import { FONT_MONO, PALETTE } from "./theme.js";
 
 /**
  * A small line-plot renderer for the sweep blocks.
@@ -17,11 +17,29 @@ export interface PlotSeries {
   readonly accent?: boolean;
 }
 
+/**
+ * A filled area rather than a line: the run-to-run band, which is a floor the two lines are read
+ * against and not a spread around either of them.
+ *
+ * `upper` is per point because the band is measured separately at every axis value. Crowd size
+ * moves it from 0.172 m at 4 people to 0.462 m at 44, so one flat line drawn across a people
+ * sweep would be a false floor at both ends. `lower: null` means the x axis.
+ */
+export interface PlotRegion {
+  readonly kind: "plotRegion";
+  readonly key: string;
+  readonly label: string;
+  readonly upper: readonly number[];
+  readonly lower: readonly number[] | null;
+}
+
 export interface PlotView {
   readonly x: readonly number[];
   readonly xLabel: string;
   readonly yLabel: string;
   readonly series: readonly PlotSeries[];
+  /** Optional so the notes' existing call sites keep compiling until they are deleted. */
+  readonly regions?: readonly PlotRegion[];
 }
 
 interface Frame {
@@ -70,6 +88,15 @@ export function drawSweep(
       }
     }
   }
+  const regions = view.regions ?? [];
+  for (const region of regions) {
+    for (let i = 0; i < region.upper.length; i++) {
+      const top = region.upper[i] as number;
+      if (Number.isFinite(top) && top > yMax) {
+        yMax = top;
+      }
+    }
+  }
   yMax = niceCeiling(yMax);
 
   const xMin = Math.min(...view.x);
@@ -79,7 +106,7 @@ export function drawSweep(
   const sy = (v: number): number => frame.bottom - (v / yMax) * (frame.bottom - frame.top);
 
   // Gridlines and axis labels.
-  context.font = `10px ${getComputedStyle(document.documentElement).getPropertyValue("--mirn-font-mono") || "monospace"}`;
+  context.font = `10px ${FONT_MONO}`;
   context.textBaseline = "middle";
   for (let k = 0; k <= 4; k++) {
     const value = (yMax * k) / 4;
@@ -119,6 +146,45 @@ export function drawSweep(
   context.textBaseline = "middle";
   context.fillText(view.yLabel, 0, 0);
   context.restore();
+
+  // Regions first, so every line is drawn on top of the floor it is read against.
+  for (const region of regions) {
+    context.fillStyle = PALETTE.grid;
+    context.beginPath();
+    for (let i = 0; i < view.x.length; i++) {
+      const top = region.upper[i] ?? 0;
+      const px = sx(view.x[i] as number);
+      const py = sy(Number.isFinite(top) ? top : 0);
+      if (i === 0) {
+        context.moveTo(px, py);
+      } else {
+        context.lineTo(px, py);
+      }
+    }
+    for (let i = view.x.length - 1; i >= 0; i--) {
+      const floor = region.lower === null ? 0 : (region.lower[i] ?? 0);
+      context.lineTo(sx(view.x[i] as number), sy(Number.isFinite(floor) ? floor : 0));
+    }
+    context.closePath();
+    context.fill();
+
+    context.strokeStyle = PALETTE.rule;
+    context.lineWidth = 1;
+    context.setLineDash([2, 3]);
+    context.beginPath();
+    for (let i = 0; i < view.x.length; i++) {
+      const top = region.upper[i] ?? 0;
+      const px = sx(view.x[i] as number);
+      const py = sy(Number.isFinite(top) ? top : 0);
+      if (i === 0) {
+        context.moveTo(px, py);
+      } else {
+        context.lineTo(px, py);
+      }
+    }
+    context.stroke();
+    context.setLineDash([]);
+  }
 
   // Series. Non-accent series get progressively lighter greys and different dashes, so a
   // greyscale print or a colour-blind reader loses nothing.
@@ -166,6 +232,9 @@ export function drawSweep(
     for (let i = 0; i < view.x.length; i++) {
       const value = s.values[i] as number;
       if (!Number.isFinite(value)) {
+        // A gap, not a shortcut. Bridging it would draw a straight segment through a cell that
+        // was censored or does not apply, which is a value the run never produced.
+        started = false;
         continue;
       }
       const px = sx(view.x[i] as number);
