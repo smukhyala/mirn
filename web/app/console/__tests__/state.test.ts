@@ -7,16 +7,11 @@ import { ContractError } from "../../../engine/core/errors.js";
 import type { RunConfig } from "../../../engine/contracts/config.js";
 import {
   DEFAULT_SETTINGS,
-  STALE_LEDGER_NOTICE,
   jobForPreview,
   jobForRun,
-  ledgerIsStale,
   makeConsoleSettings,
   measurementParamsFor,
-  sameSettings,
   type ConsoleSettings,
-  type ConsoleState,
-  type RunGroup,
 } from "../state.js";
 
 /** Reads a dotted config path, so a test can use an axis's declared `writes` as data. */
@@ -221,57 +216,8 @@ describe("the run job", () => {
   });
 });
 
-describe("the stale-ledger notice", () => {
-  const group: RunGroup = {
-    kind: "runGroup",
-    groupId: "g1",
-    label: "people sweep",
-    settings: DEFAULT_SETTINGS,
-    job: jobForRun(DEFAULT_SETTINGS),
-    rows: [],
-    bands: [],
-  };
-
-  it("is quiet while the panel still matches the selected row", () => {
-    const state: ConsoleState = {
-      kind: "consoleState",
-      settings: DEFAULT_SETTINGS,
-      groups: [group],
-      ui: {
-        kind: "consoleUi",
-        selected: { kind: "cellRef", groupId: "g1", axisIndex: 0, seedIndex: 0 },
-        pinned: [],
-        visibleColumns: [],
-        playing: true,
-        sample: 0,
-        running: false,
-        progress: null,
-      },
-    };
-    expect(ledgerIsStale(state)).toBe(false);
-  });
-
-  it("speaks the moment one knob moves", () => {
-    const moved = withAxis(DEFAULT_SETTINGS, "crowdSize", AXES.crowdSize.max);
-    const state: ConsoleState = {
-      kind: "consoleState",
-      settings: moved,
-      groups: [group],
-      ui: {
-        kind: "consoleUi",
-        selected: { kind: "cellRef", groupId: "g1", axisIndex: 0, seedIndex: 0 },
-        pinned: [],
-        visibleColumns: [],
-        playing: true,
-        sample: 0,
-        running: false,
-        progress: null,
-      },
-    };
-    expect(sameSettings(DEFAULT_SETTINGS, moved)).toBe(false);
-    expect(ledgerIsStale(state)).toBe(true);
-    expect(STALE_LEDGER_NOTICE).toBe(
-      "these numbers were measured at the settings in the link, not the ones now in the panel.",
-    );
-  });
-});
+// A "the stale-ledger notice" suite used to live here, against this file's own `RunGroup`,
+// `ConsoleState`, `sameSettings`, `STALE_LEDGER_NOTICE` and `ledgerIsStale` — a differently-shaped,
+// unused scaffolding for the same concept Task 28 built for real in `web/app/console/table.ts`
+// (`settingsMatchJob`, `STALE_MESSAGE`) against `group.ts`'s own `RunGroup`. See the removal note
+// left in state.ts itself.

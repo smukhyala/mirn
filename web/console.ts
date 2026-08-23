@@ -3,7 +3,7 @@
 // for its side effect: the module mounts the tokens on import.
 import "./app/console/boot.js";
 import { SIM_CONSTANTS } from "./engine/contracts/config.js";
-import { COLUMNS, HEADLINE_COLUMNS } from "./engine/job/columns.js";
+import { COLUMNS, COLUMN_ORDER, HEADLINE_COLUMNS, type ColumnKey } from "./engine/job/columns.js";
 import type { SweepJob } from "./engine/job/spec.js";
 import type { RunRow } from "./engine/job/stats.js";
 import { mountPanel, type PanelValues } from "./app/console/panel.js";
@@ -25,6 +25,19 @@ import { makeSweepClient, spawnSweepWorker, sweepPortFor, type SweepClient } fro
 import { anchorFor } from "./ui/labels.js";
 import { drawArena, fitCanvas, type ArenaView } from "./ui/arena.js";
 import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
+import {
+  downloadCsv,
+  makeCellRef,
+  makeLedgerView,
+  renderColumnPicker,
+  renderLedger,
+  settingsMatchJob,
+  STALE_MESSAGE,
+  type CellRef,
+  type SortKey,
+} from "./app/console/table.js";
+import { toCsv, makeCsvOptions } from "./app/console/csv.js";
+import { encodeSettings } from "./app/console/permalink.js";
 
 /**
  * The console's wiring.
@@ -182,6 +195,14 @@ export const keptGroups: RunGroup[] = [];
 let running: GroupBuilder | null = null;
 let groupCounter = 0;
 
+/** The ledger's own view state. Never persisted (guardrail 10 — no storage beyond the URL, and a
+ *  URL carries the recipe, not which row was selected or pinned). */
+let selectedCell: CellRef | null = null;
+let pinnedCells: CellRef[] = [];
+let ledgerColumns: ColumnKey[] = [...HEADLINE_COLUMNS];
+let ledgerSort: SortKey = { kind: "byAxis" };
+let ledgerDirection: "ascending" | "descending" = "ascending";
+
 /**
  * `ConsoleSettings` -> `SweepJob`, the same translation `web/app/console/state.ts`'s own
  * `jobForRun` already performs and `state.test.ts` already covers. This is a thin, deliberately
@@ -208,7 +229,12 @@ export function bootConsole(doc: Document): void {
   const { playpause, scrub, clock } = buildTransport(doc, transportHost);
   const { block: runBlock, button: runButton, cost: runCost, status: runStatus } = buildRunBlock(doc);
   const progressRule = el<HTMLDivElement>(doc, "progress-rule");
-  const kept = el<HTMLElement>(doc, "ledger");
+  const ledgerHost = el<HTMLDivElement>(doc, "ledger");
+  const columnsPanel = el<HTMLDivElement>(doc, "columns-panel");
+  const columnsToggle = el<HTMLButtonElement>(doc, "columns-toggle");
+  const exportButton = el<HTMLButtonElement>(doc, "export-csv");
+  const copyButton = el<HTMLButtonElement>(doc, "copy-link");
+  const clearButton = el<HTMLButtonElement>(doc, "clear-kept");
 
   let preview: Preview | null = null;
   let playing = true;
@@ -278,24 +304,156 @@ export function bootConsole(doc: Document): void {
   // word on the status line — only on the cost line.
   const refreshPrice = (): void => {
     priceThePress(settingsFromPanel(panel.read()));
+    renderKept();
+  };
+
+  const currentView = (): ReturnType<typeof makeLedgerView> => {
+    // Stale is derived from the panel against the MOST RECENTLY KEPT group's own job, never
+    // stored. A status nobody can persist is a status nobody can persist wrongly.
+    // `selectedCell` is not what this checks against: the brief that shipped it named it "the
+    // selected result's own job", but `CellRef`/`selectedCell` are the row a click chose for
+    // playback (Task 29's transport picks which run inside a cell plays), and a fresh ledger with
+    // one kept result and nothing yet clicked has `selectedCell === null` — which would make the
+    // whole ledger permanently unable to grey until a row was clicked, even though the panel
+    // plainly no longer matches what is on screen. The last-completed press of Run is what a
+    // reader compares the panel to without clicking anything.
+    // `settingsFromPanel` (not a `readPanel` helper — nothing in this codebase exports one) is the
+    // one existing translator from what `mountPanel` hands back to a `ConsoleSettings`, the same
+    // one every other read of the panel in this file already goes through (`priceThePress`, the
+    // Run handler, `refreshPrice`).
+    let stale: string | null = null;
+    const lastGroup = keptGroups[keptGroups.length - 1];
+    if (lastGroup !== undefined && !settingsMatchJob(settingsFromPanel(panel.read()), lastGroup.job)) {
+      stale = STALE_MESSAGE;
+    }
+    return makeLedgerView({
+      groups: keptGroups,
+      columns: ledgerColumns,
+      selected: selectedCell,
+      pinned: pinnedCells,
+      sort: ledgerSort,
+      direction: ledgerDirection,
+      staleMessage: stale,
+    });
   };
 
   const renderKept = (): void => {
-    // Task 28 replaces this with the real ledger table. Until then a kept group is one
-    // addressable line, so the Run path is complete and testable on its own. This reuses the
-    // `#ledger` div console.html already ships for that later table, rather than adding a second,
-    // redundant "kept results" area next to it.
-    while (kept.firstChild !== null) {
-      kept.removeChild(kept.firstChild);
+    while (ledgerHost.firstChild !== null) {
+      ledgerHost.removeChild(ledgerHost.firstChild);
     }
-    for (const group of keptGroups) {
-      const line = doc.createElement("p");
-      line.className = "kept-line";
-      line.setAttribute("data-group-id", group.id);
-      line.textContent = `${group.label} · ${group.rows.length} runs kept`;
-      kept.appendChild(line);
+    if (keptGroups.length === 0) {
+      const empty = doc.createElement("p");
+      empty.className = "kept-empty";
+      empty.id = "kept-empty";
+      empty.textContent = "No results kept yet.";
+      ledgerHost.appendChild(empty);
+      return;
     }
+    const view = currentView();
+    ledgerHost.appendChild(renderLedger(doc, view));
+    while (columnsPanel.firstChild !== null) {
+      columnsPanel.removeChild(columnsPanel.firstChild);
+    }
+    columnsPanel.appendChild(renderColumnPicker(doc, view));
   };
+
+  ledgerHost.addEventListener("click", (event: Event) => {
+    const target = event.target as HTMLElement;
+    const heading = target.closest(".ledger-heading");
+    if (heading !== null) {
+      const column = heading.getAttribute("data-column");
+      if (column !== null) {
+        ledgerSort = { kind: "byColumn", column: column as ColumnKey };
+        ledgerDirection = ledgerDirection === "ascending" ? "descending" : "ascending";
+        renderKept();
+      }
+      return;
+    }
+    const rowNode = target.closest(".ledger-row");
+    if (rowNode === null) {
+      return;
+    }
+    const groupId = rowNode.getAttribute("data-group-id") ?? "";
+    const axisIndex = Number(rowNode.getAttribute("data-axis-index") ?? "0");
+    const ref = makeCellRef({ groupId, axisIndex });
+    if (target.classList.contains("pin")) {
+      const remaining: CellRef[] = [];
+      let removed = false;
+      for (const pin of pinnedCells) {
+        if (pin.groupId === ref.groupId && pin.axisIndex === ref.axisIndex) {
+          removed = true;
+        } else {
+          remaining.push(pin);
+        }
+      }
+      pinnedCells = removed ? remaining : [...pinnedCells, ref];
+      renderKept();
+      return;
+    }
+    selectedCell = ref;
+    renderKept();
+  });
+
+  columnsToggle.addEventListener("click", () => {
+    columnsPanel.hidden = !columnsPanel.hidden;
+  });
+  columnsPanel.addEventListener("change", (event: Event) => {
+    const box = event.target as HTMLInputElement;
+    const key = box.value as ColumnKey;
+    const next: ColumnKey[] = [];
+    for (const candidate of COLUMN_ORDER) {
+      const isThis = candidate === key;
+      const wasOn = ledgerColumns.includes(candidate);
+      const nowOn = isThis ? box.checked : wasOn;
+      if (nowOn) {
+        next.push(candidate);
+      }
+    }
+    if (next.length === 0) {
+      return;
+    }
+    ledgerColumns = next;
+    renderKept();
+  });
+
+  exportButton.addEventListener("click", () => {
+    // Every kept group, one file each: the CSV's own provenance header (csv.ts) names the axis
+    // swept and its values, and merging two different sweeps under one header would misdescribe
+    // one of them. `toCsv` always reports every column the job actually bought (`job.columns`),
+    // not just the ones ticked in the ledger's column picker — the export is the complete record,
+    // the ledger a filtered view onto it, and there is no second grouping implementation here to
+    // filter it with.
+    for (const group of keptGroups) {
+      const text = toCsv(
+        group.job,
+        group.rows,
+        makeCsvOptions({ generatedAtIso: new Date(group.completedAtMs).toISOString() }),
+      );
+      downloadCsv(doc, `mirn-${group.id}.csv`, text);
+    }
+  });
+
+  copyButton.addEventListener("click", () => {
+    // Settings, never results. A link carrying a measured value asserts a number the current code
+    // did not produce; change a formula and the old link quotes the old answer with this page's
+    // authority. `encodeSettings` returns the bare key=value pairs with no leading "?"
+    // (permalink.test.ts's own "tolerates a leading question mark" case is the tell: decodeSettings
+    // has to strip one, which only makes sense if encodeSettings never wrote one), so the "?" is
+    // added here, once, at the only place a full URL gets assembled.
+    const query = `?${encodeSettings(settingsFromPanel(panel.read()))}`;
+    window.history.replaceState(null, "", query);
+    const clipboard = window.navigator.clipboard;
+    if (clipboard !== undefined) {
+      void clipboard.writeText(`${window.location.origin}${window.location.pathname}${query}`);
+    }
+  });
+
+  clearButton.addEventListener("click", () => {
+    keptGroups.length = 0;
+    pinnedCells = [];
+    selectedCell = null;
+    renderKept();
+  });
 
   // Spawned lazily, on the first press of Run, not here: booting the page must not require a
   // `Worker` to exist. Nothing before the first press needs the worker thread running, and
@@ -374,6 +532,7 @@ export function bootConsole(doc: Document): void {
   const scheduleRecompute = (values: PanelValues): void => {
     const settings = settingsFromPanel(values);
     priceThePress(settings);
+    renderKept();
     if (debounceTimer !== null) {
       clearTimeout(debounceTimer);
       debounceTimer = null;
@@ -455,6 +614,7 @@ export function bootConsole(doc: Document): void {
   priceThePress(initialSettings);
   recompute(initialSettings);
   render();
+  renderKept();
   requestAnimationFrame(frame);
 }
 

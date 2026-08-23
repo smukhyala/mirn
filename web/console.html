@@ -47,10 +47,16 @@
 
 <section class="ledger-region" aria-labelledby="ledger-title">
   <h2 class="region-title" id="ledger-title">Kept results</h2>
-  <div class="ledger-bar" id="ledger-bar"></div>
+  <div class="ledger-bar" id="ledger-bar">
+    <button id="columns-toggle" type="button">Columns</button>
+    <button id="export-csv" type="button">Export CSV</button>
+    <button id="copy-link" type="button">Copy link</button>
+    <button id="clear-kept" type="button">Clear</button>
+  </div>
   <p class="region-note">The link carries the settings, not the results. Pressing Run reproduces
     them exactly.</p>
-  <div class="ledger" id="ledger"><p class="kept-empty" id="kept-empty">No results kept yet.</p></div>
+  <div id="columns-panel" hidden></div>
+  <div id="ledger"><p class="kept-empty" id="kept-empty">No results kept yet.</p></div>
 </section>
 
 <script type="module" src="./console.ts"></script>

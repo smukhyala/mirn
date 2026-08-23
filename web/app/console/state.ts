@@ -2,7 +2,6 @@ import { fail } from "../../engine/core/errors.js";
 import type { RunConfigOverrides } from "../../engine/contracts/config.js";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
 import { COLUMNS, COLUMN_ORDER, type ColumnKey } from "../../engine/job/columns.js";
-import type { RunRow } from "../../engine/job/stats.js";
 import {
   BASE_SEED,
   SEED_STRIDE,
@@ -22,12 +21,6 @@ import {
  * crowd is `makeRunConfig`'s question, and it is asked before the first simulation because
  * `makeSweepJob` walks the whole grid. Duplicating that here would give the two checks somewhere
  * to disagree.
- *
- * `RunRow` is imported from `web/engine/job/stats.ts`, not `web/engine/job/runner.ts`:
- * `runner.ts` imports `RunRow` for its own `UnitOutput` field but never re-exports the name, so
- * `web/engine/job/runner.js` has no exported member `RunRow` for this file to import (the same
- * fact `web/app/worker/protocol.ts` and `web/app/worker/client.ts` already document about
- * themselves).
  *
  * `ConsoleSettings` carries no room width or height. The axis catalogue in `axes.ts` (13 axes,
  * `AXIS_ORDER`) has no entry that writes `widthM` or `heightM` — the wireframe's "Room width"
@@ -419,144 +412,14 @@ export function jobForRun(settings: ConsoleSettings): SweepJob {
   });
 }
 
-export interface CellRef {
-  readonly kind: "cellRef";
-  /** Which press of Run produced it. */
-  readonly groupId: string;
-  readonly axisIndex: number;
-  /** Which run inside the cell the transport is playing. */
-  readonly seedIndex: number;
-}
-
-export function makeCellRef(init: {
-  groupId: string;
-  axisIndex: number;
-  seedIndex: number;
-}): CellRef {
-  if (init.groupId.length === 0) {
-    fail("A selected result must name the press of Run it came from");
-  }
-  if (!Number.isInteger(init.axisIndex) || init.axisIndex < 0) {
-    fail(`A selected result's position must be a whole number, got ${String(init.axisIndex)}`);
-  }
-  if (!Number.isInteger(init.seedIndex) || init.seedIndex < 0) {
-    fail(`A selected run's seed must be a whole number, got ${String(init.seedIndex)}`);
-  }
-  return Object.freeze({
-    kind: "cellRef" as const,
-    groupId: init.groupId,
-    axisIndex: init.axisIndex,
-    seedIndex: init.seedIndex,
-  });
-}
-
-export interface BandReading {
-  readonly kind: "bandReading";
-  readonly axisIndex: number;
-  readonly meanM: number;
-  readonly peakM: number;
-  readonly nReplicates: number;
-}
-
-/**
- * One press of Run. The stored unit is a run, not a cell: a cell has no seed, so it cannot be
- * rebuilt, and playback, pinning and the recompute trick all need something that can. A cell is a
- * pure function of the runs sharing an axis value, aggregated at render time.
+/*
+ * `CellRef`, `BandReading`, `RunGroup`, `ConsoleUi`, `ConsoleState`, `sameSettings`,
+ * `STALE_LEDGER_NOTICE` and `ledgerIsStale` used to live here: an earlier, differently-shaped
+ * scaffolding for the ledger, built before Task 27 wired `keptGroups` against `web/app/console/
+ * group.ts`'s own `RunGroup` (rows, not a stored `settings`/`ConsoleUi` pair) and Task 28 built
+ * `web/app/console/table.ts`'s `CellRef`/`settingsMatchJob`/`STALE_MESSAGE` against that. Nothing
+ * outside this file's own test ever imported any of the eight names — `group.ts`'s own header
+ * comment already flagged this file's `BandReading` as dead when it added `runner.ts`'s `kind`
+ * field — so they were deleted rather than kept as a second, disagreeing shape for the same
+ * concept sitting unused beside the one the console actually runs on.
  */
-export interface RunGroup {
-  readonly kind: "runGroup";
-  readonly groupId: string;
-  readonly label: string;
-  /** The settings these numbers were measured at. Every readout prints them, always. */
-  readonly settings: ConsoleSettings;
-  readonly job: SweepJob;
-  readonly rows: readonly RunRow[];
-  readonly bands: readonly BandReading[];
-}
-
-export interface ConsoleUi {
-  readonly kind: "consoleUi";
-  readonly selected: CellRef | null;
-  /** `${groupId}:${axisIndex}` for each pinned cell. */
-  readonly pinned: readonly string[];
-  readonly visibleColumns: readonly ColumnKey[];
-  readonly playing: boolean;
-  readonly sample: number;
-  readonly running: boolean;
-  readonly progress: {
-    readonly unitsDone: number;
-    readonly unitsTotal: number;
-    readonly phase: string;
-  } | null;
-}
-
-export interface ConsoleState {
-  readonly kind: "consoleState";
-  /** What the panel reads now, which is not necessarily what any group was measured at. */
-  readonly settings: ConsoleSettings;
-  readonly groups: readonly RunGroup[];
-  readonly ui: ConsoleUi;
-}
-
-export function sameSettings(a: ConsoleSettings, b: ConsoleSettings): boolean {
-  for (const key of AXIS_ORDER) {
-    if (a.axisValues[key] !== b.axisValues[key]) {
-      return false;
-    }
-  }
-  if (a.pedestriansSeeRobot !== b.pedestriansSeeRobot) {
-    return false;
-  }
-  if (a.nearMissThresholdM !== b.nearMissThresholdM) {
-    return false;
-  }
-  if (a.recoveryToleranceFraction !== b.recoveryToleranceFraction) {
-    return false;
-  }
-  if (a.recoveryDwellSteps !== b.recoveryDwellSteps) {
-    return false;
-  }
-  if (a.sweepAxis !== b.sweepAxis) {
-    return false;
-  }
-  if (a.sweepValues.length !== b.sweepValues.length) {
-    return false;
-  }
-  for (let index = 0; index < a.sweepValues.length; index++) {
-    if (a.sweepValues[index] !== b.sweepValues[index]) {
-      return false;
-    }
-  }
-  if (a.seedCount !== b.seedCount) {
-    return false;
-  }
-  if (a.bandReplicates !== b.bandReplicates) {
-    return false;
-  }
-  if (a.withFloor !== b.withFloor) {
-    return false;
-  }
-  if (a.withFrechet !== b.withFrechet) {
-    return false;
-  }
-  if (a.withZeroReference !== b.withZeroReference) {
-    return false;
-  }
-  return true;
-}
-
-export const STALE_LEDGER_NOTICE =
-  "these numbers were measured at the settings in the link, not the ones now in the panel.";
-
-export function ledgerIsStale(state: ConsoleState): boolean {
-  const selected = state.ui.selected;
-  if (selected === null) {
-    return false;
-  }
-  for (const group of state.groups) {
-    if (group.groupId === selected.groupId) {
-      return !sameSettings(state.settings, group.settings);
-    }
-  }
-  return false;
-}
