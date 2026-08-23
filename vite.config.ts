@@ -39,6 +39,7 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, "web/index.html"),
         instrument: resolve(__dirname, "web/instrument.html"),
+        console: resolve(__dirname, "web/console.html"),
         ...generatedPages(),
       },
     },

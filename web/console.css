@@ -1,0 +1,41 @@
+/* Every colour token is injected from web/ui/theme.ts. Never write a colour literal in this file. */
+
+.console-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 2rem;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+.console-masthead { max-width: 52rem; margin: 0 auto; padding: 3rem 2rem 1.5rem; }
+
+.region-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--mirn-ink-muted);
+}
+.region-note { margin: 0 0 0.9rem; font-size: 0.82rem; color: var(--mirn-ink-muted); }
+
+.stage > canvas#arena { width: 100%; height: 22rem; display: block; }
+.sweep > canvas#sweep { width: 100%; height: 16rem; display: block; }
+
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.4rem 1.6rem;
+  margin: 1.4rem 0;
+}
+
+.ledger-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
+.ledger { font-variant-numeric: tabular-nums; }
+.ledger-region > .ledger-bar { display: flex; gap: 0.8rem; align-items: baseline; }
+
+@media (max-width: 60rem) {
+  .console-main { grid-template-columns: minmax(0, 1fr); }
+  .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

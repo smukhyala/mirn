@@ -516,6 +516,14 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   outline-offset: 2px;
 }
 
+/* A global focus ring. The rule above it is scoped to three notes-only classes and goes with the
+   notebook; on a page whose entire content is controls, a keyboard user losing the ring is not a
+   regression anybody would notice from a screenshot. */
+:focus-visible {
+  outline: 2px solid var(--mirn-ink);
+  outline-offset: 2px;
+}
+
 .widget-knob {
   display: flex;
   flex-direction: column;
