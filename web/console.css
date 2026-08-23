@@ -1,5 +1,16 @@
 /* Every colour token is injected from web/ui/theme.ts. Never write a colour literal in this file. */
 
+/*
+ * console.html links web/style.css before this file and still relies on these unscoped
+ * web/style.css rules, written for web/instrument.html. Whoever prunes style.css after the
+ * notebook pages are deleted needs to keep or replace them:
+ *   - .transport, .scrub — style the console's transport strip entirely; this file defines
+ *     nothing for them.
+ *   - #arena (bare id rule) — supplies background, border-color and aspect-ratio, alongside
+ *     this file's .stage > canvas#arena.
+ *   - button (bare element rule) — base typography for every button the console mounts.
+ */
+
 .console-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 20rem;
@@ -24,11 +35,19 @@
 .stage > canvas#arena { width: 100%; height: 22rem; display: block; }
 .sweep > canvas#sweep { width: 100%; height: 16rem; display: block; }
 
+/*
+ * web/style.css also has an unscoped .readouts rule, written for web/instrument.html, at the same
+ * specificity as this one. Because it links first, this rule only wins the properties it declares
+ * — so padding-top and border-top must be neutralised explicitly here, or the instrument page's
+ * hairline rule and top padding leak onto the console for no reason this page's design asked for.
+ */
 .readouts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.4rem 1.6rem;
   margin: 1.4rem 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .ledger-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
