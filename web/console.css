@@ -54,6 +54,41 @@
 .ledger { font-variant-numeric: tabular-nums; }
 .ledger-region > .ledger-bar { display: flex; gap: 0.8rem; align-items: baseline; }
 
+/* ---------------------------------------------------------------- the headline tile */
+
+.tile { border-top: 1px solid var(--mirn-rule); padding-top: 0.6rem; }
+.tile-label {
+  margin: 0 0 0.35rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+.tile-value { margin: 0; font-size: 1.6rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.tile-value .tile-unit { font-size: 0.9rem; color: var(--mirn-ink-muted); margin-left: 0.25rem; }
+.tile-value.is-unavailable { font-size: 0.86rem; color: var(--mirn-ink-muted); line-height: 1.4; }
+.tile-anchor { margin: 0.25rem 0 0; font-size: 0.78rem; color: var(--mirn-ink-muted); }
+.tile-zero { margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
+.tile-zero-value { color: var(--mirn-ink); }
+.tile-zero-unit { margin: 0 0.3rem 0 0.15rem; }
+.tile-stamps { margin: 0.3rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.66rem; color: var(--mirn-ink-faint); }
+.stamp { margin-right: 0.9rem; }
+.stamp-value { margin-left: 0.3rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
+.stamp-unit { margin-left: 0.15rem; }
+.tile-working { margin-top: 0.4rem; font-size: 0.78rem; }
+.tile-working summary { font-family: var(--mirn-font-mono); font-size: 0.66rem; color: var(--mirn-ink-faint); cursor: pointer; }
+.tile-assumption { margin: 0.4rem 0 0; color: var(--mirn-ink-muted); line-height: 1.5; }
+
+/* A ruler, not a box: hairline scale, a wedge over the band, one tick at the value. */
+.band-gauge { margin-top: 0.45rem; }
+.gauge-figure { display: block; width: 100%; height: 22px; overflow: visible; }
+.gauge-scale, .gauge-zero { stroke: var(--mirn-rule); stroke-width: 1; }
+.gauge-wedge { fill: var(--mirn-grid); }
+.gauge-tick { stroke: var(--mirn-perturbation); stroke-width: 2; }
+.gauge-caption { margin: 0.2rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.64rem; color: var(--mirn-ink-faint); }
+.gauge-number { color: var(--mirn-ink-muted); }
+
 @media (max-width: 60rem) {
   .console-main { grid-template-columns: minmax(0, 1fr); }
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
