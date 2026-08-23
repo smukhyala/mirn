@@ -12233,6 +12233,104 @@ Replace `renderKept` and its element lookups with:
   columnsToggle.addEventListener("click", () => {
     columnsPanel.hidden = !columnsPanel.hidden;
   });
+  columnsPanel.addEventListener("change", (event: Event) => {
+    const box = event.target as HTMLInputElement;
+    const key = box.value as ColumnKey;
+    const next: ColumnKey[] = [];
+    for (const candidate of COLUMN_ORDER) {
+      const isThis = candidate === key;
+      const wasOn = ledgerColumns.includes(candidate);
+      const nowOn = isThis ? box.checked : wasOn;
+      if (nowOn) {
+        next.push(candidate);
+      }
+    }
+    if (next.length === 0) {
+      return;
+    }
+    ledgerColumns = next;
+    renderKept();
+  });
+
+  exportButton.addEventListener("click", () => {
+    for (const group of keptGroups) {
+      const text = toCsv({
+        job: group.job,
+        rows: group.rows,
+        bands: group.bands,
+        columns: ledgerColumns,
+        generatedAtIso: new Date(group.completedAtMs).toISOString(),
+      });
+      downloadCsv(doc, `mirn-${group.id}.csv`, text);
+    }
+  });
+
+  copyButton.addEventListener("click", () => {
+    // Settings, never results. A link carrying a measured value asserts a number the current code
+    // did not produce; change a formula and the old link quotes the old answer with this page's
+    // authority. The address bar is updated so the link is there to copy even where the clipboard
+    // is not reachable.
+    const query = encodeSettings(readPanel(doc));
+    window.history.replaceState(null, "", query);
+    const clipboard = window.navigator.clipboard;
+    if (clipboard !== undefined) {
+      void clipboard.writeText(`${window.location.origin}${window.location.pathname}${query}`);
+    }
+  });
+
+  clearButton.addEventListener("click", () => {
+    keptGroups.length = 0;
+    pinnedCells = [];
+    selectedCell = null;
+    renderKept();
+  });
+```
+
+And in the panel listeners, add `renderKept();` after `priceThePress();` in both, so the staleness line appears the moment the panel moves away from the selected row. Add `renderKept();` immediately before the closing `requestAnimationFrame(frame);` in `bootConsole`.
+
+- [ ] **Step 9: Add the ledger styling to `web/style.css`**
+
+```css
+/* Set as a financial table: tabular figures, hairline row rules, no cell borders, no zebra. */
+.ledger-bar { display: flex; align-items: baseline; gap: 0.7rem; border-bottom: 2px solid var(--mirn-ink); padding-bottom: 0.5rem; }
+.ledger-title { margin: 0 auto 0 0; font-size: 0.78rem; font-family: var(--mirn-font-mono); text-transform: uppercase; letter-spacing: 0.11em; }
+.ledger-note, .ledger-stale { margin: 0.5rem 0 0; font-size: 0.74rem; color: var(--mirn-ink-faint); }
+.ledger { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.82rem; margin-top: 0.8rem; }
+.ledger th { text-align: left; font-weight: 500; font-family: var(--mirn-font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--mirn-ink-faint); padding: 0.3rem 0.6rem 0.4rem 0; cursor: pointer; }
+.ledger .col-unit { display: block; color: var(--mirn-rule); }
+.ledger td { padding: 0.35rem 0.6rem 0.35rem 0; border-top: 1px solid var(--mirn-grid); }
+.ledger-row.is-selected td { box-shadow: inset 2px 0 0 var(--mirn-perturbation); }
+.ledger.is-stale { color: var(--mirn-ink-faint); }
+.cell-unit, .cell-spread { color: var(--mirn-ink-faint); margin-left: 0.25rem; }
+.cell-reason { color: var(--mirn-ink-faint); font-size: 0.74rem; }
+.pin { border: none; background: none; padding: 0 0.4rem 0 0; font-size: 0.8rem; letter-spacing: 0; }
+.ledger-compare { margin: 0.7rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.7rem; }
+.compare-item { margin-right: 1.2rem; }
+.compare-number { margin-left: 0.35rem; color: var(--mirn-perturbation); }
+.column-picker { display: grid; gap: 0.3rem; margin-top: 0.8rem; font-size: 0.78rem; }
+.column-note { color: var(--mirn-ink-faint); font-size: 0.72rem; margin-left: 0.4rem; }
+```
+
+- [ ] **Step 10: Run the ledger DOM test to verify it passes**
+
+Run: `npx vitest run web/app/console/__tests__/ledger-dom.test.ts`
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add web/app/console/table.ts web/console.ts web/console.html web/style.css \
+        web/app/console/__tests__/table.test.ts web/app/console/__tests__/ledger-dom.test.ts
+git commit -m "The ledger: a row is a cell, the unit underneath it is a run
+
+Rows are derived at render time by accumulate() from runner.ts — the only
+per-cell grouping in the project, and the one csv.ts calls too, which is what
+stops the table and the export disagreeing. Censored and not-applicable cells
+render their reason, never a number and never blank, and a spread is omitted
+rather than printed as a zero it does not have. Pin is a filled disc against a
+hollow one, the arena's own glyph pair. When the panel moves away from the
+selected row the ledger greys and says which settings the numbers came from.
+Export CSV, Copy link and Clear are wired; the link carries settings only."
+```
 
 ---
 
