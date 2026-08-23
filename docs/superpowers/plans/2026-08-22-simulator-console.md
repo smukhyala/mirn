@@ -9274,7 +9274,7 @@ before it is spent."
   - `export function makeTileProps(init: TilePropsInit): TileProps` — frozen, throws `ContractError`.
   - `export function renderTile(doc: Document, props: TileProps): HTMLElement`
 
-`zeroRenderingFor` takes the already-resolved number rather than a `ReportContext`, so `tile.ts` imports no engine runtime at all and the jsdom test needs no simulation. Task 26 and Task 28 each resolve `ZeroReference.value(ctx)` themselves (that switch is repeated in both, deliberately).
+`zeroRenderingFor` takes the already-resolved number rather than a `ReportContext`, so `tile.ts` imports no engine runtime at all and the jsdom test needs no simulation. **`ZeroReference` carries the phrase only — it has no `value` field.** Task 26 resolves a reference to a number with its own `resolveZero(reference, ctx, readings): number`, and passes the result into `zeroRenderingFor`. Task 28 does not resolve zeros at all; the ledger reports aggregates and the tiles carry the zeros.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -9316,7 +9316,6 @@ function censored(why: string): Reading {
 const EXACT_ZERO: ZeroReference = {
   kind: "exactZero",
   how: "when nobody in the room responds to the robot",
-  value: () => 0,
 };
 
 const GEOMETRIC_BOUND: ZeroReference = {
