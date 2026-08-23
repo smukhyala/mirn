@@ -113,13 +113,25 @@ export function ledgerRows(view: LedgerView): readonly LedgerRow[] {
     const byCell = accumulate(group.rows, view.columns);
     for (const [axisIndex, cells] of byCell) {
       const ref = makeCellRef({ groupId: group.id, axisIndex });
-      let nUsed = 0;
-      let nAttempted = group.job.seedIndices.length;
+      // How many of this cell's SEEDS actually arrived — never how many produced a measured
+      // VALUE for some column. `runReport` (report.ts) writes an entry into `row.readings` for
+      // every column named in `job.columns`, on every row that arrived, whether that entry ends
+      // up measured, censored or not-applicable — so a present column's own `nAttempted` (from
+      // `aggregate()` in stats.ts) is just "how many rows are in this cell", identical across
+      // every column shown, and reading it off the first one present is not borrowing a column's
+      // statistic, because every column agrees on it. `nUsed` here previously took whichever
+      // column had the most MEASURED readings and presented that column's success rate as the
+      // row's own — so a row with trueEffectM 2/2 and robotArrivalS 1/2 showed "2/2", silently
+      // overstating the one-seed mean beside it. A column's own measured-vs-attempted count is a
+      // property of that column, not of the row, and is now rendered on the cell it describes
+      // (`cellText`, below) instead.
+      let nUsed = group.job.seedIndices.length;
+      const nAttempted = group.job.seedIndices.length;
       for (const key of view.columns) {
         const cell = cells[key];
-        if (cell !== undefined && cell.nUsed > nUsed) {
-          nUsed = cell.nUsed;
-          nAttempted = cell.nAttempted;
+        if (cell !== undefined) {
+          nUsed = cell.nAttempted;
+          break;
         }
       }
       let pinned = false;
@@ -207,18 +219,45 @@ export function compareRows(view: LedgerView): readonly ColumnDelta[] {
   return Object.freeze(deltas);
 }
 
+function sameNumberList(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let index = 0; index < a.length; index++) {
+    if (a[index] !== b[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Whether the panel still describes what a kept result was measured at.
  *
- * `ConsoleSettings` carries no `base`/`measurement` field of its own — those belong to `SweepJob`.
+ * `console.html`'s own note promises "Pressing Run reproduces them exactly" — so this has to
+ * agree on everything that promise depends on, not only the world config and the ruler. An
+ * earlier version of this function checked only those two and left `ConsoleSettings.sweepAxis`,
+ * `sweepValues`, `seedCount`, `bandReplicates`, `withFloor`, `withFrechet` and `withZeroReference`
+ * out entirely, on the theory that "a single panel position cannot describe the sweep shape" —
+ * which is false: `ConsoleSettings` (state.ts) carries all seven fields explicitly, and
+ * `jobForRun` builds `SweepJob.axis` / `axisValues` / `seedIndices.length` / `bandReplicates` /
+ * `floor` / `frechet` / `zeroReferenceRun` straight from them. Without this half, switching the
+ * swept axis, changing the seed count, or toggling band/floor/Frechet/zero-run — none of which
+ * touch a base-config or measurement value — left the stale warning silent while the panel no
+ * longer matched what pressing Run would reproduce.
+ *
  * `baseOverridesFor` and `measurementParamsFor` (state.ts) are the same translators `jobForRun`
  * itself calls to build a job FROM the panel, so comparing through them is comparing the panel and
  * the job by the one path that already has to agree with what a press of Run would produce, rather
- * than inventing a second one here that could drift from it.
+ * than inventing a second one here that could drift from it. The sweep-shape fields below are
+ * primitive enough (a key, a number list, three booleans) that reusing `jobForRun`'s own mapping
+ * inline is clearer than constructing a whole second `SweepJob` just to diff it — and `jobForRun`
+ * can throw on an in-progress-invalid panel (`priceThePress` already guards exactly that), which
+ * this function must not.
  *
- * Both sides go through `makeRunConfig`, so the world-config comparison is between two fully
- * defaulted configs with the same key order rather than between two override bags that happen to
- * differ in shape.
+ * Both sides of the world-config comparison go through `makeRunConfig`, so it is between two
+ * fully defaulted configs with the same key order rather than between two override bags that
+ * happen to differ in shape.
  */
 export function settingsMatchJob(settings: ConsoleSettings, job: SweepJob): boolean {
   const fromPanel = makeRunConfig({ ...baseOverridesFor(settings), seed: job.baseSeed, replicate: 0 });
@@ -226,7 +265,35 @@ export function settingsMatchJob(settings: ConsoleSettings, job: SweepJob): bool
   if (JSON.stringify(fromPanel) !== JSON.stringify(fromJob)) {
     return false;
   }
-  return JSON.stringify(measurementParamsFor(settings)) === JSON.stringify(job.measurement);
+  if (JSON.stringify(measurementParamsFor(settings)) !== JSON.stringify(job.measurement)) {
+    return false;
+  }
+  if (settings.sweepAxis !== job.axis) {
+    return false;
+  }
+  // `jobForRun`'s own mapping (state.ts): a null sweep axis is the degenerate single-run case,
+  // one cell at axis value 0; otherwise the swept values are the panel's own list, verbatim.
+  const sweptValues = settings.sweepAxis === null ? [0] : settings.sweepValues;
+  if (!sameNumberList(sweptValues, job.axisValues)) {
+    return false;
+  }
+  if (settings.seedCount !== job.seedIndices.length) {
+    return false;
+  }
+  const wantsBand = settings.bandReplicates > 0;
+  if (wantsBand !== (job.bandReplicates !== null)) {
+    return false;
+  }
+  if (wantsBand && job.bandReplicates !== null && settings.bandReplicates !== job.bandReplicates.n) {
+    return false;
+  }
+  if (settings.withFloor !== (job.floor !== null)) {
+    return false;
+  }
+  if (settings.withFrechet !== job.frechet) {
+    return false;
+  }
+  return settings.withZeroReference === job.zeroReferenceRun;
 }
 
 /**
@@ -288,13 +355,26 @@ function cellText(doc: Document, column: ColumnKey, cell: Aggregate | undefined)
     unitNode.textContent = suffix;
     node.appendChild(unitNode);
   }
-  // A mean never appears without its count, and a spread never appears as a zero it does not have:
-  // sd is NaN below two survivors, and a 0 printed there would read as "no spread".
+  // A spread never appears as a zero it does not have: sd is NaN below two survivors, and a 0
+  // printed there would read as "measured, and there was no spread".
   if (Number.isFinite(cell.sd)) {
     const spread = doc.createElement("span");
     spread.className = "cell-spread";
     spread.textContent = `± ${formatValue(cell.sd, unit)}`;
     node.appendChild(spread);
+  }
+  // A mean never appears without ITS OWN count. The row's "seeds" column (renderLedger, below)
+  // says how many of this cell's seeds arrived at all — a fact shared by every column in the
+  // row — never how many of THIS column's readings were actually measured, which is a different,
+  // genuinely per-column fact: trueEffectM can be 2 of 2 while robotArrivalS is 1 of 2 in the same
+  // row, if the robot missed its window on one seed. Printed only when the two would disagree
+  // (`cell.reason.kind === "partiallyCensored"`): a fully-measured cell already agrees with the
+  // row's own count, and repeating "(2/2)" on every cell would be noise with nothing to say.
+  if (cell.nUsed !== cell.nAttempted) {
+    const count = doc.createElement("span");
+    count.className = "cell-count";
+    count.textContent = `(${cell.nUsed}/${cell.nAttempted})`;
+    node.appendChild(count);
   }
   return node;
 }
@@ -365,6 +445,10 @@ export function renderLedger(doc: Document, view: LedgerView): HTMLElement {
     label.textContent = row.label;
     tr.appendChild(label);
 
+    // How many seeds this cell has ANY data for, out of how many the job asked for — a fact
+    // every column in the row shares, since `runReport` writes an entry for every requested
+    // column on every row that arrived. Never how many of a specific column's readings came back
+    // measured, which is a per-column fact printed on the cell it belongs to instead (`cellText`).
     const seeds = doc.createElement("td");
     seeds.className = "ledger-seeds";
     seeds.textContent = `${row.nUsed}/${row.nAttempted}`;

@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
+import type { SweepJob } from "../../../engine/job/spec.js";
 import type { RunRow } from "../../../engine/job/stats.js";
 import { STALE_MESSAGE } from "../table.js";
 
@@ -27,9 +28,10 @@ interface Captured {
   readonly onFailed: (message: string) => void;
 }
 
-const { handlers, csvCalls } = vi.hoisted(() => ({
+const { handlers, csvCalls, started } = vi.hoisted(() => ({
   handlers: [] as Captured[],
   csvCalls: [] as unknown[],
+  started: [] as SweepJob[],
 }));
 
 vi.mock("../../worker/client.js", () => ({
@@ -37,7 +39,13 @@ vi.mock("../../worker/client.js", () => ({
   sweepPortFor: (worker: unknown): unknown => worker,
   makeSweepClient: (_port: unknown, captured: Captured) => {
     handlers.push(captured);
-    return { kind: "sweepClient", start: (): void => {}, cancel: (): void => {} };
+    return {
+      kind: "sweepClient",
+      start: (job: SweepJob): void => {
+        started.push(job);
+      },
+      cancel: (): void => {},
+    };
   },
 }));
 
@@ -73,6 +81,7 @@ async function boot(): Promise<{ readonly document: Document; readonly window: J
   globals["requestAnimationFrame"] = (): number => 0;
   handlers.length = 0;
   csvCalls.length = 0;
+  started.length = 0;
   vi.resetModules();
   await import("../../../console.js");
   return { document: dom.window.document, window: dom.window };
@@ -102,6 +111,37 @@ async function bootWithOneResult(): Promise<{ readonly document: Document; reado
   click(booted.document.getElementById("run"), booted.window);
   const captured = handlers[0] as Captured;
   captured.onRow(row(0, 0.352));
+  captured.onDone();
+  return booted;
+}
+
+/**
+ * Two kept cells, from a real crowd-size sweep set up through the panel's own `#sweep-axis`
+ * select — the same control `panel.test.ts`'s "fills the sweep values from the picked axis's own
+ * range" pins. A single-run press only ever has one cell (axisIndex 0), which cannot exercise a
+ * sort click or a column toggle that removes a heading a reader could otherwise still see: with
+ * one row there is nothing for either to reorder or reveal a gap in.
+ */
+async function bootWithSweptResults(): Promise<{ readonly document: Document; readonly window: JSDOM["window"] }> {
+  const booted = await boot();
+  const select = booted.document.querySelector<HTMLSelectElement>("#sweep-axis") as HTMLSelectElement;
+  select.value = "crowdSize";
+  select.dispatchEvent(new booted.window.Event("change", { bubbles: true }));
+  click(booted.document.getElementById("run"), booted.window);
+  const job = started[started.length - 1] as SweepJob;
+  const captured = handlers[handlers.length - 1] as Captured;
+  const low = job.axisValues[0] as number;
+  const high = job.axisValues[1] as number;
+  captured.onRow({
+    kind: "runRow",
+    key: { axisIndex: 0, axisValue: low, seedIndex: 0 },
+    readings: { trueEffectM: { kind: "reading", value: 0.10, availability: { kind: "measured" } } },
+  });
+  captured.onRow({
+    kind: "runRow",
+    key: { axisIndex: 1, axisValue: high, seedIndex: 0 },
+    readings: { trueEffectM: { kind: "reading", value: 0.90, availability: { kind: "measured" } } },
+  });
   captured.onDone();
   return booted;
 }
@@ -165,5 +205,51 @@ describe("the ledger on the page", () => {
     // number for the page's very first paint; a brief that said 6 here was counting HEADLINE_COLUMNS
     // minus runToRunBandM alone and missing worstMomentM's own exclusion.
     expect(document.querySelectorAll(".tile").length).toBe(5);
+  });
+
+  it("sorts the table by clicking a column heading, and reverses on a second click", async () => {
+    const { document, window } = await bootWithSweptResults();
+    expect(document.querySelectorAll(".ledger-row").length).toBe(2);
+
+    // `renderKept` (console.ts) empties `#ledger` and calls `renderLedger` fresh on every render,
+    // so the `<th>` this test just clicked is a detached node once that render lands — re-queried
+    // before the second click, or the second dispatch has no ancestor chain left to bubble through
+    // and silently does nothing, which was this test's own first failure while it was being written.
+    const heading = (): Element | null =>
+      document.querySelector('.ledger-heading[data-column="trueEffectM"]');
+    expect(heading()).not.toBeNull();
+
+    // The first click on any heading moves the sort off its "byAxis" default and toggles the
+    // direction from its initial "ascending", landing on descending — highest trueEffectM (cell 1,
+    // 0.90) first.
+    click(heading(), window);
+    const descending = Array.from(document.querySelectorAll(".ledger-row")).map((tr) =>
+      tr.getAttribute("data-axis-index"),
+    );
+    expect(descending).toEqual(["1", "0"]);
+
+    click(heading(), window);
+    const ascending = Array.from(document.querySelectorAll(".ledger-row")).map((tr) =>
+      tr.getAttribute("data-axis-index"),
+    );
+    expect(ascending).toEqual(["0", "1"]);
+  });
+
+  it("drops a column's heading and cells when its picker checkbox is unticked", async () => {
+    const { document, window } = await bootWithSweptResults();
+    click(document.getElementById("columns-toggle"), window);
+    expect(document.querySelector('.ledger-heading[data-column="trueEffectM"]')).not.toBeNull();
+
+    const box = document.querySelector<HTMLInputElement>('.column-option input[value="trueEffectM"]');
+    expect(box).not.toBeNull();
+    expect(box?.checked).toBe(true);
+    if (box !== null) {
+      box.checked = false;
+      box.dispatchEvent(new window.Event("change", { bubbles: true }));
+    }
+
+    expect(document.querySelector('.ledger-heading[data-column="trueEffectM"]')).toBeNull();
+    // The rows themselves are untouched — only the one column's heading and cells are gone.
+    expect(document.querySelectorAll(".ledger-row").length).toBe(2);
   });
 });

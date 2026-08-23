@@ -78,7 +78,7 @@
 .ledger td { padding: 0.35rem 0.6rem 0.35rem 0; border-top: 1px solid var(--mirn-grid); }
 .ledger-row.is-selected td { box-shadow: inset 2px 0 0 var(--mirn-ink); }
 .ledger.is-stale { color: var(--mirn-ink-faint); }
-.cell-unit, .cell-spread { color: var(--mirn-ink-faint); margin-left: 0.25rem; }
+.cell-unit, .cell-spread, .cell-count { color: var(--mirn-ink-faint); margin-left: 0.25rem; }
 .cell-reason { color: var(--mirn-ink-faint); font-size: 0.74rem; }
 .pin { border: none; background: none; padding: 0 0.4rem 0 0; font-size: 0.8rem; letter-spacing: 0; }
 .ledger-compare { margin: 0.7rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.7rem; }
@@ -151,13 +151,18 @@
 .run-status:empty { display: none; }
 
 /* A hairline filling left to right. Not a bar, and no radius. Matches .ledger-region's own
- * max-width, centering and side padding so it lines up with the stage and the ledger around it. */
+ * max-width, centering and side padding so it lines up with the stage and the ledger around it.
+ * The fill is plain ink, not the accent: how much of the sweep has finished is a state of the
+ * computation, not a perturbation-related number, and `--mirn-perturbation` cannot be spent on
+ * chrome (`.run`, a few rules above, already declines it for the identical reason). Task 27
+ * introduced this rule on the accent; fixed here in the same commit that made the identical fix to
+ * `.ledger-row.is-selected`, in the file already open for it. */
 .progress-rule { height: 1px; background: var(--mirn-grid); max-width: 76rem; margin: 1.6rem auto; padding: 0 2rem; }
 .progress-rule > span {
   display: block;
   height: 1px;
   width: calc(var(--mirn-progress, 0) * 100%);
-  background: var(--mirn-perturbation);
+  background: var(--mirn-ink);
 }
 .kept-line { margin: 0.3rem 0; font-family: var(--mirn-font-mono); font-size: 0.72rem; }
 .kept-empty { color: var(--mirn-ink-muted); font-size: 0.82rem; }
