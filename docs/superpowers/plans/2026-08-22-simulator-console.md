@@ -6807,7 +6807,7 @@ describe("a hand-edited link", () => {
   it("writes its notices in plain English", () => {
     const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const result = decodeSettings(
-      `people=${String(AXES.crowdSize.max + 10)}&seeds=99999&band=1¬ice=maybe`,
+      `people=${String(AXES.crowdSize.max + 10)}&seeds=99999&band=1&notice=maybe`,
     );
     expect(result.notices.length).toBeGreaterThan(0);
     for (const notice of result.notices) {
