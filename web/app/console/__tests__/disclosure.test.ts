@@ -69,3 +69,26 @@ describe("the keyboard is not left behind by the notebook's deletion", () => {
     expect(css).toMatch(/^:focus-visible \{/m);
   });
 });
+
+describe("the console has a way to press Run", () => {
+  /**
+   * Three later tasks (the panel, the sweep wiring, and the Run job itself) depend on this
+   * element existing at all. A plain substring search for "run" would pass on the word "runs" in
+   * a cost estimate or "Pressing Run reproduces them" in the ledger note, so this matches the
+   * actual button tag — the exact markup Task 27's fixture and tests rely on byte-for-byte.
+   */
+  it("has a real button element, not just the word appearing somewhere on the page", () => {
+    const button = /<button\b[^>]*\bid="run"[^>]*>Run<\/button>/.exec(HTML);
+    expect(button, 'no <button id="run">Run</button> element found in web/console.html').not.toBeNull();
+  });
+
+  it("puts the Run button in the settings column, not the stage or the ledger bar", () => {
+    const settingsOpen = HTML.indexOf('id="settings"');
+    const settingsClose = HTML.indexOf("</aside>", settingsOpen);
+    const run = HTML.indexOf('id="run"');
+    expect(settingsOpen).toBeGreaterThan(-1);
+    expect(settingsClose).toBeGreaterThan(-1);
+    expect(run, "the run button is missing from the settings column").toBeGreaterThan(settingsOpen);
+    expect(run, "the run button falls outside the settings column").toBeLessThan(settingsClose);
+  });
+});

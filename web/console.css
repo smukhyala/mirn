@@ -31,6 +31,21 @@
   margin: 1.4rem 0;
 }
 
+/* The one filled thing on the console: ink fill, paper text. Everything else on the page is ink
+   on paper with a hairline rule; this is the only inversion, and it marks the one control that
+   commits the settings above it. The accent colour belongs to the perturbation alone, so it is
+   never spent here. */
+.run {
+  display: block;
+  width: 100%;
+  margin-top: 1.4rem;
+  padding: 0.85rem 1.2rem;
+  background: var(--mirn-ink);
+  color: var(--mirn-paper);
+  border: 1px solid var(--mirn-ink);
+}
+.run:hover { background: var(--mirn-paper); color: var(--mirn-ink); }
+
 .ledger-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
 .ledger { font-variant-numeric: tabular-nums; }
 .ledger-region > .ledger-bar { display: flex; gap: 0.8rem; align-items: baseline; }
