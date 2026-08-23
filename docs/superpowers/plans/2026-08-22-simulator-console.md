@@ -12062,7 +12062,11 @@ describe("the ledger on the page", () => {
 
   it("greys the ledger and says so when the panel has moved", async () => {
     const { document, window } = await bootWithOneResult();
-    const people = document.getElementById("axis-crowdSize") as HTMLInputElement;
+    // Task 24 addresses each control by its `data-axis` attribute, which its own test pins
+    // ("renders a control for every axis in AXIS_ORDER, in that order", via dataset["axis"]).
+    // There is no `axis-<key>` id anywhere, so query the attribute that actually exists rather
+    // than adding an id whose only consumer would be this test.
+    const people = document.querySelector('[data-axis="crowdSize"] input') as HTMLInputElement;
     people.value = String(Number(people.value) + 1);
     people.dispatchEvent(new window.Event("input", { bubbles: true }));
     expect(document.querySelector(".ledger")?.classList.contains("is-stale")).toBe(true);
