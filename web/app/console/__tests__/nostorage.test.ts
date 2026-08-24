@@ -31,7 +31,11 @@ const BANNED: readonly { readonly name: string; readonly pattern: RegExp }[] = [
   { name: "sessionStorage", pattern: /\bsessionStorage\b/ },
   { name: "indexedDB", pattern: /\bindexedDB\b/i },
   { name: "document.cookie", pattern: /\bdocument\s*\.\s*cookie\b/ },
-  { name: "fetch", pattern: /(?<![A-Za-z0-9_.])fetch\s*\(/ },
+  // No dot in the exclusion class: `prefetch(` is still excluded (a letter, "e", precedes
+  // "fetch("), but `window.fetch(`, `self.fetch(` and `globalThis.fetch(` — a dot precedes
+  // "fetch(" — are member-expression calls this pattern must catch, not identifier suffixes it
+  // must not.
+  { name: "fetch", pattern: /(?<![A-Za-z0-9_])fetch\s*\(/ },
   { name: "XMLHttpRequest", pattern: /\bXMLHttpRequest\b/ },
   { name: "WebSocket", pattern: /\bWebSocket\b/ },
   { name: "EventSource", pattern: /\bEventSource\b/ },
@@ -120,6 +124,22 @@ describe("no server, no storage, nothing beyond the URL", () => {
     expect(caught).toEqual(["localStorage", "fetch", "WebSocket", "navigator.sendBeacon"]);
     // And a file that only explains the rule is not a violation of it.
     expect(stripComments("// localStorage is banned here; so is fetch(\n")).not.toMatch(/localStorage/);
+  });
+
+  it("catches fetch as a member-expression call, not only a bare one", () => {
+    // The pattern used to exclude anything preceded by a dot, on the theory that a dot is what
+    // keeps a call like `object.prefetch(` from matching — but `object.prefetch(` is already
+    // excluded because "e", a letter, sits directly before "fetch(", not because of the dot. The
+    // dot exclusion's only real effect was letting `window.fetch(`, `self.fetch(` and
+    // `globalThis.fetch(` slip through, which is exactly the network call this file exists to
+    // catch.
+    const fetchBanned = BANNED.find((banned) => banned.name === "fetch");
+    expect(fetchBanned).toBeDefined();
+    expect(fetchBanned?.pattern.test(stripComments("window.fetch('/api/results');\n"))).toBe(true);
+    expect(fetchBanned?.pattern.test(stripComments("self.fetch('/api/results');\n"))).toBe(true);
+    expect(fetchBanned?.pattern.test(stripComments("globalThis.fetch('/x');\n"))).toBe(true);
+    // Still excluded: a genuinely different identifier that merely ends in "fetch".
+    expect(fetchBanned?.pattern.test(stripComments("prefetchResource();\n"))).toBe(false);
   });
 
   it("still allows the one thing the permalink needs", () => {

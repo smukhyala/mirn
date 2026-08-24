@@ -1,4 +1,6 @@
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
+import type { UnitKey } from "../../engine/job/columns.js";
+import { unitLabel } from "../../ui/labels.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "./state.js";
 
 /**
@@ -53,26 +55,48 @@ const FLOOR = "floor";
 const FRECHET = "frechet";
 const ZERO = "zero";
 
+interface SettingDescriptor {
+  readonly label: string;
+  readonly unit: UnitKey;
+}
+
 /**
- * One spelling per setting, for every sentence this file writes about one.
+ * One spelling, and one unit, per setting, for every sentence this file writes about one.
  *
  * The decoder's own notices and `settingsNotHonoured`'s both name these things to a reader, and
  * two hand-written spellings of "the recovery dwell" would eventually disagree. Guardrail 12
  * forbids the query key itself reaching a reader, so `recovery_dwell` is never what is printed.
+ *
+ * `unit` exists so a number this file prints never stands alone — `describeQuantity` reads it the
+ * same way `panel.ts` reads an axis's `unit` for its own readout. A setting with nothing physical
+ * to say (a fraction, a flag, a count of things with no further noun) is `"none"` or `"count"`,
+ * which `unitLabel` renders as nothing rather than as an invented word.
  */
-const SETTING_LABEL = Object.freeze({
-  pedestriansSeeRobot: "Whether the people notice the robot",
-  nearMissThresholdM: "The near-miss line",
-  recoveryToleranceFraction: "The recovery tolerance",
-  recoveryDwellSteps: "The recovery dwell",
-  seedCount: "The number of crowds",
-  bandReplicates: "The number of band replicates",
-  withFloor: "The detection floor",
-  withFrechet: "The walked-together ruler",
-  withZeroReference: "The zero-effect reference run",
-  sweepAxis: "The setting being varied",
-  sweepValues: "The values it is varied over",
-});
+const SETTING = Object.freeze({
+  pedestriansSeeRobot: Object.freeze({
+    label: "Whether the people notice the robot",
+    unit: "none" as const,
+  }),
+  nearMissThresholdM: Object.freeze({ label: "The near-miss line", unit: "metres" as const }),
+  recoveryToleranceFraction: Object.freeze({
+    label: "The recovery tolerance",
+    unit: "none" as const,
+  }),
+  recoveryDwellSteps: Object.freeze({ label: "The recovery dwell", unit: "count" as const }),
+  seedCount: Object.freeze({ label: "The number of crowds", unit: "count" as const }),
+  bandReplicates: Object.freeze({
+    label: "The number of band replicates",
+    unit: "count" as const,
+  }),
+  withFloor: Object.freeze({ label: "The detection floor", unit: "none" as const }),
+  withFrechet: Object.freeze({ label: "The walked-together ruler", unit: "none" as const }),
+  withZeroReference: Object.freeze({
+    label: "The zero-effect reference run",
+    unit: "none" as const,
+  }),
+  sweepAxis: Object.freeze({ label: "The setting being varied", unit: "none" as const }),
+  sweepValues: Object.freeze({ label: "The values it is varied over", unit: "none" as const }),
+}) satisfies Readonly<Record<string, SettingDescriptor>>;
 
 export const SETTING_QUERY_KEYS: readonly string[] = Object.freeze([
   NOTICE_ROBOT,
@@ -147,6 +171,38 @@ function readFlag(
 }
 
 /**
+ * A label written for the START of a sentence ("The near-miss line"), read into the MIDDLE of one
+ * ("asked for the near-miss line to be…").
+ *
+ * Every label in this file is written once, for standalone display, so it opens with a capital.
+ * Splicing it into running prose unchanged capitalises a word mid-sentence; lower-casing the whole
+ * string is the wrong fix, because a future label is free to carry a genuine proper noun or
+ * acronym after its first word, and `"the GPS antenna".toLowerCase()` would quietly wreck it. Only
+ * the first character is ever a sentence-position artefact, so only the first character moves.
+ */
+function midSentence(label: string): string {
+  if (label.length === 0) {
+    return label;
+  }
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
+/**
+ * A number with its unit, the way `panel.ts` prints one beside a slider — never a bare number.
+ *
+ * `unitLabel` returns `""` for a setting with nothing physical to say (a fraction, a count of
+ * things with no further noun), and this omits the trailing space in exactly that case rather than
+ * leaving one dangling.
+ */
+function describeQuantity(value: number, unit: UnitKey): string {
+  const suffix = unitLabel(unit);
+  if (suffix.length === 0) {
+    return String(value);
+  }
+  return `${String(value)} ${suffix}`;
+}
+
+/**
  * `readBounded`'s field description, gathered into one record rather than six positional
  * parameters. Several of those (`low`, `high`, `fallback`) share a type, and a review flagged the
  * positional form as an invitation to transpose two of them on a future edit; no call site had
@@ -159,6 +215,7 @@ interface BoundedFieldSpec {
   readonly high: number;
   readonly wholeNumber: boolean;
   readonly label: string;
+  readonly unit: UnitKey;
 }
 
 function readBounded(params: URLSearchParams, spec: BoundedFieldSpec, notices: string[]): number {
@@ -169,7 +226,8 @@ function readBounded(params: URLSearchParams, spec: BoundedFieldSpec, notices: s
   const parsed = Number(raw);
   if (raw.length === 0 || !Number.isFinite(parsed)) {
     notices.push(
-      `${spec.label} was not a number in the link, so it was left at ${String(spec.fallback)}.`,
+      `${spec.label} was not a number in the link, so it was left at ` +
+        `${describeQuantity(spec.fallback, spec.unit)}.`,
     );
     return spec.fallback;
   }
@@ -179,15 +237,15 @@ function readBounded(params: URLSearchParams, spec: BoundedFieldSpec, notices: s
   }
   if (value < spec.low) {
     notices.push(
-      `${spec.label} was ${String(parsed)} in the link, below the lowest this bench allows, so ` +
-        `it was brought up to ${String(spec.low)}.`,
+      `${spec.label} was ${describeQuantity(parsed, spec.unit)} in the link, below the lowest ` +
+        `this bench allows, so it was brought up to ${describeQuantity(spec.low, spec.unit)}.`,
     );
     return spec.low;
   }
   if (value > spec.high) {
     notices.push(
-      `${spec.label} was ${String(parsed)} in the link, above the highest this bench allows, so ` +
-        `it was brought down to ${String(spec.high)}.`,
+      `${spec.label} was ${describeQuantity(parsed, spec.unit)} in the link, above the highest ` +
+        `this bench allows, so it was brought down to ${describeQuantity(spec.high, spec.unit)}.`,
     );
     return spec.high;
   }
@@ -227,22 +285,24 @@ export function decodeSettings(query: string): DecodeResult {
     if (raw.length === 0 || !Number.isFinite(parsed)) {
       notices.push(
         `${entry.label} was not a number in the link, so it was left at ` +
-          `${String(entry.defaultValue)}.`,
+          `${describeQuantity(entry.defaultValue, entry.unit)}.`,
       );
       continue;
     }
     if (parsed < entry.min) {
       notices.push(
-        `${entry.label} was ${String(parsed)} in the link, below the lowest this bench allows, ` +
-          `so it was brought up to ${String(entry.min)}.`,
+        `${entry.label} was ${describeQuantity(parsed, entry.unit)} in the link, below the ` +
+          `lowest this bench allows, so it was brought up to ` +
+          `${describeQuantity(entry.min, entry.unit)}.`,
       );
       axisValues[key] = entry.min;
       continue;
     }
     if (parsed > entry.max) {
       notices.push(
-        `${entry.label} was ${String(parsed)} in the link, above the highest this bench allows, ` +
-          `so it was brought down to ${String(entry.max)}.`,
+        `${entry.label} was ${describeQuantity(parsed, entry.unit)} in the link, above the ` +
+          `highest this bench allows, so it was brought down to ` +
+          `${describeQuantity(entry.max, entry.unit)}.`,
       );
       axisValues[key] = entry.max;
       continue;
@@ -276,7 +336,7 @@ export function decodeSettings(query: string): DecodeResult {
         const parsed = Number(piece);
         if (piece.length === 0 || !Number.isFinite(parsed)) {
           notices.push(
-            `One of the values to vary ${entry.label.toLowerCase()} over was not a number, so ` +
+            `One of the values to vary ${midSentence(entry.label)} over was not a number, so ` +
               `it was dropped.`,
           );
           continue;
@@ -284,16 +344,17 @@ export function decodeSettings(query: string): DecodeResult {
         let value = parsed;
         if (value < entry.min) {
           notices.push(
-            `One of the values to vary ${entry.label.toLowerCase()} over was ${String(parsed)}, ` +
-              `below the lowest this bench allows, so it was brought up to ${String(entry.min)}.`,
+            `One of the values to vary ${midSentence(entry.label)} over was ` +
+              `${describeQuantity(parsed, entry.unit)}, below the lowest this bench allows, so ` +
+              `it was brought up to ${describeQuantity(entry.min, entry.unit)}.`,
           );
           value = entry.min;
         }
         if (value > entry.max) {
           notices.push(
-            `One of the values to vary ${entry.label.toLowerCase()} over was ${String(parsed)}, ` +
-              `above the highest this bench allows, so it was brought down to ` +
-              `${String(entry.max)}.`,
+            `One of the values to vary ${midSentence(entry.label)} over was ` +
+              `${describeQuantity(parsed, entry.unit)}, above the highest this bench allows, so ` +
+              `it was brought down to ${describeQuantity(entry.max, entry.unit)}.`,
           );
           value = entry.max;
         }
@@ -305,7 +366,7 @@ export function decodeSettings(query: string): DecodeResult {
       const last = sweepValues[sweepValues.length - 1];
       if (last !== undefined && last === value) {
         notices.push(
-          `Two of the values to vary ${entry.label.toLowerCase()} over ended up the same once ` +
+          `Two of the values to vary ${midSentence(entry.label)} over ended up the same once ` +
             `they were brought into range, so one was dropped.`,
         );
         continue;
@@ -314,7 +375,7 @@ export function decodeSettings(query: string): DecodeResult {
     }
     if (sweepValues.length === 0) {
       notices.push(
-        `The link asked to vary ${entry.label.toLowerCase()} but gave no usable values, so ` +
+        `The link asked to vary ${midSentence(entry.label)} but gave no usable values, so ` +
           `nothing is being varied.`,
       );
       sweepAxis = null;
@@ -325,7 +386,7 @@ export function decodeSettings(query: string): DecodeResult {
     params,
     NOTICE_ROBOT,
     DEFAULT_SETTINGS.pedestriansSeeRobot,
-    SETTING_LABEL.pedestriansSeeRobot,
+    SETTING.pedestriansSeeRobot.label,
     notices,
   );
   const nearMissThresholdM = readBounded(
@@ -336,7 +397,8 @@ export function decodeSettings(query: string): DecodeResult {
       low: 0.05,
       high: 5,
       wholeNumber: false,
-      label: SETTING_LABEL.nearMissThresholdM,
+      label: SETTING.nearMissThresholdM.label,
+      unit: SETTING.nearMissThresholdM.unit,
     },
     notices,
   );
@@ -348,7 +410,8 @@ export function decodeSettings(query: string): DecodeResult {
       low: 0.01,
       high: 1,
       wholeNumber: false,
-      label: SETTING_LABEL.recoveryToleranceFraction,
+      label: SETTING.recoveryToleranceFraction.label,
+      unit: SETTING.recoveryToleranceFraction.unit,
     },
     notices,
   );
@@ -360,7 +423,8 @@ export function decodeSettings(query: string): DecodeResult {
       low: 1,
       high: 400,
       wholeNumber: true,
-      label: SETTING_LABEL.recoveryDwellSteps,
+      label: SETTING.recoveryDwellSteps.label,
+      unit: SETTING.recoveryDwellSteps.unit,
     },
     notices,
   );
@@ -372,7 +436,8 @@ export function decodeSettings(query: string): DecodeResult {
       low: 1,
       high: 32,
       wholeNumber: true,
-      label: SETTING_LABEL.seedCount,
+      label: SETTING.seedCount.label,
+      unit: SETTING.seedCount.unit,
     },
     notices,
   );
@@ -385,7 +450,8 @@ export function decodeSettings(query: string): DecodeResult {
       low: 0,
       high: 32,
       wholeNumber: true,
-      label: SETTING_LABEL.bandReplicates,
+      label: SETTING.bandReplicates.label,
+      unit: SETTING.bandReplicates.unit,
     },
     notices,
   );
@@ -397,13 +463,25 @@ export function decodeSettings(query: string): DecodeResult {
     bandReplicates = 0;
   }
 
-  const withFloor = readFlag(params, FLOOR, DEFAULT_SETTINGS.withFloor, SETTING_LABEL.withFloor, notices);
-  const withFrechet = readFlag(params, FRECHET, DEFAULT_SETTINGS.withFrechet, SETTING_LABEL.withFrechet, notices);
+  const withFloor = readFlag(
+    params,
+    FLOOR,
+    DEFAULT_SETTINGS.withFloor,
+    SETTING.withFloor.label,
+    notices,
+  );
+  const withFrechet = readFlag(
+    params,
+    FRECHET,
+    DEFAULT_SETTINGS.withFrechet,
+    SETTING.withFrechet.label,
+    notices,
+  );
   const withZeroReference = readFlag(
     params,
     ZERO,
     DEFAULT_SETTINGS.withZeroReference,
-    SETTING_LABEL.withZeroReference,
+    SETTING.withZeroReference.label,
     notices,
   );
 
@@ -450,10 +528,6 @@ function sameSetting(asked: number, applied: number): boolean {
   return Math.abs(asked - applied) <= 1e-9 * scale;
 }
 
-function describeNumber(value: number): string {
-  return String(value);
-}
-
 function describeFlag(value: boolean): string {
   return value ? "on" : "off";
 }
@@ -475,7 +549,9 @@ function sameValues(asked: readonly number[], applied: readonly number[]): boole
   return true;
 }
 
-function describeList(values: readonly number[]): string {
+/** A whole sweep, with its axis's unit named once at the end rather than after every value —
+ *  "4, 8, 12 people", not "4 people, 8 people, 12 people". */
+function describeList(values: readonly number[], unit: UnitKey): string {
   if (values.length === 0) {
     return "nothing";
   }
@@ -483,11 +559,20 @@ function describeList(values: readonly number[]): string {
   for (const value of values) {
     written.push(String(value));
   }
-  return written.join(", ");
+  const suffix = unitLabel(unit);
+  if (suffix.length === 0) {
+    return written.join(", ");
+  }
+  return `${written.join(", ")} ${suffix}`;
 }
 
+/** `label` is written for standalone display and is spliced into running prose here, so it goes
+ *  through `midSentence` in exactly one place rather than at every call site. */
 function notHonoured(label: string, asked: string, applied: string): string {
-  return `The link asked for ${label} to be ${asked}, which no control here can be set to, so it is ${applied}.`;
+  return (
+    `The link asked for ${midSentence(label)} to be ${asked}, which no control here can be set ` +
+    `to, so it is ${applied}.`
+  );
 }
 
 /**
@@ -509,11 +594,16 @@ export function settingsNotHonoured(
   const lines: string[] = [];
 
   for (const key of AXIS_ORDER) {
+    const entry = AXES[key];
     const askedValue = asked.axisValues[key];
     const appliedValue = applied.axisValues[key];
     if (!sameSetting(askedValue, appliedValue)) {
       lines.push(
-        notHonoured(AXES[key].label, describeNumber(askedValue), describeNumber(appliedValue)),
+        notHonoured(
+          entry.label,
+          describeQuantity(askedValue, entry.unit),
+          describeQuantity(appliedValue, entry.unit),
+        ),
       );
     }
   }
@@ -521,7 +611,7 @@ export function settingsNotHonoured(
   if (asked.pedestriansSeeRobot !== applied.pedestriansSeeRobot) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.pedestriansSeeRobot,
+        SETTING.pedestriansSeeRobot.label,
         describeFlag(asked.pedestriansSeeRobot),
         describeFlag(applied.pedestriansSeeRobot),
       ),
@@ -530,65 +620,72 @@ export function settingsNotHonoured(
   if (!sameSetting(asked.nearMissThresholdM, applied.nearMissThresholdM)) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.nearMissThresholdM,
-        describeNumber(asked.nearMissThresholdM),
-        describeNumber(applied.nearMissThresholdM),
+        SETTING.nearMissThresholdM.label,
+        describeQuantity(asked.nearMissThresholdM, SETTING.nearMissThresholdM.unit),
+        describeQuantity(applied.nearMissThresholdM, SETTING.nearMissThresholdM.unit),
       ),
     );
   }
   if (!sameSetting(asked.recoveryToleranceFraction, applied.recoveryToleranceFraction)) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.recoveryToleranceFraction,
-        describeNumber(asked.recoveryToleranceFraction),
-        describeNumber(applied.recoveryToleranceFraction),
+        SETTING.recoveryToleranceFraction.label,
+        describeQuantity(asked.recoveryToleranceFraction, SETTING.recoveryToleranceFraction.unit),
+        describeQuantity(
+          applied.recoveryToleranceFraction,
+          SETTING.recoveryToleranceFraction.unit,
+        ),
       ),
     );
   }
   if (!sameSetting(asked.recoveryDwellSteps, applied.recoveryDwellSteps)) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.recoveryDwellSteps,
-        describeNumber(asked.recoveryDwellSteps),
-        describeNumber(applied.recoveryDwellSteps),
+        SETTING.recoveryDwellSteps.label,
+        describeQuantity(asked.recoveryDwellSteps, SETTING.recoveryDwellSteps.unit),
+        describeQuantity(applied.recoveryDwellSteps, SETTING.recoveryDwellSteps.unit),
       ),
     );
   }
   if (asked.sweepAxis !== applied.sweepAxis) {
     const askedName = asked.sweepAxis === null ? "nothing" : AXES[asked.sweepAxis].label;
     const appliedName = applied.sweepAxis === null ? "nothing" : AXES[applied.sweepAxis].label;
-    lines.push(notHonoured(SETTING_LABEL.sweepAxis, askedName, appliedName));
+    lines.push(notHonoured(SETTING.sweepAxis.label, askedName, appliedName));
   } else if (!sameValues(asked.sweepValues, applied.sweepValues)) {
+    // Both sides share `sweepAxis` here (the branch above returns otherwise), and a shared,
+    // non-null axis is the only way `sweepValues` can be non-empty — `makeConsoleSettings`
+    // forbids values with no axis to vary them over.
+    const sweepUnit: UnitKey = asked.sweepAxis === null ? "none" : AXES[asked.sweepAxis].unit;
     lines.push(
       notHonoured(
-        SETTING_LABEL.sweepValues,
-        describeList(asked.sweepValues),
-        describeList(applied.sweepValues),
+        SETTING.sweepValues.label,
+        describeList(asked.sweepValues, sweepUnit),
+        describeList(applied.sweepValues, sweepUnit),
       ),
     );
   }
   if (!sameSetting(asked.seedCount, applied.seedCount)) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.seedCount,
-        describeNumber(asked.seedCount),
-        describeNumber(applied.seedCount),
+        SETTING.seedCount.label,
+        describeQuantity(asked.seedCount, SETTING.seedCount.unit),
+        describeQuantity(applied.seedCount, SETTING.seedCount.unit),
       ),
     );
   }
   if (!sameSetting(asked.bandReplicates, applied.bandReplicates)) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.bandReplicates,
-        describeNumber(asked.bandReplicates),
-        describeNumber(applied.bandReplicates),
+        SETTING.bandReplicates.label,
+        describeQuantity(asked.bandReplicates, SETTING.bandReplicates.unit),
+        describeQuantity(applied.bandReplicates, SETTING.bandReplicates.unit),
       ),
     );
   }
   if (asked.withFloor !== applied.withFloor) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.withFloor,
+        SETTING.withFloor.label,
         describeFlag(asked.withFloor),
         describeFlag(applied.withFloor),
       ),
@@ -597,7 +694,7 @@ export function settingsNotHonoured(
   if (asked.withFrechet !== applied.withFrechet) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.withFrechet,
+        SETTING.withFrechet.label,
         describeFlag(asked.withFrechet),
         describeFlag(applied.withFrechet),
       ),
@@ -606,7 +703,7 @@ export function settingsNotHonoured(
   if (asked.withZeroReference !== applied.withZeroReference) {
     lines.push(
       notHonoured(
-        SETTING_LABEL.withZeroReference,
+        SETTING.withZeroReference.label,
         describeFlag(asked.withZeroReference),
         describeFlag(applied.withZeroReference),
       ),

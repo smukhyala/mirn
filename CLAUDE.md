@@ -289,7 +289,7 @@ command below is written so it runs as spelled from the repository root, with no
 npm run check                            # typecheck, vitest, vite build — 28 s
 npm run test                             # 511 tests in 22 s
 npx vitest run --exclude '**/*.slow.test.ts'   # 506 of them in 14 s
-.venv/bin/python -m pytest -q            # 298 tests, 340 s; one calibration test is 132 s of it
+.venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them in 22 s, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity   # after any formula change

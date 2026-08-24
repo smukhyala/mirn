@@ -38,8 +38,9 @@ markers = [
     # This marker existed for a while with nothing wearing it, which made the loop above a comment
     # rather than a command. The tests that wear it now were chosen by measurement, not by feel:
     # `pytest --durations=0`, everything costing more than about 2.5 s. Re-measured on an idle
-    # machine: 23 tests of 298, and 319 s of a 340 s full run; the remaining 275 take 22 s. The
-    # single largest is `test_calibration_report_records_the_solver_settings_it_used` at 132 s.
+    # machine: 23 tests of 298, and 319 s of a full run that measured roughly 6 minutes; the
+    # remaining 275 take 22 s. The single largest is
+    # `test_calibration_report_records_the_solver_settings_it_used` at 132 s.
     # Both halves of this were measured directly rather than derived from one another, and the
     # figures that were here before were off by a plausible-looking margin because nobody re-ran
     # them. Re-run both if you touch the marker.

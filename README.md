@@ -80,7 +80,7 @@ Nothing from the virtualenv is on PATH, so the Python commands are spelled out i
 npm run check                                     # typecheck, tests, site build — 28 s
 npm run test                                      # 511 tests in 22 s
 npx vitest run --exclude '**/*.slow.test.ts'      # 506 of them in 14 s
-.venv/bin/python -m pytest -q                     # the oracle: 298 tests, 5 min 40 s
+.venv/bin/python -m pytest -q                     # the oracle: 298 tests, roughly 6 minutes
 .venv/bin/python -m pytest -q -m "not slow"       # 275 of them, minus the heavy nulls, in 22 s
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity
 ```

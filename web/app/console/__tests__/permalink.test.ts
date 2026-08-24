@@ -264,13 +264,46 @@ describe("what the panel could not carry is said out loud", () => {
     expect(lines[0]).toContain(String(DEFAULT_SETTINGS.nearMissThresholdM));
   });
 
+  it("gives the near-miss line its unit, never a bare number", () => {
+    // The near-miss line is a distance. Printing "0.3" with nothing beside it is exactly the
+    // failure this project exists to teach against — a raw number never appears alone.
+    const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, nearMissThresholdM: 0.3 });
+    const lines = settingsNotHonoured(asked, DEFAULT_SETTINGS);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("0.3 metres");
+    expect(lines[0]).toContain(`${String(DEFAULT_SETTINGS.nearMissThresholdM)} metres`);
+  });
+
+  it("does not capitalise a standalone label when it lands mid-sentence", () => {
+    // `SETTING`'s labels are written for standalone display and open with a capital. Splicing
+    // one into "The link asked for ... to be" verbatim capitalises a word mid-sentence.
+    const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, nearMissThresholdM: 0.3 });
+    const lines = settingsNotHonoured(asked, DEFAULT_SETTINGS);
+    expect(lines[0]).toContain("asked for the near-miss line to be");
+    expect(lines[0]).not.toMatch(/asked for The\b/);
+  });
+
+  it("reproduces the reviewed regression fixed: unit present, no mid-sentence capital", () => {
+    // Verbatim from the finding: `?near_miss=0.3&recovery_tol=0.9&recovery_dwell=999`.
+    const decoded = decodeSettings("near_miss=0.3&recovery_tol=0.9&recovery_dwell=999");
+    const lines = settingsNotHonoured(decoded.settings, DEFAULT_SETTINGS);
+    const nearMissLine = lines.find((line) => line.includes("near-miss"));
+    expect(nearMissLine).toBeDefined();
+    expect(nearMissLine).toContain("asked for the near-miss line to be 0.3 metres");
+    expect(nearMissLine).not.toMatch(/asked for The\b/);
+  });
+
   it("names an axis the slider snapped, by its plain-English name", () => {
     const axisValues = { ...DEFAULT_SETTINGS.axisValues };
     axisValues.crowdSize = 18.5;
     const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, axisValues });
     const lines = settingsNotHonoured(asked, DEFAULT_SETTINGS);
     expect(lines.length).toBe(1);
-    expect(lines[0]).toContain(AXES.crowdSize.label);
+    // The label is written for standalone display and is lower-cased at its first letter only
+    // when spliced mid-sentence here, same as every other label in this file.
+    const midSentenceLabel = AXES.crowdSize.label.charAt(0).toLowerCase() + AXES.crowdSize.label.slice(1);
+    expect(lines[0]).toContain(midSentenceLabel);
+    expect(lines[0]).toContain("people");
   });
 
   it("tolerates the last bits of a double, which a slider's own rounding can move", () => {
