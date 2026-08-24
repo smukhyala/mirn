@@ -9,6 +9,10 @@
  *   - #arena (bare id rule) — supplies background, border-color and aspect-ratio, alongside
  *     this file's .stage > canvas#arena.
  *   - button (bare element rule) — base typography for every button the console mounts.
+ *   - .legend-accent, .legend-grey-0/1/2 (li::before swatches) — the sweep curve's two line
+ *     entries reuse these rather than duplicating them; they are shared with notes.ts's own,
+ *     identical sweep widget. This file adds only .legend-region, the swatch kind notes.ts never
+ *     needed because its widget never drew a filled region.
  */
 
 .console-main {
@@ -34,6 +38,32 @@
 
 .stage > canvas#arena { width: 100%; height: 22rem; display: block; }
 .sweep > canvas#sweep { width: 100%; height: 16rem; display: block; }
+
+.sweep-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  color: var(--mirn-ink-muted);
+}
+.sweep-legend li::before {
+  content: "";
+  display: inline-block;
+  width: 1.4rem;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+/* The run-to-run band is a filled region, not a line, so its swatch is a filled block rather than
+   the border-top rule the two line swatches (.legend-accent / .legend-grey-N, from web/style.css)
+   use. */
+.legend-region::before { height: 0.5rem; background: var(--mirn-grid); border-bottom: 1px dashed var(--mirn-rule); }
+
+/* The transport's seed stepper: a cell has no seed, so this picks which run inside it plays. */
+.seed-picker { display: inline-flex; align-items: center; gap: 0.4rem; }
 
 /*
  * web/style.css also has an unscoped .readouts rule, written for web/instrument.html, at the same

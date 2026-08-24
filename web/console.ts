@@ -20,10 +20,14 @@ import {
 import { jobForRun, type ConsoleSettings } from "./app/console/state.js";
 import { makeTileProps, renderTile, zeroRenderingFor, type BandGauge } from "./app/console/tile.js";
 import { describeCost } from "./app/console/cost.js";
-import { makeGroupBuilder, type GroupBuilder, type RunGroup } from "./app/console/group.js";
+import { labelForCell, makeGroupBuilder, type GroupBuilder, type RunGroup } from "./app/console/group.js";
+import { describeSeed, recomputeForPlayback, stepSeed } from "./app/console/playback.js";
+import { sweepPlotView } from "./app/console/curve.js";
 import { makeSweepClient, spawnSweepWorker, sweepPortFor, type SweepClient } from "./app/worker/client.js";
+import type { RunResult } from "./engine/sim/run.js";
 import { anchorFor } from "./ui/labels.js";
 import { drawArena, fitCanvas, type ArenaView } from "./ui/arena.js";
+import { drawSweep, type PlotView } from "./ui/plot.js";
 import { frameIndexAt, type PlaybackBase } from "./app/clock.js";
 import {
   downloadCsv,
@@ -70,6 +74,12 @@ function el<T extends HTMLElement>(doc: Document, id: string): T {
  * The ids and classes match `web/instrument.html`'s static transport exactly, so the `.transport`
  * and `.scrub` rules already in `web/style.css` style this one for free — console.css's own header
  * comment documents that reliance and this file is the reason it is true.
+ *
+ * The seed stepper is built here too, for the same reason: a cell (a ledger row) has no seed, so
+ * this is what picks which run inside it plays. `playing-note` is a sibling of `#transport`
+ * rather than a child of it — it is a full block-level line under the transport's own flex row,
+ * not another item inside that row — so it is inserted immediately after `host` once `host` is
+ * already attached to the document, rather than appended into it.
  */
 function buildTransport(
   doc: Document,
@@ -78,6 +88,10 @@ function buildTransport(
   readonly playpause: HTMLButtonElement;
   readonly scrub: HTMLInputElement;
   readonly clock: HTMLOutputElement;
+  readonly seedPrev: HTMLButtonElement;
+  readonly seedNext: HTMLButtonElement;
+  readonly seedReadout: HTMLOutputElement;
+  readonly playingNote: HTMLParagraphElement;
 } {
   const playpause = doc.createElement("button");
   playpause.id = "playpause";
@@ -105,8 +119,32 @@ function buildTransport(
   clock.value = "0.0";
   clockWrap.append("t ", clock, " s");
 
-  host.append(playpause, scrubLabel, clockWrap);
-  return { playpause, scrub, clock };
+  const seedPicker = doc.createElement("span");
+  seedPicker.className = "seed-picker";
+  const seedPrev = doc.createElement("button");
+  seedPrev.id = "seed-prev";
+  seedPrev.type = "button";
+  seedPrev.setAttribute("aria-label", "previous run in this cell");
+  seedPrev.textContent = "<";
+  const seedReadout = doc.createElement("output");
+  seedReadout.id = "seed-readout";
+  seedReadout.value = "seed 1 of 1";
+  const seedNext = doc.createElement("button");
+  seedNext.id = "seed-next";
+  seedNext.type = "button";
+  seedNext.setAttribute("aria-label", "next run in this cell");
+  seedNext.textContent = ">";
+  seedPicker.append(seedPrev, seedReadout, seedNext);
+
+  host.append(playpause, scrubLabel, clockWrap, seedPicker);
+
+  const playingNote = doc.createElement("p");
+  playingNote.className = "region-note";
+  playingNote.id = "playing-note";
+  playingNote.textContent = "Live preview of the settings in the panel.";
+  host.insertAdjacentElement("afterend", playingNote);
+
+  return { playpause, scrub, clock, seedPrev, seedNext, seedReadout, playingNote };
 }
 
 /**
@@ -203,6 +241,12 @@ let ledgerColumns: ColumnKey[] = [...HEADLINE_COLUMNS];
 let ledgerSort: SortKey = { kind: "byAxis" };
 let ledgerDirection: "ascending" | "descending" = "ascending";
 
+/** Which run inside the selected cell is playing, and its rebuilt result. Never persisted, for
+ *  the same reason `selectedCell` above is not — a cell has no seed until the operator picks one,
+ *  and the URL carries the recipe, not which row or run was being watched. */
+let playbackSeedIndex = 0;
+let playbackRun: RunResult | null = null;
+
 /**
  * `ConsoleSettings` -> `SweepJob`, the same translation `web/app/console/state.ts`'s own
  * `jobForRun` already performs and `state.test.ts` already covers. This is a thin, deliberately
@@ -226,7 +270,10 @@ export function bootConsole(doc: Document): void {
   if (canvasContext === null) {
     throw new Error("2d canvas context unavailable");
   }
-  const { playpause, scrub, clock } = buildTransport(doc, transportHost);
+  const { playpause, scrub, clock, seedPrev, seedNext, seedReadout, playingNote } = buildTransport(
+    doc,
+    transportHost,
+  );
   const { block: runBlock, button: runButton, cost: runCost, status: runStatus } = buildRunBlock(doc);
   const progressRule = el<HTMLDivElement>(doc, "progress-rule");
   const ledgerHost = el<HTMLDivElement>(doc, "ledger");
@@ -235,6 +282,10 @@ export function bootConsole(doc: Document): void {
   const exportButton = el<HTMLButtonElement>(doc, "export-csv");
   const copyButton = el<HTMLButtonElement>(doc, "copy-link");
   const clearButton = el<HTMLButtonElement>(doc, "clear-kept");
+  const curveBlock = el<HTMLElement>(doc, "sweep-block");
+  const curveCanvas = el<HTMLCanvasElement>(doc, "sweep");
+  const curveLegend = el<HTMLUListElement>(doc, "sweep-legend");
+  const curveContext = curveCanvas.getContext("2d");
 
   let preview: Preview | null = null;
   let playing = true;
@@ -357,6 +408,107 @@ export function bootConsole(doc: Document): void {
     columnsPanel.appendChild(renderColumnPicker(doc, view));
   };
 
+  const selectedGroup = (): RunGroup | null => {
+    if (selectedCell === null) {
+      return null;
+    }
+    for (const group of keptGroups) {
+      if (group.id === selectedCell.groupId) {
+        return group;
+      }
+    }
+    return null;
+  };
+
+  /**
+   * Rebuilds the legend from what `sweepPlotView` actually drew, rather than a hand-written list
+   * of three items — the same reason a censored point breaks the line instead of a caption
+   * asserting a floor that was never drawn: the legend must never claim a series the figure above
+   * it does not have. Mirrors web/notes.ts's own dynamic-legend construction for the identical
+   * plot, reusing its swatch classes (`legend-accent`, `legend-grey-N`) for the two lines; the
+   * band gets `legend-region`, the one swatch kind that widget never needed.
+   */
+  const renderLegend = (view: PlotView): void => {
+    while (curveLegend.firstChild !== null) {
+      curveLegend.removeChild(curveLegend.firstChild);
+    }
+    let greyIndex = 0;
+    for (const s of view.series) {
+      const item = doc.createElement("li");
+      if (s.accent === true) {
+        item.className = "legend-accent";
+      } else {
+        item.className = `legend-grey-${greyIndex % 3}`;
+        greyIndex++;
+      }
+      item.textContent = s.label;
+      curveLegend.appendChild(item);
+    }
+    for (const region of view.regions ?? []) {
+      const item = doc.createElement("li");
+      item.className = "legend-region";
+      item.textContent = region.label;
+      curveLegend.appendChild(item);
+    }
+  };
+
+  const drawCurve = (): void => {
+    const group = selectedGroup();
+    if (group === null || curveContext === null) {
+      curveBlock.hidden = true;
+      return;
+    }
+    const view = sweepPlotView(group);
+    if (view === null) {
+      curveBlock.hidden = true;
+      return;
+    }
+    curveBlock.hidden = false;
+    renderLegend(view);
+    const box = fitCanvas(curveCanvas, window.devicePixelRatio);
+    drawSweep(curveContext, view, box.width, box.height);
+  };
+
+  const playSelected = (): void => {
+    const group = selectedGroup();
+    if (group === null || selectedCell === null) {
+      playbackRun = null;
+      playingNote.textContent = "Live preview of the settings in the panel.";
+      seedReadout.value = "seed 1 of 1";
+      return;
+    }
+    // Rebuilt, not stored. Determinism is what makes this the same run the worker measured.
+    playbackRun = recomputeForPlayback(group.job, selectedCell.axisIndex, playbackSeedIndex);
+    seedReadout.value = describeSeed(group.job.seedIndices, playbackSeedIndex);
+    playingNote.textContent = `Playing ${labelForCell(group.job, selectedCell.axisIndex)}.`;
+    sample = 0;
+    base = {
+      wallStartMs: performance.now(),
+      sampleAtStart: 0,
+      dtMs: playbackRun.config.dt * 1000,
+      rate: 1,
+    };
+    scrub.max = String(playbackRun.config.nTicks);
+  };
+
+  seedPrev.addEventListener("click", () => {
+    const group = selectedGroup();
+    if (group === null) {
+      return;
+    }
+    playbackSeedIndex = stepSeed(playbackSeedIndex, -1, group.job.seedIndices);
+    playSelected();
+  });
+
+  seedNext.addEventListener("click", () => {
+    const group = selectedGroup();
+    if (group === null) {
+      return;
+    }
+    playbackSeedIndex = stepSeed(playbackSeedIndex, 1, group.job.seedIndices);
+    playSelected();
+  });
+
   ledgerHost.addEventListener("click", (event: Event) => {
     const target = event.target as HTMLElement;
     const heading = target.closest(".ledger-heading");
@@ -391,6 +543,9 @@ export function bootConsole(doc: Document): void {
       return;
     }
     selectedCell = ref;
+    playbackSeedIndex = 0;
+    playSelected();
+    drawCurve();
     renderKept();
   });
 
@@ -452,6 +607,8 @@ export function bootConsole(doc: Document): void {
     keptGroups.length = 0;
     pinnedCells = [];
     selectedCell = null;
+    playSelected();
+    drawCurve();
     renderKept();
   });
 
@@ -549,20 +706,40 @@ export function bootConsole(doc: Document): void {
     recompute(settings);
   };
 
+  /**
+   * Playback wins over the live preview: once a kept row is selected, the arena shows the
+   * rebuilt run for that cell's chosen seed, not whatever the settings panel currently reads.
+   * `frame()` and `render()` both have to agree on this, not just `render()` — `frame()` uses
+   * `config.nTicks` to decide when a loop wraps, and the panel's current nTicks can easily differ
+   * from the kept run's own, which would otherwise wrap or truncate the playback at the wrong
+   * length while `render()` drew from the right one.
+   */
+  const activeRun = (): { readonly run: RunResult; readonly config: RunResult["config"] } | null => {
+    if (playbackRun !== null) {
+      return { run: playbackRun, config: playbackRun.config };
+    }
+    if (preview !== null) {
+      return { run: preview.run, config: preview.config };
+    }
+    return null;
+  };
+
   const render = (): void => {
-    const current = preview;
-    if (current === null) {
+    const active = activeRun();
+    if (active === null) {
       return;
     }
+    const current = active.run;
+    const config = active.config;
     const box = fitCanvas(canvas, window.devicePixelRatio);
     const view: ArenaView = {
-      widthM: current.config.widthM,
-      heightM: current.config.heightM,
+      widthM: config.widthM,
+      heightM: config.heightM,
       sample,
-      nSamples: current.config.nTicks + 1,
-      treated: current.run.treated.positions,
-      control: current.run.control.positions,
-      robot: current.run.treated.robotPositions,
+      nSamples: config.nTicks + 1,
+      treated: current.treated.positions,
+      control: current.control.positions,
+      robot: current.treated.robotPositions,
       showControl: true,
       showGaps: true,
       trailSamples: 90,
@@ -571,14 +748,14 @@ export function bootConsole(doc: Document): void {
       highlight: null,
     };
     drawArena(canvasContext, view, box.width, box.height);
-    clock.value = (sample * current.config.dt).toFixed(1);
+    clock.value = (sample * config.dt).toFixed(1);
     scrub.value = String(sample);
   };
 
   const frame = (nowMs: number): void => {
-    const current = preview;
-    if (current !== null && playing) {
-      const nSamples = current.config.nTicks + 1;
+    const active = activeRun();
+    if (active !== null && playing) {
+      const nSamples = active.config.nTicks + 1;
       const next = frameIndexAt(nowMs, base, nSamples);
       if (next >= nSamples - 1) {
         sample = 0;
