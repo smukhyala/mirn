@@ -11,8 +11,11 @@ import { cssTokens } from "../../ui/theme.js";
  * `web/console.ts`, not this file, is the page's entry point. It imports this module for the side
  * effect below — injecting the palette before first paint — then mounts the panel, the arena, the
  * tiles, the sweep curve and the ledger into the hosts named in web/index.html.
+ *
+ * Not exported. The one call is the line at the bottom of this file, and an export would say
+ * there is a second document somewhere that needs its own palette. There is one page.
  */
-export function mountTokens(doc: Document): void {
+function mountTokens(doc: Document): void {
   const style = doc.createElement("style");
   style.id = "mirn-tokens";
   style.textContent = cssTokens();

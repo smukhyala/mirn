@@ -311,3 +311,42 @@ describe("the slice pump", () => {
     }
   });
 });
+
+describe("the progress line describes the unit about to run", () => {
+  it("names the next unit, and says finishing only when there is none", async () => {
+    reset();
+    const axisValues = [4, 18, 44];
+    for (let index = 0; index < 3; index++) {
+      const key = { axisIndex: index, axisValue: axisValues[index] as number, seedIndex: 0 };
+      plannedUnits.push({
+        kind: "unit",
+        key,
+        cellIndex: index,
+        needsBand: false,
+        needsFloor: false,
+        needsZeroRun: true,
+        needsFrechet: false,
+      });
+      outcomes.push({
+        kind: "unitOutput",
+        row: { kind: "runRow", key, readings: {} },
+        band: null,
+      });
+    }
+    const { port, sent } = recorder();
+    await pumpSweep(jobWithAxis("crowdSize"), port, deps({}));
+
+    const phases: string[] = [];
+    for (const message of sent) {
+      if (message.kind === "progress") {
+        phases.push(message.phase);
+      }
+    }
+    expect(phases.length).toBeGreaterThan(1);
+    // Every one but the last describes a unit still to come; the last has nothing left to name.
+    for (let i = 0; i < phases.length - 1; i++) {
+      expect(phases[i], "a mid-sweep progress line must name a unit").not.toBe("finishing");
+    }
+    expect(phases[phases.length - 1]).toBe("finishing");
+  });
+});

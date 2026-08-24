@@ -28,8 +28,9 @@ export interface RunToRunBand {
   readonly value: number;
   readonly samples: Float64Array;
   /**
-   * 95th percentile of the pairwise PEAK gap: for each replicate pair, the largest the crowd's
-   * average displacement ever got at any single step.
+   * 95th percentile of the pairwise PEAK gap: for each replicate pair, the largest the mean
+   * distance between the two replicates' crowds ever got at any single step. Not a displacement
+   * from anywhere — the two replicates are both the same room, and neither is a starting point.
    *
    * A maximum is >= a mean for any series, so a max-over-steps readout judged against `value`
    * clears the floor for free. Both statistics come from the same 28 pairs and the same
@@ -39,7 +40,10 @@ export interface RunToRunBand {
   readonly peakSamples: Float64Array;
 }
 
+/** Function-local and never exported, but its neighbour above carries a discriminant, and two
+ *  patterns in one file is how the next reader learns the wrong one. */
 interface PairStatistics {
+  readonly kind: "pairStatistics";
   readonly meanM: number;
   readonly peakM: number;
 }
@@ -111,7 +115,7 @@ export function replicateBand(config: RunConfig, nReplicates = 8): RunToRunBand 
 function pairStatistics(a: readonly Float64Array[], b: readonly Float64Array[]): PairStatistics {
   const n = Math.min(a.length, b.length);
   if (n === 0) {
-    return { meanM: 0, peakM: 0 };
+    return { kind: "pairStatistics", meanM: 0, peakM: 0 };
   }
   const steps = (a[0] as Float64Array).length / 2;
   const series = new Float64Array(steps);
@@ -136,7 +140,7 @@ function pairStatistics(a: readonly Float64Array[], b: readonly Float64Array[]):
       peak = stepMean;
     }
   }
-  return { meanM: total / n, peakM: peak };
+  return { kind: "pairStatistics", meanM: total / n, peakM: peak };
 }
 
 export { paired };

@@ -92,10 +92,15 @@ export async function pumpSweep(job: SweepJob, port: PumpPort, deps: PumpDeps): 
       }
 
       unitsDone++;
-      const unit = plan.units[unitsDone - 1];
+      // The unit ABOUT to run, not the one that just finished. `phraseFor` writes present tense
+      // ("running the room with the crowd set to 18…") and the count beside it already says how
+      // many are behind us, so describing the finished unit put the two halves of one line in
+      // different tenses. It also makes the "finishing" fallback reachable: it is what shows after
+      // the last unit, where there is no next one, rather than dead text.
+      const next = plan.units[unitsDone];
       let phase = "finishing";
-      if (unit !== undefined) {
-        phase = phraseFor(job, unit);
+      if (next !== undefined) {
+        phase = phraseFor(job, next);
       }
       port.postMessage({ kind: "progress", unitsDone, unitsTotal, phase });
 

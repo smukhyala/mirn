@@ -12,7 +12,17 @@ export interface PlotSeries {
   readonly key: string;
   readonly label: string;
   readonly values: readonly number[];
-  /** Optional per-point standard deviation, drawn as a band. */
+  /**
+   * Optional per-point standard deviation, drawn as a filled band around the line.
+   *
+   * Nothing sets it. `web/app/console/curve.ts` builds every series the console draws and never
+   * populates this, so the ribbon path below is unreached today — and whoever reaches it first has
+   * one thing to fix before they do. The main polyline breaks into separate segments around a
+   * censored point rather than bridging it, because bridging draws a straight line through a value
+   * the run never produced. The ribbon does not: it is one closed path, and a non-finite `values`
+   * entry would put a NaN vertex in it. Splitting a filled region the same way is real work, and
+   * it is deliberately not done speculatively for a caller that does not exist.
+   */
   readonly sd?: readonly number[];
   readonly accent?: boolean;
 }
@@ -167,8 +177,13 @@ export function drawSweep(
       }
     }
     for (let i = view.x.length - 1; i >= 0; i--) {
-      const floor = region.lower === null ? 0 : (region.lower[i] ?? 0);
-      context.lineTo(sx(view.x[i] as number), sy(Number.isFinite(floor) ? floor : 0));
+      // `sy` maps 0 to the bottom of the frame, and nothing folds a region's floor into `yMax` the
+      // way its ceiling is folded in — so a negative floor would be drawn below the axis, outside
+      // the frame. Clamped rather than trusted: `lower` is always null from the console today, and
+      // the first caller to set it should not have to discover this by looking at a broken figure.
+      const declared = region.lower === null ? 0 : (region.lower[i] ?? 0);
+      const floor = Number.isFinite(declared) && declared > 0 ? declared : 0;
+      context.lineTo(sx(view.x[i] as number), sy(floor));
     }
     context.closePath();
     context.fill();

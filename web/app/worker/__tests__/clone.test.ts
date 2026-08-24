@@ -10,6 +10,8 @@ import {
   type SweepJob,
 } from "../../../engine/job/spec.js";
 import { COLUMN_ORDER, type ColumnKey } from "../../../engine/job/columns.js";
+import type { RunRow } from "../../../engine/job/stats.js";
+import type { FromWorker, ToWorker } from "../protocol.js";
 
 /**
  * The Worker boundary is a structural clone, not a function call.
@@ -118,6 +120,45 @@ describe("the worker boundary", () => {
       name = (error as { name?: string }).name ?? "an error with no name";
     }
     expect(name).toBe("DataCloneError");
+  });
+
+  it("carries a whole ToWorker envelope, not just the job inside it", () => {
+    const envelopes: ToWorker[] = [{ kind: "start", job: worldSweep }, { kind: "cancel" }];
+    for (const envelope of envelopes) {
+      const clone = structuredClone(envelope);
+      expect(clone).toEqual(envelope);
+      expect(JSON.stringify(clone)).toBe(JSON.stringify(envelope));
+    }
+  });
+
+  it("carries every FromWorker message back, including the one with a whole row in it", () => {
+    // The return half had no runtime assertion at all, only tsc's structural check — and tsc
+    // cannot see that a `Reading` is a plain frozen record rather than something with a prototype.
+    // `RunRow` is the one variant carrying a nested object, so it is the one that could break.
+    const row: RunRow = {
+      kind: "runRow",
+      key: { axisIndex: 1, axisValue: 18, seedIndex: 0 },
+      readings: {
+        trueEffectM: { kind: "reading", value: 0.352, availability: { kind: "measured" } },
+        robotArrivalS: {
+          kind: "reading",
+          value: Number.NaN,
+          availability: { kind: "censored", why: "the robot never arrived" },
+        },
+      },
+    };
+    const messages: FromWorker[] = [
+      { kind: "progress", unitsDone: 3, unitsTotal: 40, phase: "running the room, seed 1 of 4" },
+      { kind: "row", row },
+      { kind: "band", axisIndex: 1, meanM: 0.31, peakM: 0.48, nReplicates: 8 },
+      { kind: "done" },
+      { kind: "cancelled" },
+      { kind: "failed", message: "the robot's goal is outside the room" },
+    ];
+    for (const message of messages) {
+      const clone = structuredClone(message);
+      expect(clone, message.kind).toEqual(message);
+    }
   });
 
   it("holds message types and nothing else", () => {

@@ -248,3 +248,49 @@ describe("a censored cell breaks the line", () => {
     expect((seriesStroke.subpaths[1] as readonly unknown[]).length).toBe(1);
   });
 });
+
+describe("a region's floor", () => {
+  /**
+   * `lower` is null from the console, so this is the untested half of a shipped branch rather than
+   * a live defect. `sy` maps 0 to the bottom of the frame and nothing folds a floor into `yMax`
+   * the way a ceiling is folded in, so a negative floor would be drawn below the axis, outside the
+   * frame — the first caller to set one should not have to find that out from a broken figure.
+   */
+  function withLower(lower: readonly number[] | null): Op {
+    const view: PlotView = {
+      ...baseView(),
+      regions: [
+        {
+          kind: "plotRegion",
+          key: "band",
+          label: "ordinary difference between two runs of this room",
+          upper: [0.15, 0.2, 0.3],
+          lower,
+        },
+      ],
+    };
+    const recorder = draw(view);
+    const fills = recorder.ops.filter((op) => op.kind === "fill" && op.fill === PALETTE.grid);
+    return fills[0] as Op;
+  }
+
+  it("follows a positive floor point by point instead of returning along the axis", () => {
+    const region = withLower([0.05, 0.05, 0.05]);
+    const points = (region.subpaths[0] ?? []) as readonly (readonly [number, number])[];
+    expect(points.length).toBe(6);
+    for (const index of [3, 4, 5]) {
+      const y = (points[index] as readonly [number, number])[1];
+      expect(y, "a positive floor must sit above the axis").toBeLessThan(FRAME_BOTTOM);
+    }
+  });
+
+  it("never draws below the frame, whatever it is handed", () => {
+    for (const lower of [[-1, -1, -1], [Number.NaN, Number.NaN, Number.NaN]]) {
+      const region = withLower(lower);
+      const points = (region.subpaths[0] ?? []) as readonly (readonly [number, number])[];
+      for (const index of [3, 4, 5]) {
+        expect((points[index] as readonly [number, number])[1]).toBe(FRAME_BOTTOM);
+      }
+    }
+  });
+});
