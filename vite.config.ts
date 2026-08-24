@@ -22,7 +22,7 @@ export default defineConfig({
     target: "es2022",
     rollupOptions: {
       input: {
-        console: resolve(__dirname, "web/console.html"),
+        index: resolve(__dirname, "web/index.html"),
       },
     },
   },

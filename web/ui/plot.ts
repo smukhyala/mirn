@@ -38,7 +38,12 @@ export interface PlotView {
   readonly xLabel: string;
   readonly yLabel: string;
   readonly series: readonly PlotSeries[];
-  /** Optional so the notes' existing call sites keep compiling until they are deleted. */
+  /**
+   * Optional because the console's own caller can produce a view with none: `sweepPlotView`
+   * (web/app/console/curve.ts) returns the view without `regions` whenever the run-to-run band was
+   * not measured at every axis cell — a finished sweep either measured the band everywhere or
+   * nowhere, and a partial band is left out entirely rather than drawn from a placeholder.
+   */
   readonly regions?: readonly PlotRegion[];
 }
 

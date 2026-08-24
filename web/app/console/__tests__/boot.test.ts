@@ -28,7 +28,7 @@ import { BAND_NOT_MEASURED } from "../tile.js";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 async function boot(): Promise<Document> {
-  const html = readFileSync(join(ROOT, "console.html"), "utf8");
+  const html = readFileSync(join(ROOT, "index.html"), "utf8");
   const dom = new JSDOM(html, { pretendToBeVisual: true, url: "https://example.test/console" });
 
   // jsdom has no canvas, so `getContext` returns null and bootConsole's own guard would throw

@@ -70,7 +70,7 @@ vi.mock("../../worker/client.js", () => ({
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 async function boot(): Promise<{ readonly document: Document; readonly window: JSDOM["window"] }> {
-  const html = readFileSync(join(ROOT, "console.html"), "utf8");
+  const html = readFileSync(join(ROOT, "index.html"), "utf8");
   const dom = new JSDOM(html, { pretendToBeVisual: true, url: "https://example.test/console" });
   const stub = new Proxy({}, { get: () => (): void => {}, set: () => true });
   const prototype = dom.window.HTMLCanvasElement.prototype as unknown as { getContext: () => unknown };
