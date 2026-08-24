@@ -1,0 +1,348 @@
+/*
+ * This is the console's only stylesheet — web/index.html links nothing else. Every colour token
+ * used here is injected at runtime, from web/ui/theme.ts, by web/app/console/boot.ts; never write
+ * a colour literal in this file.
+ *
+ * .legend-grey-0, .legend-grey-1 and .legend-grey-2 (in the sweep-legend swatches below) are easy
+ * to think unused: no source file spells them as literal text. web/console.ts builds the class
+ * name as `legend-grey-${greyIndex % 3}`, so searching for the string finds nothing. They are the
+ * only classes in this file that a grep will not find; anything else with no producer in web/ is
+ * dead and should go, which is how the .readouts, .tile-label, .tile-value, .legend, .tile-note,
+ * .accent, .ledger-note and .kept-line duplicates left over from the deleted web/style.css were
+ * found. Two same-specificity rules for one selector is not a cascade trick worth keeping: the
+ * later one silently owns every property both declare, and an editor changing the earlier one
+ * sees no effect at all.
+ */
+
+/* ---------------------------------------------------------------- base rules */
+
+/*
+ * Inherited from web/style.css (task 36), which styled the deleted notebook pages and has been
+ * deleted along with them. These are the rules the console itself was actually relying on, and
+ * each one is now the only rule in the file for its selector.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 4rem;
+  background: var(--mirn-paper);
+  color: var(--mirn-ink);
+  font-family: var(--mirn-font-sans);
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  color: var(--mirn-ink-faint);
+}
+.standfirst { margin: 0; max-width: 38rem; color: var(--mirn-ink-muted); }
+
+/*
+ * The page's one <main> carries class="console-main", and every property this used to set is set
+ * again by .console-main below — at (0,1,0) against this selector's (0,0,1), so the class wins
+ * whatever the source order and whatever the viewport. The layout, its narrow-viewport collapse
+ * and the one property nothing else declared (align-items) all live there now. A `main` rule and
+ * a `.console-main` rule for the same element is a trap: an editor changing the former sees the
+ * page not move.
+ */
+
+#arena {
+  width: 100%;
+  display: block;
+  background: var(--mirn-paper);
+  border: 1px solid var(--mirn-rule);
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin-top: 0.75rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.78rem;
+  color: var(--mirn-ink-muted);
+}
+.transport output { color: var(--mirn-ink); font-variant-numeric: tabular-nums; }
+.scrub { flex: 1; display: flex; }
+.scrub input { width: 100%; }
+
+button {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 0.35rem 0.8rem;
+  background: var(--mirn-paper);
+  color: var(--mirn-ink);
+  border: 1px solid var(--mirn-ink);
+  cursor: pointer;
+}
+button:hover { background: var(--mirn-surface); }
+
+.panel-title {
+  margin: 0;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+  color: var(--mirn-ink-faint);
+}
+
+.control { display: flex; flex-direction: column; gap: 0.35rem; }
+.control > span,
+.toggle > span {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  color: var(--mirn-ink-muted);
+}
+.control output { color: var(--mirn-ink); font-variant-numeric: tabular-nums; }
+.toggle { display: flex; align-items: center; gap: 0.5rem; }
+
+/* A knob's name, the note under it and guardrail 3's "Moves:" sentence are three different kinds
+   of thing and were three identical lines of grey mono. The name is the label; the note is prose;
+   the moves sentence is the guarantee that this control changes a readout you can see, so it is
+   the one that must not read as decoration. */
+.control-label { color: var(--mirn-ink); }
+.control-note { font-family: var(--mirn-font-sans); font-size: 0.74rem; line-height: 1.45; }
+.control-moves { color: var(--mirn-ink-faint); letter-spacing: 0.03em; }
+
+/* Three sections in one narrow column with nothing between them read as one long list. */
+.panel { display: flex; flex-direction: column; gap: 1.6rem; }
+.panel-group { display: flex; flex-direction: column; gap: 0.9rem; }
+
+/* Set as prose, not as another control: it is a sentence about the preview, not a knob. */
+.panel-note { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--mirn-ink-muted); }
+.panel-note:empty { display: none; }
+
+/* What a link could not carry, printed above the controls it is about. Empty on an ordinary
+   visit, and an empty paragraph must not open a gap where no message is. */
+.link-notice { margin: 0 0 1.2rem; font-size: 0.74rem; line-height: 1.5; color: var(--mirn-ink-muted); }
+.link-notice:empty { display: none; }
+
+input[type="range"] { width: 100%; accent-color: var(--mirn-ink); }
+input[type="checkbox"] { accent-color: var(--mirn-ink); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/*
+ * .readouts, .tile-label and .tile-value each had a second, earlier declaration here, moved in
+ * from web/style.css. Every property all three declared was declared again by the console's own
+ * rules further down the file, so the earlier copies decided nothing; .tile-value.accent output
+ * and .tile-value .unit decided nothing either, because no element on this page is given class
+ * "accent" and the unit span's class is .tile-unit. --mirn-perturbation still reaches the one
+ * number it belongs to, through .gauge-tick, and the accent is spent nowhere else.
+ */
+
+/* Each swatch reproduces its line's actual stroke. Weight and dash are the only thing
+   distinguishing series once hue is gone, so a shared swatch would make the legend useless. */
+.legend-accent::before { border-top: 2px solid var(--mirn-perturbation); }
+.legend-grey-0::before { border-top: 2px solid var(--mirn-ink); }
+.legend-grey-1::before { border-top: 1.5px dashed var(--mirn-ink-muted); }
+.legend-grey-2::before { border-top: 1.5px dotted var(--mirn-ink-faint); }
+
+:focus-visible {
+  outline: 2px solid var(--mirn-ink);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- the console's own rules */
+
+.console-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 2rem;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+  align-items: start;
+}
+.console-masthead { max-width: 52rem; margin: 0 auto; padding: 3rem 2rem 1.5rem; }
+
+.region-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--mirn-ink-muted);
+}
+.region-note { margin: 0 0 0.9rem; font-size: 0.82rem; color: var(--mirn-ink-muted); }
+
+.stage > canvas#arena { width: 100%; height: 22rem; display: block; }
+.sweep > canvas#sweep { width: 100%; height: 16rem; display: block; }
+
+.sweep-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  color: var(--mirn-ink-muted);
+}
+.sweep-legend li::before {
+  content: "";
+  display: inline-block;
+  width: 1.4rem;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+/* The run-to-run band is a filled region, not a line, so its swatch is a filled block rather than
+   the border-top rule the two line swatches (.legend-accent / .legend-grey-N, defined above in
+   this file's borrowed-rules section) use. */
+.legend-region::before { height: 0.5rem; background: var(--mirn-grid); border-bottom: 1px dashed var(--mirn-rule); }
+
+/* The transport's seed stepper: a cell has no seed, so this picks which run inside it plays. */
+.seed-picker { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* The only .readouts rule in the file. Its column count is narrowed twice at the bottom. */
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.4rem 1.6rem;
+  margin: 1.4rem 0;
+}
+
+.ledger-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
+.ledger-region > .ledger-bar { display: flex; gap: 0.8rem; align-items: baseline; }
+
+/* ---------------------------------------------------------------- the kept-results ledger */
+
+/*
+ * Set as a financial table: tabular figures, hairline row rules, no cell borders, no zebra.
+ *
+ * `.ledger-row.is-selected` does not spend `--mirn-perturbation` on a selection highlight, which
+ * is chrome rather than a perturbation-related number — `web/ui/theme.ts`'s own header comment is
+ * explicit that the token exists so it CANNOT be reached for a button, a link or a focus ring
+ * without the code visibly lying. Selection here is plain ink instead. `.compare-number` keeps the
+ * accent: unlike a selection outline, it prints a measured delta between two pinned cells' own
+ * perturbation readings, which is exactly what the token is for.
+ *
+ * The table is the one thing on this page that can be wider than the viewport — ten columns of
+ * numbers do not fold — so it carries its own horizontal scroll rather than making the whole
+ * document slide sideways under everything else.
+ */
+.ledger-wrap { overflow-x: auto; }
+.ledger-stale { margin: 0.5rem 0 0; font-size: 0.74rem; color: var(--mirn-ink-faint); }
+.ledger { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.82rem; margin-top: 0.8rem; }
+.ledger th { text-align: left; font-weight: 500; font-family: var(--mirn-font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--mirn-ink-faint); padding: 0.3rem 0.6rem 0.4rem 0; cursor: pointer; }
+.ledger .col-unit { display: block; color: var(--mirn-rule); }
+.ledger td { padding: 0.35rem 0.6rem 0.35rem 0; border-top: 1px solid var(--mirn-grid); }
+.ledger-row.is-selected td { box-shadow: inset 2px 0 0 var(--mirn-ink); }
+.ledger.is-stale { color: var(--mirn-ink-faint); }
+.cell-unit, .cell-spread, .cell-count { color: var(--mirn-ink-faint); margin-left: 0.25rem; }
+.cell-reason { color: var(--mirn-ink-faint); font-size: 0.74rem; }
+.pin { border: none; background: none; padding: 0 0.4rem 0 0; font-size: 0.8rem; letter-spacing: 0; }
+.ledger-compare { margin: 0.7rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.7rem; }
+.compare-item { margin-right: 1.2rem; }
+.compare-number { margin-left: 0.35rem; color: var(--mirn-perturbation); }
+.column-picker { display: grid; gap: 0.3rem; margin-top: 0.8rem; font-size: 0.78rem; }
+.column-note { color: var(--mirn-ink-faint); font-size: 0.72rem; margin-left: 0.4rem; }
+
+/* ---------------------------------------------------------------- the headline tile */
+
+.tile { border-top: 1px solid var(--mirn-rule); padding-top: 0.6rem; }
+.tile-label {
+  margin: 0 0 0.35rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+.tile-value { margin: 0; font-size: 1.6rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.tile-value .tile-unit { font-size: 0.9rem; color: var(--mirn-ink-muted); margin-left: 0.25rem; }
+.tile-value.is-unavailable { font-size: 0.86rem; color: var(--mirn-ink-muted); line-height: 1.4; }
+.tile-anchor { margin: 0.25rem 0 0; font-size: 0.78rem; color: var(--mirn-ink-muted); }
+.tile-zero { margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
+.tile-zero-value { color: var(--mirn-ink); }
+.tile-zero-unit { margin: 0 0.3rem 0 0.15rem; }
+.tile-stamps { margin: 0.3rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.66rem; color: var(--mirn-ink-faint); }
+.stamp { margin-right: 0.9rem; }
+.stamp-value { margin-left: 0.3rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
+.stamp-unit { margin-left: 0.15rem; }
+.tile-working { margin-top: 0.4rem; font-size: 0.78rem; }
+.tile-working summary { font-family: var(--mirn-font-mono); font-size: 0.66rem; color: var(--mirn-ink-faint); cursor: pointer; }
+.tile-assumption { margin: 0.4rem 0 0; color: var(--mirn-ink-muted); line-height: 1.5; }
+
+/* A ruler, not a box: hairline scale, a wedge over the band, one tick at the value. */
+.band-gauge { margin-top: 0.45rem; }
+.gauge-figure { display: block; width: 100%; height: 22px; overflow: visible; }
+.gauge-scale, .gauge-zero { stroke: var(--mirn-rule); stroke-width: 1; }
+.gauge-wedge { fill: var(--mirn-grid); }
+.gauge-tick { stroke: var(--mirn-perturbation); stroke-width: 2; }
+.gauge-caption { margin: 0.2rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.64rem; color: var(--mirn-ink-faint); }
+.gauge-number { color: var(--mirn-ink-muted); }
+
+/* ---------------------------------------------------------------- Run: the button, its cost, its progress */
+
+/* The one inverted element on the page. One solid mass tells the eye where the verb is. It does
+ * not spend --mirn-perturbation: that token belongs to the perturbation alone (CLAUDE.md). */
+.run {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: var(--mirn-ink);
+  color: var(--mirn-paper);
+  border: 1px solid var(--mirn-ink);
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+.run:hover { background: var(--mirn-ink-muted); }
+.run-cost, .run-status {
+  margin: 0.4rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  color: var(--mirn-ink-faint);
+}
+.run-status:empty { display: none; }
+
+/* A hairline filling left to right. Not a bar, and no radius. Matches .ledger-region's own
+ * max-width, centering and side padding so it lines up with the stage and the ledger around it.
+ * The fill is plain ink, not the accent: how much of the sweep has finished is a state of the
+ * computation, not a perturbation-related number, and `--mirn-perturbation` cannot be spent on
+ * chrome (`.run`, a few rules above, already declines it for the identical reason). Task 27
+ * introduced this rule on the accent; fixed here in the same commit that made the identical fix to
+ * `.ledger-row.is-selected`, in the file already open for it. */
+.progress-rule { height: 1px; background: var(--mirn-grid); max-width: 76rem; margin: 1.6rem auto; padding: 0 2rem; }
+.progress-rule > span {
+  display: block;
+  height: 1px;
+  width: calc(var(--mirn-progress, 0) * 100%);
+  background: var(--mirn-ink);
+}
+.kept-empty { color: var(--mirn-ink-muted); font-size: 0.82rem; }
+
+/*
+ * Last in the file on purpose. Media queries add no specificity, so a narrowing rule only wins if
+ * it comes after every wider rule for the same selector — the single-column .readouts rule this
+ * replaces sat above two later three- and two-column ones and could not fire at any width at all.
+ * Narrowest last, so each one overrides the one above it.
+ */
+@media (max-width: 60rem) {
+  .console-main { grid-template-columns: minmax(0, 1fr); }
+  .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* A tile carries a 1.6rem value, an anchor sentence, a gauge, a zero row and a stamp row. Two of
+   them across a phone is about 150px each, which is not enough for any of it. */
+@media (max-width: 45rem) {
+  .console-main { padding: 0 1.2rem; }
+  .console-masthead { padding: 2rem 1.2rem 1.2rem; }
+  .ledger-region { padding: 0 1.2rem; }
+  .readouts { grid-template-columns: minmax(0, 1fr); }
+}

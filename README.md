@@ -1,170 +1,150 @@
-# MIRN — Minimum-Intervention Robot Navigation
+# MIRN
 
-**Building the ruler, not the room.**
+**A bench for one question: how much did a robot move a crowd, and how would you know?**
 
-MIRN is a measurement instrument for *robot-induced perturbation of pedestrian motion* — how much a mobile robot's presence deforms how people move, relative to a counterfactual world where the robot was never there.
+A robot crosses a room full of people. Some of them move differently than they would have. MIRN is
+a console for measuring how much — set up an invented crowd, press Run, and compare what different
+rulers say about what the robot did to it.
 
-This repository is **not** a simulator, a dataset, or a navigation planner. It is an estimator with an identification strategy, a calibration procedure, and a small policy whose only job is to demonstrate that the corrected measurement changes conclusions.
-
----
-
-## The contribution in one paragraph
-
-Planning against a counterfactual estimate of human motion is **not novel** — it has been published at least four times ([Courteous AV, IROS 2018](https://arxiv.org/abs/1808.02633); [Moder & Pauli, RO-MAN 2022](https://dl.acm.org/doi/10.1109/RO-MAN53752.2022.9900826); [SACSoN, RA-L 2024](https://arxiv.org/abs/2306.01874); [Zhou et al. 2023](https://arxiv.org/abs/2312.17076)). What *is* open is that the quantity everyone optimizes is **misestimated three ways**, and all three are now measurable:
-
-1. **Wrong control condition.** SACSoN's counterfactual is *robot stationary* — it zeros the robot's future actions but leaves it in the scene. The authors explicitly flag *robot absent* as the correct generalization and do not do it. The gap between the two is a real bias, and [PeRoI](https://doi.org/10.5281/zenodo.18876411)'s `PD` vs `PD-SR` split measures it directly.
-2. **Estimator confounds causal effect with predictor error.** Perturbation is computed as a prediction residual. A forecaster with 0.4 m ADE reports ~0.4 m of "perturbation" for a robot that did nothing — and real robot-induced deviations are the same order of magnitude. Worse, a policy trained to minimize that number is partly trained to move in ways the forecaster finds *easy to predict*, which is not unobtrusiveness and is sometimes its opposite.
-3. **No detection floor.** Nobody has published the null distribution of trajectory divergence under no intervention, so no published perturbation number has a known significance.
-
-**Fix those and "how much did the robot disturb people" acquires an estimand, an identification strategy, a null, and an error bar.**
-
-### What changes about perturbation
-
-| | Current practice | MIRN |
-|---|---|---|
-| **Control condition** | Robot **stationary** | Robot **absent**, with the gap measured on PeRoI PD vs PD-SR |
-| **Estimator** | Point forecast minus observation | Divergence between **paired rollout distributions**, **debiased** for predictor error |
-| **Scope** | Dyadic, one-step, nearest pedestrian | Closed-loop over the rollout, incl. **second-order propagation** |
-| **Units** | Raw metres, uncalibrated | Effect size against a **measured null**, with a stated detection floor |
-
-Row 2 is load-bearing. Everything else is supporting evidence.
-
----
-
-## What we build (and explicitly do not)
-
-Five artifacts, descending value:
-
-| # | Artifact | Scale | Why |
-|---|---|---|---|
-| 1 | **Estimator** — `(peds, robot, env) → estimate + CI + identification assumption` | ~2k LOC | This is the paper |
-| 2 | **Calibration** — null distribution → minimum detectable perturbation (MDP) | a table + a plot | This is what others cite |
-| 3 | **Paired-rollout harness** — adapters over existing sims | ~500 LOC | Plumbing, not a simulator |
-| 4 | **Policy** — MPPI cost term, deliberately unambitious | ~800 LOC | Proves the measurement matters |
-| 5 | **Results** — PeRoI bias, confounding plot, ablation ladder | notebooks + CSV | The evidence |
-
-**Explicitly absent:** new environments, new physics, crowd rendering, dataset collection, ROS packages beyond the harness.
-
-> We are a **consumer** of simulators. NavIsaacLab has diffusion pedestrians and GPU parallelism; Arena has a five-version head start; HuNavSim has an active maintainer and ROS 2 packaging. Competing on simulation infrastructure is a lost year.
-
----
-
-## Repository layout
-
-```
-mirn/
-├── configs/                     # YAML experiment configs; every run is a config
-├── src/mirn/
-│   ├── contracts.py             # Frozen typed dataclasses — the only cross-module vocabulary
-│   ├── registry.py              # Generic name → class registry backing every plugin point
-│   ├── data/                    # DatasetAdapter ABC → peroi, thor_magni, jrdb
-│   ├── divergence/              # Divergence ABC → sinkhorn_w2, frechet, ade_fde
-│   ├── predictor/               # Predictor ABC → cvm (mandatory baseline), agent_transformer
-│   ├── estimator/               # PerturbationEstimator ABC → residual (naive), paired, debiased
-│   ├── calibration/             # Split-half null, MDP, power analysis
-│   ├── harness/                 # PairedRolloutEnv ABC → socnavgym, crowdnav, hunavsim
-│   ├── policy/                  # Planner ABC → mppi; cost terms incl. lambda_h
-│   ├── experiments/             # One module per numbered milestone experiment
-│   └── viz/                     # theme.py (dark, minimal) + plots.py
-├── tests/
-├── results/                     # CSV only — never commit large artifacts
-└── docs/research/mirn-research-wayfinder.md   # READ THIS FIRST
-```
-
-Every extension point is an ABC plus a registry entry. Swapping the divergence, the predictor, or the simulator is a config edit, never a code edit.
-
----
-
-## Core contracts
-
-Defined once in `src/mirn/contracts.py`, frozen, and never bypassed:
-
-- **`Trajectory`** — `(T, 2)` positions, `t0`, `dt`, `agent_id`, optional heading/velocity.
-- **`Scene`** — pedestrian trajectories, static geometry, optional robot trajectory, `robot_present: bool`.
-- **`RolloutPair`** — a factual scene and its counterfactual twin, sharing `seed`, goals, and initial conditions. The *only* legal input to a paired estimator; construction asserts the pairing invariants.
-- **`PerturbationEstimate`** — `value`, `ci_low`, `ci_high`, `units` (`"metres"` or `"mdp"`), `identification: str`, `n_rollouts`, `divergence_name`. **An estimate without a stated identification assumption is a bug, not a value.**
-
----
-
-## Non-negotiable methodology
-
-These are enforced in tests and in review; violating one invalidates the result.
-
-1. **Report in MDP units.** A raw-metres perturbation with no null distribution is meaningless. `PerturbationEstimate.units == "metres"` is permitted only inside calibration code.
-2. **The placebo test gates everything.** Delete a random *non-interacting* pedestrian; the estimator must return Δ ≈ 0. [CausalAgents](https://arxiv.org/abs/2207.03586) shows SOTA forecasters shift 25–38% relative minADE when provably non-causal agents are removed — so this is a live failure mode, not a formality.
-3. **One model, three conditions.** Never fit a robot-free prior and a robot-conditioned model separately: the difference then contains dataset-shift bias confounded with the causal effect, and it does not shrink with more data. Train a single predictor on PeRoI `PD + PD-SR + PD-MR` with an explicit robot-presence indicator so the null arm is genuinely observed and positivity holds.
-4. **Constant velocity is a mandatory baseline row.** CVM scores 0.39/0.83 ADE/FDE on ETH/UCY, and with angular sampling under best-of-20 reaches [0.28/0.56](https://arxiv.org/abs/1903.07933). A predictor that cannot beat CVM on *calibration* (NLL, coverage) is not earning its parameters.
-5. **Report collision rate and NLL, never minADE alone.** A hand-crafted uniform predictor [matches SOTA minADE₂₀ while producing 3.3–15.7% collisions](https://arxiv.org/abs/2209.12243).
-6. **Δ_H stays a soft cost.** Only `C_collision` goes through the CBF safety filter. A miscalibrated learned cost inside a hard constraint produces infeasibility in exactly the crowded scenarios that matter.
-7. **λ_h = 0 vs λ_h > 0 must be a config change, not a retraining run.** This is why the planner is MPPI and not RL.
-
----
-
-## Getting started
+You need no robotics background. The mathematics goes no further than the distance between two
+points.
 
 ```bash
-uv venv && source .venv/bin/activate     # Python 3.11+
-uv pip install -e ".[dev]"
-cp .env.example .env                     # paths to datasets; never commit .env
-pytest -q
+npm install
+npm run dev          # then open the address it prints
 ```
 
-Fetch PeRoI (CC-BY-4.0, ~UNVERIFIED size) and point `.env` at it:
+---
+
+## The idea in ninety seconds
+
+Run one crowd twice. Same people, same starting positions, same random wobble — once with a robot
+in the room and once without. Because everything else is held identical, **the gap between a
+person's two paths is the robot's effect on them**, with nothing predicted or guessed at.
+
+Then measure it the way you would have to in a real corridor, where the second run does not exist:
+guess where each person was about to walk, and call the error the robot's doing.
+
+Now switch the robot off — leave it crossing the room but let nobody respond to it — so the true
+answer is exactly zero, and watch what the second method says. At the console's default forecast
+horizon it reports 0.334 m on a run whose true effect is exactly zero, and 0.285 m on a run whose
+true effect is 0.352 m. Its number is essentially unrelated to the truth.
+
+---
+
+## What is on the page
+
+One page. A settings panel, an arena you can scrub, seven headline readouts with a column picker
+for everything else, a sweep curve, and a ledger of every result you have kept. Five of the seven
+show before you press Run: the other two need the run-to-run band, which a live preview does not
+buy, and a number with no zero beside it is not shown at all.
+
+One press of Run executes **(N axis values × M seeds)**; a single run is the degenerate 1×1 case of
+the same mechanism. A 72-run sweep takes about 4.8 seconds; with a per-axis-value run-to-run band
+switched on, a 9-value × 8-seed sweep is about 10 seconds. Editing a setting re-simulates a live
+1×1 preview at about 38 ms; Run is what commits a result to the ledger and what buys seeds, sweeps,
+bands and floors.
+
+**Every number is one interaction from what it assumes and from what it would read if the answer
+were zero.** The zero reference is not optional and is never collapsible — it is rendered beside
+the value, measured at the same settings, because a value with nothing to judge it against is the
+exact error this thing exists to show.
+
+Nothing persists. The ledger does not survive a reload and there is no storage of any kind. A
+permalink carries the settings, never the results: Copy link writes them into the address bar, and
+opening that link sets every control back where it was, with an empty ledger and a primed Run that
+reproduces the sweep exactly. A hand-edited link never throws — anything it asks for that this
+bench does not have, or that no control here can be set to, is printed above the settings panel
+rather than silently rounded off.
+
+---
+
+## How it is built
+
+The browser owns the simulation. A frozen configuration goes in and a complete paired result comes
+out, so the renderer is a scrubber over a finished run rather than a live loop — which is what
+keeps the physics, the measurement and the drawing separable. Both arms of a pair are driven by one
+addressable noise tape, so they share their randomness by construction and there is nothing to keep
+in step. Sweeps run in a Worker that returns numbers only, never trajectories; selecting a row for
+playback rebuilds that run from its key and re-simulates it, which is legal only because the same
+seed gives the same bytes, and a test asserts that bitwise rather than assuming it.
+
+Python is the oracle. `src/mirn/` holds the reference implementations of the divergences,
+estimators and calibration, and `.venv/bin/python -m mirn.cli fixtures` writes their answers to
+`tests/golden/parity/`. The TypeScript has to reproduce them, at a tolerance the oracle author
+declares in the fixture itself. Fréchet is compared bitwise and is the canary.
+
+Nothing from the virtualenv is on PATH, so the Python commands are spelled out in full.
 
 ```bash
-python -m mirn.data.peroi fetch --out "$MIRN_DATA_ROOT/peroi"
-python -m mirn.data.peroi characterize --out results/peroi_characterization.csv
+npm run check                                     # typecheck, tests, site build — 28 s
+npm run test                                      # 511 tests in 22 s
+npx vitest run --exclude '**/*.slow.test.ts'      # 506 of them in 14 s
+.venv/bin/python -m pytest -q                     # the oracle: 298 tests, roughly 6 minutes
+.venv/bin/python -m pytest -q -m "not slow"       # 275 of them, minus the heavy nulls, in 22 s
+.venv/bin/python -m mirn.cli fixtures --out tests/golden/parity
 ```
 
-Every experiment is a config:
+The axes and the columns are two closed tables, and the build checks four mechanical shadows of the
+promise that a knob you can turn changes something you can see: every axis produces a legal
+configuration at both ends and every step between; every axis moves the measurement it declares by
+more than the seed noise on that move; the console shows an axis's declared measurement whenever
+that axis is on screen; and every axis and column has a plain-English name and a unit, with no bare
+code identifier anywhere a reader can see one.
 
-```bash
-python -m mirn.experiments.run --config configs/experiment/m05_detection_floor.yaml
+The second check is deliberately *not* made against the run-to-run band, which is the more
+interesting half. It runs the axis at both ends under the same eight seeds and asks whether the
+mean of the eight paired differences clears twice their own standard error. The band is the spread
+between two runs of the same room with nothing held in common but the settings — and both ends of
+this comparison share their seeds, so that spread is precisely what the pairing already removed.
+Judging a paired difference against an unpaired floor is the confounded comparison this whole
+console exists to teach against, and doing it in our own test suite would be the same mistake in
+the same building.
+
+None of the four knows whether an expander's wording is *true*, and three of the axes are
+measurably non-monotone. Reading the console at both ends of every dial is still a person's job.
+
+---
+
+## Layout
+
+```
+web/            the product
+  index.html    the console — one page, hand-written, no build step
+  engine/       sim, contracts, measurement, job — no DOM anywhere in here
+  app/          the worker boundary and the console's own state
+  ui/           canvas renderers and the palette
+src/mirn/       the oracle: divergences, estimators, calibration, paper figures
+tests/golden/   parity fixtures and theme goldens
+docs/archive/   the research assessment this project began as. Not maintained
 ```
 
-Results land in `results/` as CSV. Figures render dark-mode via `mirn.viz.theme`.
+---
+
+## What this is not
+
+**Not a research result.** The crowd is a model. A toy crowd is exactly the kind of environment
+that would make the underlying research question circular — we decided how people respond to
+robots and then measured how people respond to robots. Nothing here may be cited as a finding.
+
+**Not a benchmark.** The CSV is an export, never an input format. The moment something else can be
+read in and scored, the numbers stop being about this toy and start being about someone else's
+robot. There is no user-defined column and no formula field.
+
+**Not a robotics simulator to build on.** It is deliberately narrow. Every request to widen it has
+to answer one question: which readout does this move, and what does that readout say when the
+answer is zero?
 
 ---
 
-## Roadmap
+## Provenance
 
-**No code before Milestone 3.** Milestones 1–2 are reading and writing.
+MIRN began as a research measurement instrument for robot-induced perturbation of pedestrian
+motion — an estimator with an identification strategy, a calibration procedure and a detection
+floor. That assessment, its literature review, and its `UNVERIFIED` markers are preserved unchanged
+in `docs/archive/`. It is not maintained and it does not govern current work.
 
-| # | Milestone | Output | Est. |
-|---|---|---|---|
-| 1 | Resolve prior-art threats; hunt hard for prior statements of the predictor-error confounding argument | One-page honest delta statement | 1 wk |
-| 2 | Write the related-work section **first** | If it cannot survive "how is this not SACSoN?", there is no project | 3 d |
-| 3 | Download & characterize PeRoI; quantify selection effects (≥3.5 m, ≤2.7 m/s); power analysis on 260 PD-MR trajectories | `results/peroi_characterization.csv` | 1 wk |
-| 4 | Evaluation harness: Sinkhorn W₂, Fréchet, ADE/FDE; reproduce the uniform-predictor exploit on JRDB-Traj | `mirn.divergence`, `mirn.estimator.residual` | 1.5 wk |
-| 5 | **Detection floor + control-condition bias — no model required** | **Two publishable results.** Highest-value work in the plan | 1.5 wk |
-| 6 | Single mixture predictor: 1–5M param agent-token transformer, anchor queries, unicycle head, robot-presence indicator | `mirn.predictor.agent_transformer` | 2 wk |
-| 7 | MVP decision battery: Δ_H distribution vs MDP, placebo test, **estimator-confounding sweep (the killer plot)**, proxemics collinearity | **Go/no-go gate** | 1.5 wk |
-| 8 | Predictor ablation ladder: agent-mixing ∈ {none, mean-pool, k-NN graph, dense attention} | Collision rate + NLL, CVM row included | 1.5 wk |
-| 9 | Human preference collection; compare metrics by pairwise-preference accuracy vs min-distance, social work, PSC, SN26 | Validity evidence | 2–3 wk |
-| 10 | **Only now:** the MPPI loop. First experiment is λ_h = 0 vs λ_h > 0 | `mirn.policy.mppi` | 3 wk |
+It then spent a while as a teaching notebook, which explained the thesis faster than the paper did.
+The console explains it faster still, because the reader stops reading and starts turning the dial.
 
-Milestone 7 is a genuine kill gate. If Δ_H does not clear the detection floor, or the placebo test fails, the honest outcome is a negative-result paper on measurement validity — which is still publishable and still useful.
-
----
-
-## Key external dependencies
-
-| Thing | Where | License | Note |
-|---|---|---|---|
-| **PeRoI** | [zenodo 18876411](https://doi.org/10.5281/zenodo.18876411) | CC-BY-4.0 | 15,461 PD / 2,948 PD-SR / 260 PD-MR, 15 Hz, two outdoor sites |
-| THÖR-MAGNI | [zenodo 10407223](https://doi.org/10.5281/zenodo.10407223) | CC-BY-4.0 | 100 Hz mocap. **No robot-absent condition** — static vs mobile only |
-| JRDB / JRDB-Traj | [jrdb.erc.monash.edu](https://jrdb.erc.monash.edu/) | CC BY-NC-SA 3.0 | Registration required; stationary vs moving captures at recurring locations |
-| SocNavGym | [gnns4hri/SocNavGym](https://github.com/gnns4hri/SocNavGym) | **GPL-3.0** | Continuous `prob_to_avoid_robot` knob — the reactivity dose-response |
-| CrowdNav++ | [Shuijing725/CrowdNav_Prediction_AttnGraph](https://github.com/Shuijing725/CrowdNav_Prediction_AttnGraph) | MIT | `robot.visible` is the paired-rollout hook |
-| HuNavSim 2.0 | [robotics-upo/hunav_sim](https://github.com/robotics-upo/hunav_sim) | MIT | ROS 2 Humble; `Impassive` behavior = robot-blind arm |
-| Nav2 MPPI | [nav2_mppi_controller](https://github.com/ros-navigation/navigation2) | MIT | Reference: 1000×56 @ 50+ Hz CPU |
-
-**GPL warning:** SocNavGym is GPL-3.0. Keep it behind the `harness` adapter boundary and out of any distributed artifact, or the license propagates.
-
----
-
-## Reading order
-
-1. `docs/research/mirn-research-wayfinder.md` — the full literature assessment. **Start here.**
-2. §15b (build scope) and §16 (milestones) of that document are the operational plan.
-3. `CLAUDE.md` — conventions and guardrails for agentic work in this repo.
+> The ruler is real. The room is invented. Turn the dial.

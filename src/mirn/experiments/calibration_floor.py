@@ -19,7 +19,11 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-from mirn.calibration.null import minimum_detectable_perturbation, split_half_null
+from mirn.calibration.null import (
+    minimum_detectable_perturbation,
+    solver_settings_for,
+    split_half_null,
+)
 from mirn.data.synthetic import SyntheticAdapter
 from mirn.experiments.base import (
     EXPERIMENTS,
@@ -41,6 +45,9 @@ CALIBRATION_COLUMNS: tuple[str, ...] = (
     "null_sd",
     "mdp_95",
     "seed",
+    "epsilon",
+    "max_iter",
+    "tol",
 )
 
 
@@ -225,6 +232,14 @@ class CalibrationFloor(Experiment):
         row["null_sd"] = float(np.std(null_array))
         row["mdp_95"] = mdp_95
         row["seed"] = seed
+        # The floor is the scale every other number on the page is expressed as a multiple of, so
+        # the row has to say how it was computed. For `ade` and `fde` these are empty strings
+        # rather than absent columns: a CSV whose columns depend on a parameter value is a CSV
+        # nothing can concatenate.
+        settings = solver_settings_for(divergence, None)
+        row["epsilon"] = settings["epsilon"]
+        row["max_iter"] = settings["max_iter"]
+        row["tol"] = settings["tol"]
         frame = pd.DataFrame([row], columns=list(CALIBRATION_COLUMNS))
 
         sample_list: list[float] = []

@@ -58,6 +58,7 @@ def make_divergence(name: str) -> object:
 # --- identity -------------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 @given(path=path_strategy(5))
 @settings(max_examples=25, deadline=None)
 def test_identity_between_paths_is_exactly_zero(path: np.ndarray) -> None:
@@ -67,6 +68,7 @@ def test_identity_between_paths_is_exactly_zero(path: np.ndarray) -> None:
         assert value == 0.0
 
 
+@pytest.mark.slow
 @given(cloud=path_strategy(6))
 @settings(max_examples=25, deadline=None)
 def test_identity_between_clouds_is_exactly_zero(cloud: np.ndarray) -> None:
@@ -83,6 +85,7 @@ def test_identity_between_clouds_is_exactly_zero(cloud: np.ndarray) -> None:
 # --- non-negativity ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 @given(a=path_strategy(5), b=path_strategy(5))
 @settings(max_examples=25, deadline=None)
 def test_non_negativity_between_paths(a: np.ndarray, b: np.ndarray) -> None:
@@ -92,6 +95,7 @@ def test_non_negativity_between_paths(a: np.ndarray, b: np.ndarray) -> None:
         assert value >= 0.0
 
 
+@pytest.mark.slow
 @given(a=path_strategy(5), b=path_strategy(7))
 @settings(max_examples=25, deadline=None)
 def test_non_negativity_between_clouds(a: np.ndarray, b: np.ndarray) -> None:
@@ -106,6 +110,7 @@ def test_non_negativity_between_clouds(a: np.ndarray, b: np.ndarray) -> None:
 # --- translation invariance --------------------------------------------------------------------
 
 
+@pytest.mark.slow
 @given(
     a=path_strategy(5),
     b=path_strategy(5),
@@ -122,6 +127,7 @@ def test_translation_invariance_between_paths(
         assert abs(original - shifted) < 1e-6
 
 
+@pytest.mark.slow
 @given(
     a=path_strategy(5),
     b=path_strategy(7),
@@ -143,6 +149,7 @@ def test_translation_invariance_between_clouds(
 # --- rotation invariance ------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 @given(
     a=path_strategy(5),
     b=path_strategy(5),
@@ -160,6 +167,7 @@ def test_rotation_invariance_between_paths(a: np.ndarray, b: np.ndarray, theta: 
         assert abs(original - rotated) < 1e-6
 
 
+@pytest.mark.slow
 @given(
     a=path_strategy(5),
     b=path_strategy(7),

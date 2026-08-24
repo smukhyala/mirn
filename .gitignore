@@ -55,3 +55,8 @@ htmlcov/
 # Experiment outputs. Every experiment is seeded and deterministic and each CSV carries
 # its own seed column, so these are reproducible from `mirn run` rather than artifacts to version.
 /results/
+
+# Node / web toolchain
+node_modules/
+/dist/
+.vite/

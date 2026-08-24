@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mirn"
 version = "0.1.0"
-description = "A measurement instrument for robot-induced perturbation of pedestrian motion."
+description = "The measurement oracle behind MIRN, a simulator console for perturbation."
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
@@ -16,15 +16,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-app = [
-    "fastapi",
-    "uvicorn[standard]",
-]
 dev = [
     "pytest",
     "hypothesis",
     "ruff",
-    "httpx",
 ]
 
 [project.scripts]
@@ -33,19 +28,33 @@ mirn = "mirn.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-mirn_app = ["static/*", "static/vendor/katex/*", "static/vendor/katex/fonts/*"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Task 13: importing `fastapi.testclient` (which re-exports `starlette.testclient.TestClient`)
-# unconditionally emits this warning under the installed starlette/httpx combination, regardless
-# of any code in this repo -- it fires on `import starlette.testclient` alone, before any test
-# runs. Starlette's suggested fix is a separate `httpx2` package, which is a new dependency this
-# project does not add. Ignore only this exact, known, pre-existing warning; nothing else here is
-# suppressed.
-filterwarnings = [
-    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+markers = [
+    # The split-half nulls and the Sinkhorn solver dominate the suite's runtime, so
+    # `.venv/bin/python -m pytest -q -m "not slow"` serves the tight loop and the full suite runs
+    # before a push. A pre-commit gate nobody runs because it takes six minutes is not a gate.
+    #
+    # This marker existed for a while with nothing wearing it, which made the loop above a comment
+    # rather than a command. The tests that wear it now were chosen by measurement, not by feel:
+    # `pytest --durations=0`, everything costing more than about 2.5 s. Re-measured on an idle
+    # machine: 23 tests of 298, and 319 s of a full run that measured roughly 6 minutes; the
+    # remaining 275 take 22 s. The single largest is
+    # `test_calibration_report_records_the_solver_settings_it_used` at 132 s.
+    # Both halves of this were measured directly rather than derived from one another, and the
+    # figures that were here before were off by a plausible-looking margin because nobody re-ran
+    # them. Re-run both if you touch the marker.
+    #
+    # The fast loop cannot go much below that, and the reason is worth knowing before you
+    # try. `cached_floor` and `cached_null_samples` are LRU-cached, so one split-half computation
+    # is shared across a family of tests in test_experiments.py and whichever of them runs first
+    # pays about 8 s for it. Deselecting that one only hands the bill to the next, which is why
+    # they are not marked: they are cheap tests behind an expensive fixture, not slow tests.
+    #
+    # What the fast loop gives up, so nobody discovers it by surprise: the hypothesis property
+    # tests over the divergences, and the calibration suite. `tests/test_placebo.py` is a gate and
+    # is deliberately unmarked, so it runs in both.
+    "slow: over ~2.5 s measured with --durations; skipped by the pre-commit loop, never in CI",
 ]
 
 [tool.ruff]

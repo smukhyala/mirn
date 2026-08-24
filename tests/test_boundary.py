@@ -20,7 +20,6 @@ _FORBIDDEN_ROOTS: tuple[str, ...] = (
 
 # mirn.cli is the single module allowed to reference the app package, and only inside a function
 # body, so that `mirn serve` can offer an actionable message when the extra is absent.
-_MIRN_APP_ALLOWED_IN: tuple[str, ...] = ("cli.py",)
 
 
 def _module_paths() -> list[Path]:
@@ -57,16 +56,24 @@ def test_no_library_module_imports_a_web_package() -> None:
     assert offenders == [], f"web dependencies leaked into src/mirn/: {offenders}"
 
 
-def test_only_the_cli_references_the_app_package() -> None:
+def test_matplotlib_stays_out_of_the_measurement_path() -> None:
+    """The oracle is a pure computation library; only the figure and CLI layers may plot.
+
+    This replaces the old check that `mirn_app` was referenced nowhere but the CLI. That package
+    is gone — the site is static now — but the property it protected is worth keeping under a new
+    name: importing `mirn` must not drag in a rendering stack. matplotlib is the one that would,
+    and it costs about a second of import time that the parity fixture generator should not pay.
+    """
+    allowed = {"figures.py", "theme.py", "cli.py"}
     offenders: list[str] = []
     for path in _module_paths():
-        if path.name in _MIRN_APP_ALLOWED_IN:
+        if path.name in allowed:
             continue
         tree = ast.parse(path.read_text())
         for root in _imported_roots(tree):
-            if root == "mirn_app":
-                offenders.append(f"{path.name} imports mirn_app")
-    assert offenders == [], f"mirn_app referenced outside the CLI: {offenders}"
+            if root == "matplotlib":
+                offenders.append(f"{path.name} imports matplotlib")
+    assert offenders == [], f"matplotlib imported outside the figure layer: {offenders}"
 
 
 def test_importing_mirn_pulls_in_no_web_package() -> None:
