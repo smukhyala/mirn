@@ -1,19 +1,20 @@
 import { fail } from "../../engine/core/errors.js";
-import { configForCell, type SweepJob } from "../../engine/job/spec.js";
+import type { SweepJob } from "../../engine/job/spec.js";
 import type { RunRow } from "../../engine/job/stats.js";
-import { runPair, type RunResult } from "../../engine/sim/run.js";
 import type { FromWorker, ToWorker } from "./protocol.js";
 
 /**
  * The main thread's whole view of the worker.
  *
- * Two things are worth stating. First, the worker returns numbers and never trajectories: a
- * 72-run sweep of paths is about 33 MB and the readings are about 90 KB. Playback re-simulates
- * the selected run here instead, which is legal only because the run is a pure function of
- * `(config)` — `client.test.ts` asserts the rebuild is bitwise rather than assuming it.
+ * The worker returns numbers and never trajectories: a 72-run sweep of paths is about 33 MB and
+ * the readings are about 90 KB. Playback rebuilds the selected run instead of storing it —
+ * `web/app/console/playback.ts`'s `recomputeForPlayback` is the one place that happens, not this
+ * file; an earlier draft of this client also carried its own byte-identical copy of that rebuild,
+ * unused by any real caller, which is exactly the kind of drift surface guardrail 4 exists to
+ * forbid. `playback.test.ts` asserts the rebuild is bitwise.
  *
- * Second, cancelling is not instant and is not pretended to be. `cancel()` posts a flag the
- * worker reads between units and then ignores everything until `cancelled` comes back, so a row
+ * Cancelling is not instant and is not pretended to be. `cancel()` posts a flag the worker reads
+ * between units and then ignores everything until `cancelled` comes back, so a row
  * still in flight from an abandoned sweep never reaches the ledger. A genuine failure arriving
  * during that window is never relabelled as a cancellation: this console's whole subject is
  * measurement honesty, and there is no log an operator can check afterwards, so `failed` always
@@ -52,11 +53,6 @@ export interface SweepClient {
   readonly start: (job: SweepJob) => void;
   readonly cancel: () => void;
   readonly isRunning: () => boolean;
-  readonly recomputeForPlayback: (
-    job: SweepJob,
-    cellIndex: number,
-    seedIndex: number,
-  ) => RunResult;
 }
 
 type ClientPhase = "idle" | "running" | "cancelling";
@@ -131,21 +127,11 @@ export function makeSweepClient(port: SweepPort, handlers: SweepHandlers): Sweep
 
   const isRunning = (): boolean => phase !== "idle";
 
-  const recomputeForPlayback = (
-    job: SweepJob,
-    cellIndex: number,
-    seedIndex: number,
-  ): RunResult => {
-    const config = configForCell(job, cellIndex, seedIndex);
-    return runPair(config);
-  };
-
   return Object.freeze({
     kind: "sweepClient" as const,
     start,
     cancel,
     isRunning,
-    recomputeForPlayback,
   });
 }
 

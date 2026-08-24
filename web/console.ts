@@ -21,7 +21,13 @@ import { jobForRun, type ConsoleSettings } from "./app/console/state.js";
 import { makeTileProps, renderTile, zeroRenderingFor, type BandGauge } from "./app/console/tile.js";
 import { describeCost } from "./app/console/cost.js";
 import { labelForCell, makeGroupBuilder, type GroupBuilder, type RunGroup } from "./app/console/group.js";
-import { describeSeed, recomputeForPlayback, stepSeed } from "./app/console/playback.js";
+import {
+  describeSeed,
+  makePlaybackSelection,
+  recomputeForPlayback,
+  stepSeed,
+  type PlaybackSelection,
+} from "./app/console/playback.js";
 import { sweepPlotView } from "./app/console/curve.js";
 import { makeSweepClient, spawnSweepWorker, sweepPortFor, type SweepClient } from "./app/worker/client.js";
 import type { RunResult } from "./engine/sim/run.js";
@@ -241,10 +247,23 @@ let ledgerColumns: ColumnKey[] = [...HEADLINE_COLUMNS];
 let ledgerSort: SortKey = { kind: "byAxis" };
 let ledgerDirection: "ascending" | "descending" = "ascending";
 
-/** Which run inside the selected cell is playing, and its rebuilt result. Never persisted, for
- *  the same reason `selectedCell` above is not — a cell has no seed until the operator picks one,
- *  and the URL carries the recipe, not which row or run was being watched. */
-let playbackSeedIndex = 0;
+/**
+ * Which run inside the selected cell is playing, and its rebuilt result. Never persisted, for the
+ * same reason `selectedCell` above is not — a cell has no seed until the operator picks one, and
+ * the URL carries the recipe, not which row or run was being watched.
+ *
+ * `selectedCell` (a `CellRef`) is which CELL the ledger highlights; `playback` (a
+ * `PlaybackSelection`) is which RUN of that cell — cell plus a seed index — is being watched. The
+ * two are set together at the same two call sites below rather than merged into one, because
+ * `makeLedgerView`/`CellRef` genuinely have no seed to carry (guardrail: "a cell has no seed, so it
+ * cannot be played"), and a `PlaybackSelection` that DID double as the ledger's selection would
+ * force every ledger-selection consumer to invent a seed index it does not use.
+ *
+ * `playback` is built through `makePlaybackSelection` rather than a raw `{ groupId, axisIndex,
+ * seedIndex }` — the validated, frozen `make*` factory this project's own conventions ask for,
+ * not a second, weaker restatement of the same three values with no `ContractError` behind it.
+ */
+let playback: PlaybackSelection | null = null;
 let playbackRun: RunResult | null = null;
 
 /**
@@ -471,16 +490,16 @@ export function bootConsole(doc: Document): void {
 
   const playSelected = (): void => {
     const group = selectedGroup();
-    if (group === null || selectedCell === null) {
+    if (group === null || playback === null) {
       playbackRun = null;
       playingNote.textContent = "Live preview of the settings in the panel.";
       seedReadout.value = "seed 1 of 1";
       return;
     }
     // Rebuilt, not stored. Determinism is what makes this the same run the worker measured.
-    playbackRun = recomputeForPlayback(group.job, selectedCell.axisIndex, playbackSeedIndex);
-    seedReadout.value = describeSeed(group.job.seedIndices, playbackSeedIndex);
-    playingNote.textContent = `Playing ${labelForCell(group.job, selectedCell.axisIndex)}.`;
+    playbackRun = recomputeForPlayback(group.job, playback.axisIndex, playback.seedIndex);
+    seedReadout.value = describeSeed(group.job.seedIndices, playback.seedIndex);
+    playingNote.textContent = `Playing ${labelForCell(group.job, playback.axisIndex)}.`;
     sample = 0;
     base = {
       wallStartMs: performance.now(),
@@ -493,19 +512,21 @@ export function bootConsole(doc: Document): void {
 
   seedPrev.addEventListener("click", () => {
     const group = selectedGroup();
-    if (group === null) {
+    if (group === null || playback === null) {
       return;
     }
-    playbackSeedIndex = stepSeed(playbackSeedIndex, -1, group.job.seedIndices);
+    const seedIndex = stepSeed(playback.seedIndex, -1, group.job.seedIndices);
+    playback = makePlaybackSelection({ groupId: playback.groupId, axisIndex: playback.axisIndex, seedIndex });
     playSelected();
   });
 
   seedNext.addEventListener("click", () => {
     const group = selectedGroup();
-    if (group === null) {
+    if (group === null || playback === null) {
       return;
     }
-    playbackSeedIndex = stepSeed(playbackSeedIndex, 1, group.job.seedIndices);
+    const seedIndex = stepSeed(playback.seedIndex, 1, group.job.seedIndices);
+    playback = makePlaybackSelection({ groupId: playback.groupId, axisIndex: playback.axisIndex, seedIndex });
     playSelected();
   });
 
@@ -543,7 +564,7 @@ export function bootConsole(doc: Document): void {
       return;
     }
     selectedCell = ref;
-    playbackSeedIndex = 0;
+    playback = makePlaybackSelection({ groupId: ref.groupId, axisIndex: ref.axisIndex, seedIndex: 0 });
     playSelected();
     drawCurve();
     renderKept();
@@ -607,6 +628,7 @@ export function bootConsole(doc: Document): void {
     keptGroups.length = 0;
     pinnedCells = [];
     selectedCell = null;
+    playback = null;
     playSelected();
     drawCurve();
     renderKept();

@@ -63,9 +63,6 @@ vi.mock("../../worker/client.js", () => ({
         cancelled.push(1);
       },
       isRunning: (): boolean => false,
-      recomputeForPlayback: (): never => {
-        throw new Error("recomputeForPlayback is not exercised by the Run wiring");
-      },
     };
   },
 }));

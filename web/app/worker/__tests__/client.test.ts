@@ -172,23 +172,6 @@ describe("the main-thread client", () => {
     expect(h.seen).toEqual([]);
   });
 
-  it("rebuilds a run for playback bitwise, which is what lets the worker return numbers only", () => {
-    const h = harness();
-    const client = makeSweepClient(h.port, handlersInto(h.seen));
-    const first = client.recomputeForPlayback(job, 0, 0);
-    const second = client.recomputeForPlayback(job, 0, 0);
-
-    expect(second.treated.positions.length).toBe(first.treated.positions.length);
-    for (let agent = 0; agent < first.treated.positions.length; agent++) {
-      const a = first.treated.positions[agent] as Float64Array;
-      const b = second.treated.positions[agent] as Float64Array;
-      expect(b.length).toBe(a.length);
-      for (let i = 0; i < a.length; i++) {
-        expect(b[i]).toBe(a[i]);
-      }
-    }
-  });
-
   it("constructs the worker in the form Vite can bundle", () => {
     const source = readFileSync(join(HERE, "..", "client.ts"), "utf8");
     expect(

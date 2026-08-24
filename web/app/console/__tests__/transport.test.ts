@@ -46,9 +46,6 @@ vi.mock("../../worker/client.js", () => ({
       },
       cancel: (): void => {},
       isRunning: (): boolean => false,
-      recomputeForPlayback: (): never => {
-        throw new Error("the worker client's own copy is not exercised by this file");
-      },
     };
   },
 }));

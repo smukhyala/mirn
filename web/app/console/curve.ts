@@ -53,6 +53,13 @@ export function sweepPlotView(group: RunGroup): PlotView | null {
     { key: FORECAST, label: "what a forecaster would report", values: forecastValues },
   ];
 
+  // Keyed on axisIndex alone, which is only safe because `BandReading` carries no seed and every
+  // caller in this codebase today runs with `bandReplicates.scope: "perCell"` (one band reading
+  // per axis index, hardcoded — see `web/app/console/state.ts`'s `jobForRun`). A `"perSeed"` band
+  // would emit several `BandReading`s per axis index, one per seed, and this `Map.set` would
+  // silently keep only the last one `set` overwrote the rest with. Unreached today; if `"perSeed"`
+  // ever becomes reachable from the console, this has to average or otherwise combine the readings
+  // for that axis index rather than pick one arbitrarily.
   const bandByAxis = new Map<number, number>();
   for (const reading of group.bands) {
     bandByAxis.set(reading.axisIndex, reading.meanM);
