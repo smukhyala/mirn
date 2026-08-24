@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "An interactive learning environment for perturbation in robotics.",
+  "description": "A simulator console for perturbation in robotics.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

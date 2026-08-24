@@ -34,8 +34,10 @@ true effect is 0.352 m. Its number is essentially unrelated to the truth.
 
 ## What is on the page
 
-One page. A settings panel, an arena you can scrub, six headline readouts with a column picker for
-everything else, a sweep curve, and a ledger of every result you have kept.
+One page. A settings panel, an arena you can scrub, seven headline readouts with a column picker
+for everything else, a sweep curve, and a ledger of every result you have kept. Five of the seven
+show before you press Run: the other two need the run-to-run band, which a live preview does not
+buy, and a number with no zero beside it is not shown at all.
 
 One press of Run executes **(N axis values × M seeds)**; a single run is the degenerate 1×1 case of
 the same mechanism. A 72-run sweep takes about 4.8 seconds; with a per-axis-value run-to-run band
@@ -49,8 +51,11 @@ the value, measured at the same settings, because a value with nothing to judge 
 exact error this thing exists to show.
 
 Nothing persists. The ledger does not survive a reload and there is no storage of any kind. A
-permalink carries the settings, never the results, and reloading one shows an empty ledger with a
-primed Run that reproduces the sweep exactly.
+permalink carries the settings, never the results: Copy link writes them into the address bar, and
+opening that link sets every control back where it was, with an empty ledger and a primed Run that
+reproduces the sweep exactly. A hand-edited link never throws — anything it asks for that this
+bench does not have, or that no control here can be set to, is printed above the settings panel
+rather than silently rounded off.
 
 ---
 
@@ -72,21 +77,31 @@ declares in the fixture itself. Fréchet is compared bitwise and is the canary.
 Nothing from the virtualenv is on PATH, so the Python commands are spelled out in full.
 
 ```bash
-npm run check                                     # typecheck, tests, site build
-npm run test -- --project engine                  # the fast loop
-.venv/bin/python -m pytest -q                     # the oracle: 297 tests, about six minutes
-.venv/bin/python -m pytest -q -m "not slow"       # 274 of them, minus the heavy nulls, in 20 s
+npm run check                                     # typecheck, tests, site build — 28 s
+npm run test                                      # 511 tests in 22 s
+npx vitest run --exclude '**/*.slow.test.ts'      # 506 of them in 14 s
+.venv/bin/python -m pytest -q                     # the oracle: 298 tests, 5 min 40 s
+.venv/bin/python -m pytest -q -m "not slow"       # 275 of them, minus the heavy nulls, in 22 s
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity
 ```
 
 The axes and the columns are two closed tables, and the build checks four mechanical shadows of the
 promise that a knob you can turn changes something you can see: every axis produces a legal
 configuration at both ends and every step between; every axis moves the measurement it declares by
-more than the run-to-run band at those same settings; the console shows an axis's declared
-measurement whenever that axis is on screen; and every axis and column has a plain-English name and
-a unit, with no bare code identifier anywhere a reader can see one.
+more than the seed noise on that move; the console shows an axis's declared measurement whenever
+that axis is on screen; and every axis and column has a plain-English name and a unit, with no bare
+code identifier anywhere a reader can see one.
 
-None of those four knows whether an expander's wording is *true*, and three of the axes are
+The second check is deliberately *not* made against the run-to-run band, which is the more
+interesting half. It runs the axis at both ends under the same eight seeds and asks whether the
+mean of the eight paired differences clears twice their own standard error. The band is the spread
+between two runs of the same room with nothing held in common but the settings — and both ends of
+this comparison share their seeds, so that spread is precisely what the pairing already removed.
+Judging a paired difference against an unpaired floor is the confounded comparison this whole
+console exists to teach against, and doing it in our own test suite would be the same mistake in
+the same building.
+
+None of the four knows whether an expander's wording is *true*, and three of the axes are
 measurably non-monotone. Reading the console at both ends of every dial is still a person's job.
 
 ---

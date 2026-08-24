@@ -7,7 +7,7 @@
  * tested directly and covered again by the cross-language parity fixtures.
  *
  * Neither this file nor `metrics.ts` explains itself. The wording a reader opens underneath a
- * number is written separately, by the derivation builders in `web/notes.ts`, and nothing checks
+ * number is written separately, in the `assumption` and `zero` fields of `web/engine/job/columns.ts`, and nothing checks
  * that the two still describe the same arithmetic — so a formula change here is not finished until
  * its builder has been changed too.
  *

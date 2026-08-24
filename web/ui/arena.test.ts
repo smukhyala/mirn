@@ -11,8 +11,8 @@ import { PALETTE } from "./theme.js";
  *
  * "Filled" is the whole of the claim and not a hedge on it. The crowd's trails are still stroked
  * in `PALETTE.ink`, on purpose, and one of the tests below pins that so nobody mutes them while
- * tidying: page 2 asks the reader to tell a solid path from a faint one, and the same `SERIES`
- * entries are what plot.ts and the key on the page draw.
+ * tidying: the arena asks the reader to tell a solid path from a faint one, and the same `SERIES`
+ * entries are what plot.ts and the sweep legend draw.
  *
  * They also hold the line this file must never cross. Drawing is allowed to change what a reader
  * sees; it is not allowed to change anything measured. So the buffers handed to `drawArena` are
@@ -253,9 +253,9 @@ describe("the robot on the canvas", () => {
     // Not an exception to the rule above but the other half of it, and the reason that rule says
     // "filled". SERIES.treated is PALETTE.ink and the trails are drawn with it at full alpha, so
     // there are black lines on this canvas and the comment in arena.ts must keep saying so.
-    // Muting them would falsify page 2, which asks the reader to tell the solid path from "the
-    // faint one", and would drift the arena away from plot.ts and the key, which read the same
-    // SERIES entries.
+    // Muting them would falsify the arena, which asks the reader to tell the treated path from
+    // the control one, and would drift the arena away from plot.ts and the sweep legend, which
+    // read the same SERIES entries.
     const recorder = draw(makeView({}));
     const solidInkTrails: Op[] = [];
     for (const op of recorder.ops) {

@@ -56,17 +56,25 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
 
 3. **The knobs are one closed table and each entry names, as data, the measurement it moves.** The
    build checks four mechanical shadows: every axis's `apply` produces a legal `RunConfig` at both
-   ends and every step between; every axis moves its declared measurement by more than the band
-   measured at the same settings; the console shows an axis's declared measurement whenever that
-   axis is on screen; every axis and column has a plain-English name and a unit.
+   ends and every step between; every axis moves its declared measurement by more than the paired
+   seed noise; the console shows an axis's declared measurement whenever that axis is on screen;
+   every axis and column has a plain-English name and a unit.
 
-   The second is the check `lintComparatives` could never make — it only measured how close a
-   comparative word sat to a number. It immediately catches a violation already shipped:
-   `instrument.html` puts a reaction-time slider directly above a True-effect tile, and reaction
-   time is flat on true effect (0.290 to 0.269, inside seed noise) while moving minimum clearance
-   monotonically (-0.134 to -0.402 m). None of the four knows whether an expander's wording is
-   *true*, and three axes are measurably non-monotone, so reading the console at both ends of every
-   dial is still the author's job.
+   **The second one is not judged against the run-to-run band, and must never be changed to be.**
+   `axes.slow.test.ts` runs the axis at its minimum and at its maximum under the same eight seeds,
+   takes the mean of the eight paired differences, and asserts that its size exceeds twice the
+   standard error of those differences. It passes `band: null` deliberately. The run-to-run band is
+   the *unpaired* spread between two runs of the same room, and both endpoints of this comparison
+   share their seeds — so that spread is exactly the thing the pairing already removed, and judging
+   a paired difference against an unpaired floor is the confounded comparison this whole console
+   exists to teach against. An agent who reads a "more than the band" sentence, finds the test
+   disagreeing and "fixes" the test has broken the lesson, which is why the sentence is written out
+   at this length.
+
+   The measured margins are recorded in that file's own header, smallest first, so a physics change
+   that halves one is a visible number rather than a red test with no baseline. None of the four
+   checks knows whether an expander's wording is *true*, and three axes are measurably non-monotone,
+   so reading the console at both ends of every dial is still the author's job.
 
 4. **Determinism is a feature.** Every stochastic path takes an explicit seed. No global RNG in
    either language — `Math.random` throws in the engine test suite. The paired world's two arms
@@ -105,7 +113,19 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     `localStorage`, `sessionStorage` and `IndexedDB`, which are exactly the loophole a reviewer
     reads as compliant. The ledger does not survive a reload. A permalink is a query string and it
     carries the recipe, never the results: a link asserting `true_effect=0.352` would quote an old
-    answer with the new page's authority.
+    answer with the new page's authority. Both halves of it are wired — `web/console.ts` reads
+    `window.location.search` before it mounts the panel, and `mountPanel`'s `initial` option is the
+    only seam that exists for it. A write-only permalink is worse than none: the link looks like it
+    works and loses its payload in silence. What the panel cannot take (a crowd count off the
+    picker's list, a slider's own notches, the three settings with no control yet) is printed above
+    the controls, never rounded off quietly.
+
+    This one used to be enforced by two prose comments, which is the position the `Math.hypot` ban
+    was in before somebody wrote a test.
+    `web/app/console/__tests__/nostorage.test.ts` now greps every `.ts`, `.html` and `.css` file
+    under `web/` for the storage and network APIs, with the same canary and meta-test
+    `hypot.test.ts` carries. `history.replaceState` is the one allowed exception and is asserted
+    present rather than absent, because it is how the permalink reaches the address bar.
 
 11. **The line is not "do not be a simulator"; it is between this toy, measured well, and robots,
     characterised.** The operative half of the old rule — "which page does this make clearer?" —
@@ -123,10 +143,13 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
 12. **No bare code identifier on any surface a reader sees, and every term defined in plain English
     at first use.** Half of this guardrail genuinely died: `web/vocab.ts`, the `introduces`/`uses`
     front matter, `checkVocabulary` and `lintForwardTerms` all go, because with one page there is no
-    order to fix. What survives is the whole rule. Its only mechanical enforcement is the identifier
+    order to fix. What survives is the whole rule. Its mechanical enforcement is the identifier
     regex, re-homed from the deleted render suite onto `COLUMNS` and `AXES` in
     `web/engine/job/__tests__/columns.test.ts` and `axes.slow.test.ts`. Pointed at the catalogue
-    rather than a rendered DOM, it also covers a column nobody ticked.
+    rather than a rendered DOM, it also covers a column nobody ticked. Two more suites run variants
+    of the same regex over strings the catalogue does not own: `panel.test.ts` over the whole
+    booted panel's text, and `permalink.test.ts` over every sentence a hand-edited link can
+    produce.
 
 13. **`docs/archive/` is read-only.** Never delete or soften an `UNVERIFIED` marker in it, never
     cite it as current, and never quietly update a claim in it to match something we now believe.
@@ -205,11 +228,12 @@ entirely — Python-only estimators are not a parity question until something po
 - **A number and its explanation live in different files, and nothing checks that they agree.**
   `web/engine/measure/kernels.ts` is the numeric layer — pairwise summation, per-step distance,
   path length, numpy's linear quantile — and everything in `measure/` that has to match the oracle
-  bottoms out there. `metrics.ts` composes those into the six measurements the lesson quotes; it
-  returns values and nothing else. The wording a reader opens underneath a number is written by
-  hand, in the `assumption` and `zero` fields of each descriptor in `web/engine/job/columns.ts`. So
-  changing a formula means editing its builder in the same commit: a panel has already once
-  explained a different quantity from the one printed above it, and it compiled.
+  bottoms out there. `metrics.ts` composes those into four measurements — `deviation`, `robotCost`,
+  `clearance`, `recovery` — and returns values and nothing else. The wording a reader opens
+  underneath a number is written by hand, in the `assumption` and `zero` fields of each descriptor
+  in `web/engine/job/columns.ts`. So changing a formula means editing its descriptor in the same
+  commit: a panel has already once explained a different quantity from the one printed above it,
+  and it compiled.
 
 ### Python (`src/mirn/`)
 
@@ -245,9 +269,16 @@ shared-tape construction makes exactness available, and inexactness means the ar
 **Legibility is a functional requirement.** For a console, "the demonstration is legible at every
 position of every dial" is behaviour, and a physics change that breaks it should fail a test rather
 than be noticed three weeks later. That is what `axes.slow.test.ts` is for, and its failure mode is
-named in its own comment: reducing `nTicks` to speed it up makes a genuinely real axis move less
-than the band, it goes red for a good reason, and the natural repair is loosening the threshold —
-which is how the placebo gate would have been destroyed.
+named in its own comment: reducing `nTicks` to speed it up gives the crowd less room to respond, so
+a genuinely real axis moves its readout by less than the seed noise on the move, it goes red for a
+good reason, and the natural repair is loosening the threshold — which is how the placebo gate
+would have been destroyed.
+
+It also owns the check nothing else can make: that every axis's default, minimum and maximum lie on
+its own step grid. A range input snaps whatever it is given to `min + n * step`, and jsdom does not,
+so a default off the grid is invisible to every test that mounts the panel and shows up only in a
+browser. One was: `walkingPace` defaulted to 1.34 with a step of 0.05 above 0.4, so the console ran
+its crowd at 1.35 while `DEFAULT_CONFIG` and the whole test suite used 1.34.
 
 ### Commands
 
@@ -255,22 +286,33 @@ Nothing from the virtualenv is on PATH — not `python`, not `pytest`, not `ruff
 command below is written so it runs as spelled from the repository root, with no activation step.
 
 ```bash
-npm run check                            # typecheck, vitest, vite build — no notes step
-npm run test -- --project engine         # the fast loop
-.venv/bin/python -m pytest -q            # 297 tests, 6 min; one calibration test is 134 s of it
-.venv/bin/python -m pytest -q -m "not slow"   # 274 of them in 20 s, minus the heavy nulls
+npm run check                            # typecheck, vitest, vite build — 28 s
+npm run test                             # 511 tests in 22 s
+npx vitest run --exclude '**/*.slow.test.ts'   # 506 of them in 14 s
+.venv/bin/python -m pytest -q            # 298 tests, 340 s; one calibration test is 132 s of it
+.venv/bin/python -m pytest -q -m "not slow"   # 275 of them in 22 s, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity   # after any formula change
 ```
 
-The fast pytest loop is real, not aspirational: the tests that dominate the runtime carry
-`@pytest.mark.slow`, and `pyproject.toml` records the measurement the cut-off came from. It does
-skip the divergence property tests, so it is a working loop and not the gate. `tests/test_placebo.py`
-is deliberately not marked and runs in both.
+Every figure above was measured on this machine on the commit that wrote them, not estimated. Two
+of them used to be wrong by a plausible-looking margin, which is the failure mode this paragraph
+exists to name: a timing nobody re-ran is a claim, and the whole point of a documented fast loop is
+that its cost is small enough to be worth it.
 
-Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — ten
-seconds measured, so it actually gets run. Full `npm run check` plus `.venv/bin/python -m pytest -q`
-before any push. **Never claim work is complete without running it and showing the output.**
+**There is no `--project engine` fast loop, and naming one was the mistake.** It runs in 17 s
+against 22 s for everything, because `axes.slow.test.ts` is 14 s of the suite and lives inside the
+engine project. Excluding that one file is the only cut worth making, and it is what the third line
+above does — 14 s, at the cost of the guardrail-3 check, so it is a working loop and not the gate.
+
+The fast pytest loop is real: the tests that dominate the runtime carry `@pytest.mark.slow`, and
+`pyproject.toml` records the measurement the cut-off came from. It skips the divergence property
+tests and the calibration suite, so it is also a loop and not a gate. `tests/test_placebo.py` is
+deliberately not marked and runs in both.
+
+Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — 27
+seconds measured. Full `npm run check` plus `.venv/bin/python -m pytest -q` before any push.
+**Never claim work is complete without running it and showing the output.**
 
 ---
 
@@ -281,8 +323,12 @@ There is no prose file. Every word a reader sees is a `label`, a `zero`, an `ass
 catalogues are closed.
 
 **No numeric literal appears in console copy.** Every zero line, band figure and caption renders
-from the cell actually on screen. A test asserts no tile string contains a literal metre value,
-because a hardcoded number is a claim that outlives the settings that produced it.
+from the cell actually on screen, because a hardcoded number is a claim that outlives the settings
+that produced it. `tile.test.ts` renders **every column in `COLUMN_ORDER`**, not a fixture, and
+fails on a literal metre or second value in any leaf that is not one of the four value slots. The
+zero's own phrase, `tile-zero-how`, is scanned rather than excused: six catalogue phrases used to
+end "…and this reads 0.000 m" beside a slot already printing 0.000 m, and the fixture-based version
+of this test could not see them.
 
 **No wording may be written before its measurement has been run.** Copy asserting a phenomenon the
 operator is watching not happen is the worst failure this project has. Four sim bugs and two

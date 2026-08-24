@@ -264,7 +264,7 @@ export function drawArena(
   // find at a few pixels.
   //
   // The trails were deliberately not muted with the dots, so the canvas still carries black
-  // lines: `SERIES.treated` is `PALETTE.ink` and stays that way, because page 2 asks the reader
+  // lines: `SERIES.treated` is `PALETTE.ink` and stays that way, because the arena asks the reader
   // to tell the solid path from "the faint one", and because the same `SERIES` entries are drawn
   // by plot.ts and by the key on the page. What changed is narrower than "the darkest ink belongs
   // to the robot": every black *dot* on the canvas is now the robot. What separates the two runs

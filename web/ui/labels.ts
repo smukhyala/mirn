@@ -7,9 +7,9 @@
  * identifier in the page rather than as a blank tile or a crash.
  *
  * That fallback is a review aid, not a check. `labels.test.ts` pins the fallback behaviour itself;
- * nothing scans these maps for coverage, and `unitLabel`/`variantLabel` currently have no caller
- * at all. The reader-facing surfaces that ARE checked are the provenance notes and the axis names,
- * by the jargon assertion in `web/app/__tests__/render.test.ts`.
+ * nothing scans these maps for coverage, and `variantLabel` has no caller outside its own test. The
+ * reader-facing surfaces that ARE checked are the column and axis catalogues, by the identifier
+ * assertions in `web/engine/job/__tests__/columns.test.ts` and `axes.slow.test.ts`.
  */
 
 /** Keys whose expansion lives only inside a disclosure that is closed by default, so the
@@ -50,12 +50,12 @@ export function variantLabel(variant: string): string {
 /**
  * A metre means nothing until it is a body-scale comparison.
  *
- * This is guardrail 7 in one function: a length may appear, but never alone. It lives here rather
- * than beside its first caller because two things need the identical wording — the derivation
- * panel in `web/notes.ts`, which shows it under a live number, and the `{{q:…anchor}}` token in
- * `web/build/quantities.ts`, which is the sanctioned escape from the comparative lint. Two copies
- * of these five phrases would drift, and the drift would be a page whose prose disagreed with the
- * panel directly below it.
+ * This is guardrail 7 in one function: a length may appear, but never alone. It had two callers
+ * when it was written, on the notebook this console replaced, and one now — `web/console.ts`,
+ * which prints it under every headline tile whose column declares it needs an anchor. It stays
+ * here, in the labels file, rather than moving into the tile: the phrasing is reader-facing
+ * vocabulary, and the next surface that shows a length is meant to reach for this rather than
+ * write its own five bands.
  *
  * The bands are ordinary human distances, not round numbers: below the wobble of a normal
  * walking gait, a part-stride, a stride, a doorway.

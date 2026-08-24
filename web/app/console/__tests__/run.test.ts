@@ -21,9 +21,9 @@ import type { RunRow } from "../../../engine/job/stats.js";
  *    committed. `onBand` is four numbers on the wire (`axisIndex, meanM, peakM, nReplicates`),
  *    matching `web/app/worker/protocol.ts`'s flat `"band"` message — not a single `BandReading`
  *    object, which is `console.ts`'s job to assemble, not the client's.
- * 2. `web/console.html`'s `<aside id="settings">` is empty until `mountPanel` (Task 24) appends its
- *    own root into it. A prior attempt put the Run block directly in that static markup and was
- *    reverted (`git log -- web/console.html`, commit "Revert the Run button") because
+ * 2. `web/index.html`'s `<aside id="settings">` is empty until `mountPanel` appends its own root
+ *    into it. A prior attempt put the Run block directly in that static markup and was reverted
+ *    (`git log -- web/console.html`, before the page was renamed) because
  *    `mountPanel`'s `host.append(root)` would then push the panel BELOW a button that is supposed
  *    to sit below the panel. `console.ts` builds the run block detached and attaches it only after
  *    `mountPanel` has run, so `#run` exists once `bootConsole` finishes either way — this file

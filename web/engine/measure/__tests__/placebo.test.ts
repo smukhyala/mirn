@@ -15,7 +15,7 @@
  * bystander from the social-force crowd — someone who never came within 5 m of the robot — and the
  * estimate moves by up to 37%. That is the crowd being a crowd: removing anybody rewires the
  * interaction chain, the robot then plans a different path, and everyone's counterfactual changes.
- * It is correct behaviour, it is taught on page 9, and it means the sim can never pass a placebo
+ * It is correct behaviour, it is why this gate is analytic, and it means the sim can never pass a placebo
  * test. Pointing this gate at it would make the gate permanently red for a good reason, and the
  * obvious repair — loosening the tolerance until it goes green — leaves a test that asserts
  * nothing. So the gate runs on `analyticPair.ts`, a world whose pedestrians do not interact with

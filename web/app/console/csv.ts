@@ -81,8 +81,8 @@ function formatValue(unit: UnitKey, value: number): string {
   }
   if (unit === "metres") {
     // Three places, matching the precision used everywhere else a metre reaches a reader
-    // (web/build/quantities.ts's formatQuantity, web/notes.ts, web/main.ts) — a fourth digit here
-    // would be a precision this file invented rather than one the rest of the site agrees on.
+    // (web/app/console/tile.ts's DECIMALS) — a fourth digit here would be a precision this file
+    // invented rather than one the rest of the console agrees on.
     return value.toFixed(3);
   }
   if (unit === "seconds") {
@@ -91,8 +91,8 @@ function formatValue(unit: UnitKey, value: number): string {
   if (unit === "count" || unit === "people") {
     // A count of a single run is a whole number, but a MEAN of counts across seeds is not, and
     // rounding it to a whole number overstates precision the data never had — the same failure
-    // class as a mean with no denominator. web/build/quantities.ts's formatQuantity already
-    // solved this for its own count columns ("let the value decide"); this mirrors that rule.
+    // class as a mean with no denominator. The rule is the same one the research era's own
+    // formatter settled on for a count column: let the value decide.
     return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
   }
   if (unit === "ratio") {

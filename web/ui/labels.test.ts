@@ -3,8 +3,8 @@ import { anchorFor, unitLabel, variantLabel } from "./labels.js";
 
 describe("anchorFor, the body-scale phrase beside a metre", () => {
   // Guardrail 7: a metre may appear, but never alone. This function is the smallest form of that
-  // promise, and it is shared between the derivation panel in web/notes.ts and the
-  // {{q:…anchor}} token in web/build/quantities.ts — so a change here changes both, which is the
+  // promise, and it is the only wording for a body-scale comparison anywhere in the product —
+  // so a change here changes every surface that shows a length, which is the
   // reason it lives in one place.
   it("gives a phrase, never a number, for every band", () => {
     expect(anchorFor(0.05)).toBe("less than the wobble of ordinary walking");
