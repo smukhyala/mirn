@@ -78,8 +78,8 @@ function el<T extends HTMLElement>(doc: Document, id: string): T {
  * is populated by `mountPanel` rather than hand-authored: every host named in console.html is an
  * empty mount point, and a later task's markup never has to be reconciled against this file's.
  * The ids and classes match `web/instrument.html`'s static transport exactly, so the `.transport`
- * and `.scrub` rules already in `web/style.css` style this one for free — console.css's own header
- * comment documents that reliance and this file is the reason it is true.
+ * and `.scrub` rules folded into `web/console.css` (from the deleted `web/style.css`, task 36)
+ * style this one for free.
  *
  * The seed stepper is built here too, for the same reason: a cell (a ledger row) has no seed, so
  * this is what picks which run inside it plays. `playing-note` is a sibling of `#transport`

@@ -35,7 +35,7 @@ export const INVENTED_CROWD_DISCLOSURE =
 /**
  * The clauses the disclosure must contain wherever it appears. The page says "on this page" and
  * the file says "in this file", so the two sentences are not identical and cannot be compared
- * whole; these are the parts that carry the obligation, and `console.html` is checked against
+ * whole; these are the parts that carry the obligation, and `index.html` is checked against
  * this list rather than against a copy of the sentence.
  */
 export const DISCLOSURE_CLAUSES: readonly string[] = Object.freeze([

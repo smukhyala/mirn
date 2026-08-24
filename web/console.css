@@ -1,19 +1,176 @@
-/* Every colour token is injected from web/ui/theme.ts. Never write a colour literal in this file. */
+/*
+ * This is the console's only stylesheet — web/index.html links nothing else. Every colour token
+ * used here is injected at runtime, from web/ui/theme.ts, by web/app/console/boot.ts; never write
+ * a colour literal in this file.
+ *
+ * .legend-grey-0, .legend-grey-1 and .legend-grey-2 (in the sweep-legend swatches below) are easy
+ * to think unused: no source file spells them as literal text. web/console.ts builds the class
+ * name as `legend-grey-${greyIndex % 3}`, so searching for the string finds nothing.
+ */
+
+/* ---------------------------------------------------------------- base and borrowed rules */
 
 /*
- * console.html links web/style.css before this file and still relies on these unscoped
- * web/style.css rules, written for web/instrument.html. Whoever prunes style.css after the
- * notebook pages are deleted needs to keep or replace them:
- *   - .transport, .scrub — style the console's transport strip entirely; this file defines
- *     nothing for them.
- *   - #arena (bare id rule) — supplies background, border-color and aspect-ratio, alongside
- *     this file's .stage > canvas#arena.
- *   - button (bare element rule) — base typography for every button the console mounts.
- *   - .legend-accent, .legend-grey-0/1/2 (li::before swatches) — the sweep curve's two line
- *     entries reuse these rather than duplicating them; they are shared with notes.ts's own,
- *     identical sweep widget. This file adds only .legend-region, the swatch kind notes.ts never
- *     needed because its widget never drew a filled region.
+ * Moved here from web/style.css (task 36), which styled the deleted notebook pages and has been
+ * deleted along with them. These are the rules the console itself was actually relying on; they
+ * sit first in the file, in their original relative order, so any console-specific rule below
+ * that shares a selector with one of these — .readouts, .tile-label, .tile-value — continues to
+ * win the cascade for it exactly as it did when style.css was a separate, earlier-linked file.
  */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 4rem;
+  background: var(--mirn-paper);
+  color: var(--mirn-ink);
+  font-family: var(--mirn-font-sans);
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  color: var(--mirn-ink-faint);
+}
+.standfirst { margin: 0; max-width: 38rem; color: var(--mirn-ink-muted); }
+
+main {
+  max-width: 72rem;
+  margin: 2rem auto 0;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+#arena {
+  width: 100%;
+  aspect-ratio: 22 / 13;
+  display: block;
+  background: var(--mirn-paper);
+  border: 1px solid var(--mirn-rule);
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin-top: 0.75rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.78rem;
+  color: var(--mirn-ink-muted);
+}
+.transport output { color: var(--mirn-ink); font-variant-numeric: tabular-nums; }
+.transport .accent output { color: var(--mirn-perturbation); }
+.scrub { flex: 1; display: flex; }
+.scrub input { width: 100%; }
+
+button {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  padding: 0.35rem 0.8rem;
+  background: var(--mirn-paper);
+  color: var(--mirn-ink);
+  border: 1px solid var(--mirn-ink);
+  cursor: pointer;
+}
+button:hover { background: var(--mirn-surface); }
+
+.legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  color: var(--mirn-ink-muted);
+}
+.legend li { display: flex; align-items: center; gap: 0.45rem; }
+
+.panel-title {
+  margin: 0;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+  color: var(--mirn-ink-faint);
+}
+
+.control { display: flex; flex-direction: column; gap: 0.35rem; }
+.control > span,
+.toggle > span {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  color: var(--mirn-ink-muted);
+}
+.control output { color: var(--mirn-ink); font-variant-numeric: tabular-nums; }
+.toggle { display: flex; align-items: center; gap: 0.5rem; }
+
+input[type="range"] { width: 100%; accent-color: var(--mirn-ink); }
+input[type="checkbox"] { accent-color: var(--mirn-ink); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--mirn-rule);
+}
+@media (max-width: 720px) { .readouts { grid-template-columns: minmax(0, 1fr); } }
+
+.tile-label {
+  margin: 0 0 0.3rem;
+  font-family: var(--mirn-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.62rem;
+  color: var(--mirn-ink-faint);
+}
+.tile-value {
+  margin: 0 0 0.4rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+/* The one coloured number on the page is the perturbation itself. */
+.tile-value.accent output { color: var(--mirn-perturbation); }
+.tile-value .unit { font-size: 0.8rem; color: var(--mirn-ink-faint); }
+.tile-note { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--mirn-ink-muted); }
+
+/* Each swatch reproduces its line's actual stroke. Weight and dash are the only thing
+   distinguishing series once hue is gone, so a shared swatch would make the legend useless. */
+.legend-accent::before { border-top: 2px solid var(--mirn-perturbation); }
+.legend-grey-0::before { border-top: 2px solid var(--mirn-ink); }
+.legend-grey-1::before { border-top: 1.5px dashed var(--mirn-ink-muted); }
+.legend-grey-2::before { border-top: 1.5px dotted var(--mirn-ink-faint); }
+
+:focus-visible {
+  outline: 2px solid var(--mirn-ink);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- the console's own rules */
 
 .console-main {
   display: grid;
@@ -58,18 +215,19 @@
   vertical-align: middle;
 }
 /* The run-to-run band is a filled region, not a line, so its swatch is a filled block rather than
-   the border-top rule the two line swatches (.legend-accent / .legend-grey-N, from web/style.css)
-   use. */
+   the border-top rule the two line swatches (.legend-accent / .legend-grey-N, defined above in
+   this file's borrowed-rules section) use. */
 .legend-region::before { height: 0.5rem; background: var(--mirn-grid); border-bottom: 1px dashed var(--mirn-rule); }
 
 /* The transport's seed stepper: a cell has no seed, so this picks which run inside it plays. */
 .seed-picker { display: inline-flex; align-items: center; gap: 0.4rem; }
 
 /*
- * web/style.css also has an unscoped .readouts rule, written for web/instrument.html, at the same
- * specificity as this one. Because it links first, this rule only wins the properties it declares
- * — so padding-top and border-top must be neutralised explicitly here, or the instrument page's
- * hairline rule and top padding leak onto the console for no reason this page's design asked for.
+ * This file's own borrowed .readouts rule above (moved from the deleted web/style.css, written
+ * originally for web/instrument.html) is at the same specificity as this one. Because it appears
+ * earlier in the file, this rule only wins the properties it declares — so padding-top and
+ * border-top must be neutralised explicitly here, or the instrument page's hairline rule and top
+ * padding leak onto the console for no reason this page's design asked for.
  */
 .readouts {
   display: grid;

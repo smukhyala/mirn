@@ -58,6 +58,12 @@ describe("the console page is the page the build ships", () => {
     expect(ignore).not.toContain("web/index.html");
     expect(ignore).not.toContain("web/generated/");
   });
+
+  it("links one stylesheet, which is the console's own", () => {
+    const links = HTML.match(/<link[^>]+rel="stylesheet"[^>]*>/g) ?? [];
+    expect(links).toHaveLength(1);
+    expect(links[0]).toContain("console.css");
+  });
 });
 
 describe("the invented-crowd disclosure comes first", () => {
@@ -85,33 +91,44 @@ describe("the invented-crowd disclosure comes first", () => {
 
 describe("the keyboard is not left behind by the notebook's deletion", () => {
   it("has a focus ring that is not scoped to three notes classes", () => {
-    const css = readFileSync("web/style.css", "utf8");
+    // Task 36 folded this rule in from the deleted web/style.css; it now lives in web/console.css,
+    // the page's only stylesheet.
+    const css = readFileSync("web/console.css", "utf8");
     expect(css).toMatch(/^:focus-visible \{/m);
   });
 });
 
-describe("the console's readouts do not inherit the deleted instrument page's rule", () => {
+describe("the console's own .readouts rule wins the cascade over the one borrowed from the deleted instrument page", () => {
   /**
-   * web/index.html links web/style.css first and web/console.css second. web/style.css has its
-   * own unscoped .readouts rule, originally written for the now-deleted web/instrument.html, at
-   * the same specificity as console.css's — so console.css only wins the properties it actually
-   * declares. web/style.css's rule sets padding-top and border-top; unless console.css's rule
-   * neutralises both, the console inherits a hairline rule and top padding that nothing in its
-   * design asked for.
+   * web/console.css now carries two .readouts rules at the same specificity: one folded in
+   * verbatim from the deleted web/style.css (task 36), written originally for the also-deleted
+   * web/instrument.html, and the console's own further down. Same-specificity rules are decided by
+   * source order, so the console's own rule must keep appearing AFTER the borrowed one and must
+   * keep neutralising the properties the borrowed one sets — otherwise the console inherits a
+   * hairline rule and top padding that nothing in its design asked for.
    */
-  it("still has padding-top and border-top in web/style.css's .readouts rule, so this is a real collision to guard against", () => {
-    const instrumentCSS = readFileSync("web/style.css", "utf8");
-    const rule = /\.readouts\s*\{([^}]*)\}/.exec(instrumentCSS);
-    expect(rule, ".readouts rule not found in web/style.css").not.toBeNull();
-    expect(rule?.[1]).toMatch(/padding-top:/);
-    expect(rule?.[1]).toMatch(/border-top:/);
+  it("still has padding-top and border-top in the borrowed .readouts rule, so this is a real collision to guard against", () => {
+    const css = readFileSync("web/console.css", "utf8");
+    // Anchored to the start of a line: this file's own convention is that a rule nested inside a
+    // multi-line @media block is indented, and a rule folded onto one line with its @media wrapper
+    // (as the borrowed 720px breakpoint is) never starts the line either. Both of the file's two
+    // @media .readouts breakpoint overrides are excluded this way, leaving just the two base rules.
+    const rules = [...css.matchAll(/^\.readouts\s*\{([^}]*)\}/gm)];
+    expect(rules, "expected exactly two .readouts rules in web/console.css").toHaveLength(2);
+    expect(rules[0]?.[1]).toMatch(/padding-top:/);
+    expect(rules[0]?.[1]).toMatch(/border-top:/);
   });
 
-  it("neutralises padding-top and border-top in its own .readouts rule", () => {
-    const consoleCSS = readFileSync("web/console.css", "utf8");
-    const rule = /\.readouts\s*\{([^}]*)\}/.exec(consoleCSS);
-    expect(rule, ".readouts rule not found in web/console.css").not.toBeNull();
-    expect(rule?.[1]).toMatch(/padding-top:\s*0\b/);
-    expect(rule?.[1]).toMatch(/border-top:\s*none\b/);
+  it("places its own .readouts rule after the borrowed one, and neutralises padding-top and border-top", () => {
+    const css = readFileSync("web/console.css", "utf8");
+    // Anchored to the start of a line: this file's own convention is that a rule nested inside a
+    // multi-line @media block is indented, and a rule folded onto one line with its @media wrapper
+    // (as the borrowed 720px breakpoint is) never starts the line either. Both of the file's two
+    // @media .readouts breakpoint overrides are excluded this way, leaving just the two base rules.
+    const rules = [...css.matchAll(/^\.readouts\s*\{([^}]*)\}/gm)];
+    expect(rules, "expected exactly two .readouts rules in web/console.css").toHaveLength(2);
+    const own = rules[1]?.[1] ?? "";
+    expect(own).toMatch(/padding-top:\s*0\b/);
+    expect(own).toMatch(/border-top:\s*none\b/);
   });
 });

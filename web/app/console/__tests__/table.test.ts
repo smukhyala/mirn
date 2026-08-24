@@ -165,7 +165,7 @@ describe("the ledger", () => {
     // (every knob, including the one being swept, at its slider position) plus `sweepAxis` /
     // `sweepValues` / `seedCount` / `bandReplicates: number` / `withFloor` / `withFrechet` /
     // `withZeroReference`. `settingsMatchJob` has to agree on ALL of it, not only the world config
-    // and the ruler: `console.html`'s own note promises pressing Run reproduces a kept result
+    // and the ruler: `index.html`'s own note promises pressing Run reproduces a kept result
     // exactly, and none of the sweep-shape fields above touch a base-config or measurement value,
     // so a comparison that skipped them would leave that promise unchecked whenever an operator
     // switched the swept axis, changed the seed count, or toggled band/floor/Frechet/zero-run.

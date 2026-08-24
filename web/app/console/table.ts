@@ -234,7 +234,7 @@ function sameNumberList(a: readonly number[], b: readonly number[]): boolean {
 /**
  * Whether the panel still describes what a kept result was measured at.
  *
- * `console.html`'s own note promises "Pressing Run reproduces them exactly" — so this has to
+ * `index.html`'s own note promises "Pressing Run reproduces them exactly" — so this has to
  * agree on everything that promise depends on, not only the world config and the ruler. An
  * earlier version of this function checked only those two and left `ConsoleSettings.sweepAxis`,
  * `sweepValues`, `seedCount`, `bandReplicates`, `withFloor`, `withFrechet` and `withZeroReference`
