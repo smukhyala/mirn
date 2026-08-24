@@ -4,7 +4,7 @@ import { COLUMNS, type ColumnKey, type Reading } from "../../engine/job/columns.
 import { buildContext, runReport, type ReportContext } from "../../engine/job/report.js";
 import { configForCell, paramsForCell } from "../../engine/job/spec.js";
 import { runPair, type RunResult } from "../../engine/sim/run.js";
-import { PREVIEW_DEBOUNCE_PEOPLE, type PanelValues } from "./panel.js";
+import { makePanelValues, PREVIEW_DEBOUNCE_PEOPLE, type PanelValues } from "./panel.js";
 import { DEFAULT_SETTINGS, jobForPreview, makeConsoleSettings, type ConsoleSettings } from "./state.js";
 import type { SettingStamp } from "./tile.js";
 
@@ -83,6 +83,34 @@ export function settingsFromPanel(values: PanelValues): ConsoleSettings {
   });
 }
 
+/**
+ * The other direction, for the one caller that needs it: a decoded permalink, on its way into the
+ * controls.
+ *
+ * It lives beside `settingsFromPanel` rather than in `panel.ts` or `permalink.ts` because the two
+ * shapes disagree — `bandReplicates` is `number` with 0 meaning off on one side and `number | null`
+ * with `null` meaning off on the other — and one file translating both ways is one place for that
+ * disagreement to be resolved rather than two.
+ *
+ * The three fields `PanelValues` does not carry (the near-miss line, the recovery tolerance, the
+ * recovery dwell) are dropped here, not defaulted: `settingsFromPanel` will fill them from
+ * `DEFAULT_SETTINGS` on the way back, and `settingsNotHonoured` is what tells the operator a link
+ * asked for something else.
+ */
+export function panelValuesFromSettings(settings: ConsoleSettings): PanelValues {
+  return makePanelValues({
+    axisValues: settings.axisValues,
+    pedestriansSeeRobot: settings.pedestriansSeeRobot,
+    sweepAxis: settings.sweepAxis,
+    sweepValues: settings.sweepValues,
+    seedCount: settings.seedCount,
+    bandReplicates: settings.bandReplicates === 0 ? null : settings.bandReplicates,
+    detectionFloor: settings.withFloor,
+    frechet: settings.withFrechet,
+    zeroReferenceRun: settings.withZeroReference,
+  });
+}
+
 export function runPreview(settings: ConsoleSettings): Preview {
   const job = jobForPreview(settings);
   const config = configForCell(job, 0, 0);
@@ -116,8 +144,10 @@ export function stampsFor(preview: Preview): readonly SettingStamp[] {
   const dt = preview.config.dt;
   return Object.freeze([
     Object.freeze({
+      // Not "people". The label and the unit are printed either side of the value, so a stamp
+      // labelled with its own unit reads "people 18 people".
       kind: "settingStamp" as const,
-      label: "people",
+      label: "crowd",
       value: preview.config.crowd.nPedestrians,
       unit: "people" as const,
     }),

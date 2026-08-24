@@ -154,6 +154,26 @@ describe("the axis catalogue", () => {
     }
   });
 
+  it("puts its default, its bottom and its top on its own notches", () => {
+    // A range input snaps whatever it is given to `min + n * step`, so a default that is not on
+    // that grid is a default the operator can never select and the console never runs. `jsdom`
+    // does not sanitise range values, so no test that mounts the panel can see this — only the
+    // catalogue itself can. Found in a browser: walkingPace's default of 1.34 was not a multiple
+    // of a 0.05 step above 0.4, and the console quietly ran a crowd at 1.35 while every test here
+    // ran it at 1.34.
+    for (const key of AXIS_ORDER) {
+      const axis = AXES[key];
+      for (const value of [axis.min, axis.max, axis.defaultValue]) {
+        const notches = (value - axis.min) / axis.step;
+        const nearest = Math.round(notches);
+        expect(
+          Math.abs(notches - nearest),
+          `${key} cannot be set to ${value}: it is ${notches} notches of ${axis.step} above ${axis.min}`,
+        ).toBeLessThan(1e-6);
+      }
+    }
+  });
+
   it("produces a legal setting at the bottom, the top and every notch between", () => {
     for (const key of AXIS_ORDER) {
       const axis = AXES[key];

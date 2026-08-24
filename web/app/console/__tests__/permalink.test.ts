@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../../engine/job/axes.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "../state.js";
-import { AXIS_QUERY_KEY, SETTING_QUERY_KEYS, decodeSettings, encodeSettings } from "../permalink.js";
+import {
+  AXIS_QUERY_KEY,
+  SETTING_QUERY_KEYS,
+  decodeSettings,
+  encodeSettings,
+  settingsNotHonoured,
+} from "../permalink.js";
 
 /**
  * Every field here is set away from `DEFAULT_SETTINGS`, on purpose — all thirteen axes included,
@@ -230,6 +236,98 @@ describe("a hand-edited link", () => {
     expect(result.notices.length).toBeGreaterThan(0);
     for (const notice of result.notices) {
       expect(identifier.test(notice), `"${notice}" carries a code identifier`).toBe(false);
+    }
+  });
+});
+
+describe("what the panel could not carry is said out loud", () => {
+  /**
+   * The decoder's own notices cover what the LINK got wrong. This covers what the BENCH cannot
+   * do with a link that is entirely legal — three settings that are decoded and validated but have
+   * no control yet, a crowd count off the picker's fixed list, and a slider snapping to its own
+   * notches. Each of those silently changes a number the operator is about to read.
+   *
+   * It is written as a comparison of two settings objects rather than a list of fields believed to
+   * be uncontrolled, so a control added later stops producing its sentence with nothing to
+   * remember.
+   */
+  it("says nothing when the panel took everything", () => {
+    expect(settingsNotHonoured(awkward(), awkward())).toEqual([]);
+  });
+
+  it("names a setting there is no control for", () => {
+    const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, nearMissThresholdM: 0.3 });
+    const lines = settingsNotHonoured(asked, DEFAULT_SETTINGS);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("near-miss");
+    expect(lines[0]).toContain("0.3");
+    expect(lines[0]).toContain(String(DEFAULT_SETTINGS.nearMissThresholdM));
+  });
+
+  it("names an axis the slider snapped, by its plain-English name", () => {
+    const axisValues = { ...DEFAULT_SETTINGS.axisValues };
+    axisValues.crowdSize = 18.5;
+    const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, axisValues });
+    const lines = settingsNotHonoured(asked, DEFAULT_SETTINGS);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain(AXES.crowdSize.label);
+  });
+
+  it("tolerates the last bits of a double, which a slider's own rounding can move", () => {
+    const axisValues = { ...DEFAULT_SETTINGS.axisValues };
+    const drifted = AXES.holdingLine.defaultValue + Number.EPSILON * 4;
+    axisValues.holdingLine = drifted;
+    expect(drifted).not.toBe(AXES.holdingLine.defaultValue);
+    const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, axisValues });
+    expect(settingsNotHonoured(asked, DEFAULT_SETTINGS)).toEqual([]);
+  });
+
+  it("names a crowd count the picker had to snap", () => {
+    const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, seedCount: 3 });
+    const applied = makeConsoleSettings({ ...DEFAULT_SETTINGS, seedCount: 4 });
+    const lines = settingsNotHonoured(asked, applied);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("3");
+    expect(lines[0]).toContain("4");
+  });
+
+  it("names a sweep the panel could not reproduce", () => {
+    const asked = makeConsoleSettings({
+      ...DEFAULT_SETTINGS,
+      sweepAxis: "crowdSize",
+      sweepValues: [4, 18, 44],
+    });
+    const applied = makeConsoleSettings({
+      ...DEFAULT_SETTINGS,
+      sweepAxis: "crowdSize",
+      sweepValues: [4, 18],
+    });
+    const lines = settingsNotHonoured(asked, applied);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain(String(44));
+  });
+
+  it("names every toggle that ended up the other way", () => {
+    const asked = makeConsoleSettings({
+      ...DEFAULT_SETTINGS,
+      withFloor: true,
+      withFrechet: true,
+      withZeroReference: false,
+      pedestriansSeeRobot: false,
+    });
+    const lines = settingsNotHonoured(asked, DEFAULT_SETTINGS);
+    expect(lines.length).toBe(4);
+    for (const line of lines) {
+      expect(line).toMatch(/\bon\b|\boff\b/);
+    }
+  });
+
+  it("writes every one of them in plain English", () => {
+    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
+    const lines = settingsNotHonoured(awkward(), DEFAULT_SETTINGS);
+    expect(lines.length).toBeGreaterThan(5);
+    for (const line of lines) {
+      expect(identifier.test(line), `"${line}" carries a code identifier`).toBe(false);
     }
   });
 });

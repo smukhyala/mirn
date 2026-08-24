@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { AXES } from "../../../engine/job/axes.js";
 import { BAND_NOT_MEASURED } from "../tile.js";
 
 /**
@@ -27,9 +28,12 @@ import { BAND_NOT_MEASURED } from "../tile.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-async function boot(): Promise<Document> {
+async function boot(query = ""): Promise<Document> {
   const html = readFileSync(join(ROOT, "index.html"), "utf8");
-  const dom = new JSDOM(html, { pretendToBeVisual: true, url: "https://example.test/console" });
+  const dom = new JSDOM(html, {
+    pretendToBeVisual: true,
+    url: `https://example.test/console${query}`,
+  });
 
   // jsdom has no canvas, so `getContext` returns null and bootConsole's own guard would throw
   // before anything else mounted. A proxy that accepts every call and records none is enough:
@@ -87,5 +91,69 @@ describe("the console boots", () => {
     for (const tile of tiles) {
       expect(tile.querySelectorAll(".stamp").length).toBe(3);
     }
+  });
+});
+
+describe("a permalink is read back, not just written", () => {
+  /**
+   * The Copy-link button has always written the settings into the address bar. Nothing read them
+   * out again: `decodeSettings` had no production caller, `mountPanel` took no initial values, and
+   * opening a copied link silently produced the defaults while three surfaces — this page, the
+   * README and the module's own docstring — promised it reproduced the sweep exactly.
+   *
+   * Booted from the real HTML with the real module, which is the only place the wiring exists.
+   */
+  it("opens the controls at the settings the query string carries", async () => {
+    const document = await boot("?people=32&seeds=4&floor=1&zero=0&vary=people&values=8,18,32");
+    const crowd = document.querySelector<HTMLInputElement>('[data-axis="crowdSize"] input[type="range"]');
+    expect(crowd?.value).toBe("32");
+    expect(document.querySelector<HTMLSelectElement>("#seed-count")?.value).toBe("4");
+    expect(document.querySelector<HTMLInputElement>("#floor-on")?.checked).toBe(true);
+    expect(document.querySelector<HTMLInputElement>("#zero-on")?.checked).toBe(false);
+    expect(document.querySelector<HTMLSelectElement>("#sweep-axis")?.value).toBe("crowdSize");
+    expect(document.querySelector<HTMLInputElement>("#sweep-values")?.value).toBe("8 18 32");
+  });
+
+  it("prices the press for the link's sweep, not for a single run", async () => {
+    const document = await boot("?vary=people&values=8,18,32&seeds=4");
+    const cost = document.querySelector("#run-cost")?.textContent ?? "";
+    expect(cost.length).toBeGreaterThan(0);
+    expect(cost).toContain("12");
+  });
+
+  it("says nothing about the link when the link was clean", async () => {
+    const document = await boot("?people=32&seeds=4");
+    expect(document.querySelector("#link-notice")?.textContent).toBe("");
+  });
+
+  it("survives a hand-edited link and says what it could not use", async () => {
+    const document = await boot("?people=99999&unicorns=7&near_miss=0.3");
+    const notice = document.querySelector("#link-notice")?.textContent ?? "";
+    // Out of range, brought back in; an invented key, ignored; and a real setting with no control.
+    expect(notice).toContain("unicorns");
+    expect(notice).toContain("near-miss");
+    const crowd = document.querySelector<HTMLInputElement>('[data-axis="crowdSize"] input[type="range"]');
+    expect(crowd?.value).toBe(String(44));
+    expect(document.querySelectorAll(".tile").length).toBe(5);
+  });
+
+  it("puts that notice above the controls it is about, not below them", async () => {
+    const document = await boot("?unicorns=7");
+    const settings = document.querySelector("#settings");
+    const notice = document.querySelector("#link-notice");
+    const panel = document.querySelector(".panel");
+    expect(notice?.parentElement).toBe(settings);
+    expect(notice).not.toBeNull();
+    expect(panel).not.toBeNull();
+    const position = (notice as Element).compareDocumentPosition(panel as Node);
+    // DOCUMENT_POSITION_FOLLOWING: the panel comes after the notice.
+    expect(position & 4, "the notice must precede the panel").toBeTruthy();
+  });
+
+  it("still opens at the defaults with no query string at all", async () => {
+    const document = await boot();
+    const crowd = document.querySelector<HTMLInputElement>('[data-axis="crowdSize"] input[type="range"]');
+    expect(crowd?.value).toBe(String(AXES.crowdSize.defaultValue));
+    expect(document.querySelector("#link-notice")?.textContent).toBe("");
   });
 });

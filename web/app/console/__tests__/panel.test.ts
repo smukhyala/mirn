@@ -11,13 +11,15 @@ import {
   SEED_COUNT_CHOICES,
   type PanelValues,
 } from "../panel.js";
+import { decodeSettings, encodeSettings, settingsNotHonoured } from "../permalink.js";
+import { panelValuesFromSettings, settingsFromPanel } from "../preview.js";
 
 /**
  * The panel and the sweep picker are one table walked twice, and this file is what stops them
  * becoming two.
  *
- * The movesColumns assertion is guardrail 3 with the sequencing removed. instrument.html already
- * ships the violation it catches: a reaction-time slider sitting directly above a true-effect
+ * The movesColumns assertion is guardrail 3 with the sequencing removed. The deleted notebook
+ * shipped the violation it catches: a reaction-time slider sitting directly above a true-effect
  * tile, when reaction time is flat on true effect and moves minimum clearance instead. On a page
  * where every knob is on screen at once, the only defensible fix is that every knob names what it
  * moves, in words, beside itself.
@@ -232,3 +234,188 @@ function defaults(): Record<string, number> {
   }
   return out;
 }
+
+describe("the panel opens where a link tells it to", () => {
+  /**
+   * The seam a permalink comes in through. Without it the decoder had nowhere to put its answer:
+   * every control was built at its catalogue default, and a copied link lost its whole payload
+   * while the page promised otherwise.
+   *
+   * A control is allowed to refuse. What is asserted here is that the panel takes what it can and
+   * that `read()` tells the truth about the rest, which is what lets `web/console.ts` compare the
+   * two and print the difference rather than round a setting off in secret.
+   */
+  function initialValues(overrides: Partial<Parameters<typeof makePanelValues>[0]>): PanelValues {
+    const axisValues: Record<string, number> = {};
+    for (const key of AXIS_ORDER) {
+      axisValues[key] = AXES[key].defaultValue;
+    }
+    return makePanelValues({
+      axisValues,
+      pedestriansSeeRobot: true,
+      sweepAxis: null,
+      sweepValues: [],
+      seedCount: 1,
+      bandReplicates: 8,
+      detectionFloor: false,
+      frechet: false,
+      zeroReferenceRun: true,
+      ...overrides,
+    });
+  }
+
+  it("opens every control at the link's settings, not at the defaults", () => {
+    const axisValues: Record<string, number> = {};
+    for (const key of AXIS_ORDER) {
+      axisValues[key] = AXES[key].max;
+    }
+    const asked = initialValues({
+      axisValues,
+      pedestriansSeeRobot: false,
+      sweepAxis: "crowdSize",
+      sweepValues: [4, 18, 44],
+      seedCount: 8,
+      bandReplicates: 12,
+      detectionFloor: true,
+      frechet: true,
+      zeroReferenceRun: false,
+    });
+    const handle = mountPanel(host(), { onInput: () => {}, initial: asked });
+    const read = handle.read();
+    for (const key of AXIS_ORDER) {
+      expect(read.axisValues[key], key).toBe(AXES[key].max);
+    }
+    expect(read.pedestriansSeeRobot).toBe(false);
+    expect(read.sweepAxis).toBe("crowdSize");
+    expect(read.sweepValues).toEqual([4, 18, 44]);
+    expect(read.seedCount).toBe(8);
+    expect(read.bandReplicates).toBe(12);
+    expect(read.detectionFloor).toBe(true);
+    expect(read.frechet).toBe(true);
+    expect(read.zeroReferenceRun).toBe(false);
+  });
+
+  it("brings the value readouts and the debounce note with it", () => {
+    const axisValues: Record<string, number> = {};
+    for (const key of AXIS_ORDER) {
+      axisValues[key] = AXES[key].defaultValue;
+    }
+    axisValues["crowdSize"] = PREVIEW_DEBOUNCE_PEOPLE;
+    const handle = mountPanel(host(), { onInput: () => {}, initial: initialValues({ axisValues }) });
+    const control = handle.root.querySelector<HTMLElement>('[data-axis="crowdSize"]');
+    expect(control?.querySelector("output")?.value).toBe(String(PREVIEW_DEBOUNCE_PEOPLE));
+    expect(handle.root.querySelector("#preview-note")?.textContent ?? "").not.toBe("");
+  });
+
+  it("still pushes nothing on mount, so the first preview comes from read()", () => {
+    const seen: PanelValues[] = [];
+    mountPanel(host(), { onInput: (values) => seen.push(values), initial: initialValues({}) });
+    expect(seen).toEqual([]);
+  });
+
+  it("snaps a crowd count the picker does not offer, rather than reading back as none", () => {
+    // Assigning an unlisted value to a <select> leaves it reading "", which makePanelValues would
+    // reject as a count of zero — a legal link crashing the boot. The console says what happened.
+    const handle = mountPanel(host(), { onInput: () => {}, initial: initialValues({ seedCount: 3 }) });
+    expect(SEED_COUNT_CHOICES).not.toContain(3);
+    expect(SEED_COUNT_CHOICES).toContain(handle.read().seedCount);
+  });
+
+  it("switches the band off when the link says off", () => {
+    const handle = mountPanel(host(), {
+      onInput: () => {},
+      initial: initialValues({ bandReplicates: null }),
+    });
+    expect(handle.read().bandReplicates).toBeNull();
+  });
+});
+
+describe("copy a link, open the link", () => {
+  /**
+   * The whole journey, through the same three functions `web/console.ts` uses and in the same
+   * order: the Copy-link button's `encodeSettings(settingsFromPanel(panel.read()))`, then the boot
+   * path's `decodeSettings` and `panelValuesFromSettings`, then a second panel mounted from that.
+   *
+   * The two panels must read identically. This is the assertion the feature was missing: the
+   * encoder, the decoder and their round-trip were all tested in isolation while nothing on the
+   * page called the decoder at all, so a copied link looked like it worked and silently produced
+   * the defaults.
+   */
+  function copyAndOpen(prepare: (root: HTMLElement) => void): {
+    readonly before: PanelValues;
+    readonly after: PanelValues;
+    readonly notices: readonly string[];
+    readonly unhonoured: readonly string[];
+  } {
+    const first = mountPanel(host(), { onInput: () => {} });
+    prepare(first.root);
+    const before = first.read();
+
+    const query = encodeSettings(settingsFromPanel(before));
+    const decoded = decodeSettings(`?${query}`);
+    const second = mountPanel(host(), {
+      onInput: () => {},
+      initial: panelValuesFromSettings(decoded.settings),
+    });
+    const after = second.read();
+    return {
+      before,
+      after,
+      notices: decoded.notices,
+      unhonoured: settingsNotHonoured(decoded.settings, settingsFromPanel(after)),
+    };
+  }
+
+  it("brings the defaults back unchanged", () => {
+    const { before, after, notices, unhonoured } = copyAndOpen(() => {});
+    expect(notices).toEqual([]);
+    expect(unhonoured).toEqual([]);
+    expect(after).toEqual(before);
+  });
+
+  it("brings a moved slider, a switched toggle and a picked sweep back unchanged", () => {
+    const { before, after, notices, unhonoured } = copyAndOpen((root) => {
+      const crowd = root.querySelector<HTMLInputElement>('[data-axis="crowdSize"] input[type="range"]');
+      (crowd as HTMLInputElement).value = "32";
+      const seeRobot = root.querySelector<HTMLInputElement>("#see-robot");
+      (seeRobot as HTMLInputElement).checked = false;
+      const floor = root.querySelector<HTMLInputElement>("#floor-on");
+      (floor as HTMLInputElement).checked = true;
+      const seeds = root.querySelector<HTMLSelectElement>("#seed-count");
+      (seeds as HTMLSelectElement).value = "8";
+      const axis = root.querySelector<HTMLSelectElement>("#sweep-axis");
+      (axis as HTMLSelectElement).value = "crowdSize";
+      axis?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(notices).toEqual([]);
+    expect(unhonoured).toEqual([]);
+    expect(after.axisValues.crowdSize).toBe(32);
+    expect(after.pedestriansSeeRobot).toBe(false);
+    expect(after.detectionFloor).toBe(true);
+    expect(after.seedCount).toBe(8);
+    expect(after.sweepAxis).toBe("crowdSize");
+    expect(after.sweepValues).toEqual(before.sweepValues);
+    expect(after).toEqual(before);
+  });
+
+  it("brings every axis back from its own maximum", () => {
+    // One slider at a time would pass with a swapped pair of query keys; all thirteen at their
+    // maxima would too. Each axis is set to a DIFFERENT fraction of its own range instead.
+    const { before, after, notices, unhonoured } = copyAndOpen((root) => {
+      let index = 0;
+      for (const key of AXIS_ORDER) {
+        const entry = AXES[key];
+        const notches = Math.round((entry.max - entry.min) / entry.step);
+        const notch = notches === 0 ? 0 : (index % (notches + 1));
+        const slider = root.querySelector<HTMLInputElement>(`[data-axis="${key}"] input[type="range"]`);
+        (slider as HTMLInputElement).value = String(entry.min + notch * entry.step);
+        index += 3;
+      }
+    });
+    expect(notices).toEqual([]);
+    expect(unhonoured).toEqual([]);
+    for (const key of AXIS_ORDER) {
+      expect(after.axisValues[key], key).toBe(before.axisValues[key]);
+    }
+  });
+});

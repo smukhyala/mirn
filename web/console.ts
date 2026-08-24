@@ -6,10 +6,11 @@ import { SIM_CONSTANTS } from "./engine/contracts/config.js";
 import { COLUMNS, COLUMN_ORDER, HEADLINE_COLUMNS, type ColumnKey } from "./engine/job/columns.js";
 import type { SweepJob } from "./engine/job/spec.js";
 import type { RunRow } from "./engine/job/stats.js";
-import { mountPanel, type PanelValues } from "./app/console/panel.js";
+import { mountPanel, type PanelOptions, type PanelValues } from "./app/console/panel.js";
 import {
   DEBOUNCE_MS,
   isRenderable,
+  panelValuesFromSettings,
   resolveZero,
   runPreview,
   settingsFromPanel,
@@ -47,7 +48,7 @@ import {
   type SortKey,
 } from "./app/console/table.js";
 import { toCsv, makeCsvOptions } from "./app/console/csv.js";
-import { encodeSettings } from "./app/console/permalink.js";
+import { decodeSettings, encodeSettings, settingsNotHonoured } from "./app/console/permalink.js";
 
 /**
  * The console's wiring.
@@ -59,10 +60,10 @@ import { encodeSettings } from "./app/console/permalink.js";
  * Editing a setting re-simulates the preview and repaints the arena and every tile. Nothing here
  * ever buys the run-to-run band — 267 ms is not a keystroke budget — so every tile's gauge is
  * handed `{ kind: "bandNotMeasured" }`, always, regardless of what has actually been measured.
- * The preview's tiles do not repaint when a press of Run finishes, either: `#readouts-note` in
- * console.html says why two of the seven are never shown here, and that stays true after Run as
- * much as before it — a finished press lands in the kept list at the bottom of the page, not back
- * into this preview.
+ * The preview's tiles do not repaint when a press of Run finishes, either: the note under the
+ * readouts in `web/index.html` says why two of the seven are never shown here, and that stays true
+ * after Run as much as before it — a finished press lands in the kept list at the bottom of the
+ * page, not back into this preview.
  */
 
 function el<T extends HTMLElement>(doc: Document, id: string): T {
@@ -74,12 +75,11 @@ function el<T extends HTMLElement>(doc: Document, id: string): T {
 }
 
 /**
- * The transport strip. Built here rather than written into console.html, matching how `#settings`
- * is populated by `mountPanel` rather than hand-authored: every host named in console.html is an
- * empty mount point, and a later task's markup never has to be reconciled against this file's.
- * The ids and classes match `web/instrument.html`'s static transport exactly, so the `.transport`
- * and `.scrub` rules folded into `web/console.css` (from the deleted `web/style.css`, task 36)
- * style this one for free.
+ * The transport strip. Built here rather than written into `web/index.html`, matching how
+ * `#settings` is populated by `mountPanel` rather than hand-authored: every host named in the page
+ * is an empty mount point, and its markup never has to be reconciled against this file's. The ids
+ * and classes are the ones `web/console.css`'s `.transport` and `.scrub` rules were written for,
+ * so this strip is styled for free.
  *
  * The seed stepper is built here too, for the same reason: a cell (a ledger row) has no seed, so
  * this is what picks which run inside it plays. `playing-note` is a sibling of `#transport`
@@ -155,13 +155,15 @@ function buildTransport(
 
 /**
  * The button, and the cost and status text beside it — built here, not written into
- * `console.html`, for the same reason `buildTransport` above is.
+ * `web/index.html`, for the same reason `buildTransport` above is.
  *
  * `mountPanel` appends its own root into `#settings` (`host.append(root)`), so anything already
  * sitting in that host when the panel mounts ends up ABOVE it in the DOM, not below — the
  * opposite of "the button commits the settings above it". An earlier attempt at this exact button
- * put it directly into `console.html`'s static markup and was reverted for exactly that reason
- * (`git log -- web/console.html`): a button already in the aside pushed the panel below it.
+ * put it directly into the page's static markup and was reverted for exactly that reason (`git
+ * log -- web/console.html`, before the page was renamed): a button already in the aside pushed the
+ * panel below it. The link notice is the one thing deliberately appended to `#settings` BEFORE the
+ * panel mounts, because it is meant to sit above the controls it is about.
  *
  * The fix is to build this detached — nothing here is attached to the document yet — and let
  * `bootConsole` decide when to attach it: after `mountPanel` has already appended its own root,
@@ -443,9 +445,9 @@ export function bootConsole(doc: Document): void {
    * Rebuilds the legend from what `sweepPlotView` actually drew, rather than a hand-written list
    * of three items — the same reason a censored point breaks the line instead of a caption
    * asserting a floor that was never drawn: the legend must never claim a series the figure above
-   * it does not have. Mirrors web/notes.ts's own dynamic-legend construction for the identical
-   * plot, reusing its swatch classes (`legend-accent`, `legend-grey-N`) for the two lines; the
-   * band gets `legend-region`, the one swatch kind that widget never needed.
+   * it does not have. The swatch classes (`legend-accent`, `legend-grey-N`) are the ones
+   * `web/console.css` styles for the two lines; the band gets `legend-region`, the one swatch kind
+   * a line plot never needed.
    */
   const renderLegend = (view: PlotView): void => {
     while (curveLegend.firstChild !== null) {
@@ -563,8 +565,17 @@ export function bootConsole(doc: Document): void {
       renderKept();
       return;
     }
+    // Validate, then assign, in that order and both together. `makePlaybackSelection` throws, and
+    // assigning `selectedCell` before it ran would leave the highlighted row and the playing run
+    // pointing at different things if it ever did. Unreachable today, and it is the pattern the
+    // rest of this codebase follows everywhere else.
+    const selection = makePlaybackSelection({
+      groupId: ref.groupId,
+      axisIndex: ref.axisIndex,
+      seedIndex: 0,
+    });
     selectedCell = ref;
-    playback = makePlaybackSelection({ groupId: ref.groupId, axisIndex: ref.axisIndex, seedIndex: 0 });
+    playback = selection;
     playSelected();
     drawCurve();
     renderKept();
@@ -790,10 +801,53 @@ export function bootConsole(doc: Document): void {
     requestAnimationFrame(frame);
   };
 
-  const panel = mountPanel(settingsHost, { onInput: scheduleRecompute });
+  // The link's read side, and the only thing on this page that survives a reload.
+  //
+  // The Copy-link button below writes `encodeSettings` into the address bar; this is what makes
+  // opening that link reproduce the sweep rather than silently discard it. Decoding happens BEFORE
+  // the panel is mounted, so the controls are built at the link's settings rather than built at
+  // the defaults and then corrected — no flash of a room the link did not ask for.
+  //
+  // `decodeSettings` never throws: a hand-edited query is a reader poking at a URL bar, and every
+  // key it could not use comes back as a sentence in `notices` rather than as an exception. Those
+  // are printed. So is everything the panel itself could not take, which the decoder cannot know
+  // about — a crowd count off the picker's list, a slider snapping to its own notches, or one of
+  // the three settings that are decoded and validated but have no control yet. That second list is
+  // read back out of the mounted panel rather than predicted, so it cannot go stale when a control
+  // is added.
+  const linkNotice = doc.createElement("p");
+  linkNotice.className = "link-notice";
+  linkNotice.id = "link-notice";
+  settingsHost.append(linkNotice);
+
+  const noticeLines: string[] = [];
+  let askedFor: ConsoleSettings | null = null;
+  const query = window.location.search;
+  if (query.length > 0 && query !== "?") {
+    const decoded = decodeSettings(query);
+    askedFor = decoded.settings;
+    for (const notice of decoded.notices) {
+      noticeLines.push(notice);
+    }
+  }
+
+  let panelOptions: PanelOptions = { onInput: scheduleRecompute };
+  if (askedFor !== null) {
+    panelOptions = { onInput: scheduleRecompute, initial: panelValuesFromSettings(askedFor) };
+  }
+  const panel = mountPanel(settingsHost, panelOptions);
   // mountPanel appends its own root last, so the run block — built detached above specifically so
   // it could be attached only now — lands after it: the button sits below the settings it commits.
   settingsHost.append(runBlock);
+
+  if (askedFor !== null) {
+    for (const line of settingsNotHonoured(askedFor, settingsFromPanel(panel.read()))) {
+      noticeLines.push(line);
+    }
+  }
+  if (noticeLines.length > 0) {
+    linkNotice.textContent = `This page opened from a link. ${noticeLines.join(" ")}`;
+  }
 
   scrub.addEventListener("input", () => {
     sample = Number(scrub.value);

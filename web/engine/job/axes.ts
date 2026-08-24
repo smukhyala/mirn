@@ -35,7 +35,10 @@ export type AxisKey =
   | "forecastHorizon"
   | "forecastWindowEnd";
 
-interface AxisCommon {
+/** The half of an axis entry that does not depend on what it writes. Exported because both
+ *  variants below extend it and a reader following `WorldAxis` has nowhere else to find these
+ *  ten fields. */
+export interface AxisCommon {
   readonly key: AxisKey;
   readonly label: string;
   readonly unit: UnitKey;
@@ -145,7 +148,13 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     unit: "none" as const,
     min: 0.4,
     max: 2,
-    step: 0.05,
+    // 0.01, not 0.05. A range input snaps whatever it is given to its own notches, and 1.34 is
+    // not a multiple of 0.05 above 0.4 — so in a real browser (though not in jsdom, which does not
+    // sanitise) this slider opened at 1.35 and the console simulated a crowd walking at 1.35 while
+    // `DEFAULT_CONFIG.crowd.desiredSpeed` and every test used 1.34. The default is the measured
+    // mean preferred walking speed and is not the thing to move; the notch spacing is.
+    // `axes.slow.test.ts` now asserts every axis's default, minimum and maximum sit on its grid.
+    step: 0.01,
     defaultValue: 1.34,
     note: "In metres per second. It is not monotone: the effect peaks around a strolling pace, so a sentence claiming faster always means more would be false at one end of this dial.",
     writes: Object.freeze(["crowd.desiredSpeed"]),

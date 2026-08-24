@@ -13,9 +13,9 @@ import { unitLabel } from "../../ui/labels.js";
  *
  * Each control also prints the readouts its entry declares it moves. On a page with no reading
  * order, that is the only form guardrail 3 can take: a knob is always on screen, so it always has
- * to say what it does. instrument.html ships the failure - a reaction-time slider directly above a
- * true-effect tile, when reaction time is flat on true effect (0.290 to 0.269, inside seed noise)
- * and moves minimum clearance monotonically instead.
+ * to say what it does. The notebook this console replaced shipped the failure - a reaction-time
+ * slider directly above a true-effect tile, when reaction time is flat on true effect (0.290 to
+ * 0.269, inside seed noise) and moves minimum clearance monotonically instead.
  *
  * PanelValues is a frozen plain record and is what a job is built from. PanelHandle has function
  * members and never leaves the main thread.
@@ -37,6 +37,19 @@ export interface PanelValues {
 
 export interface PanelOptions {
   readonly onInput: (values: PanelValues) => void;
+  /**
+   * Where the controls open, when that is not their defaults. This is the seam a permalink comes
+   * in through: `web/console.ts` decodes the query string before mounting and hands the result
+   * here, so the panel is never built at the defaults and then corrected — the operator never
+   * sees a flash of settings that are not the link's. Omitted, every control opens where its
+   * catalogue entry says.
+   *
+   * A control is allowed to refuse: the crowd count is a fixed list of choices and a slider snaps
+   * to its own notches, so `read()` can legitimately hand back something other than what was
+   * passed in. Nothing is silently rounded off in secret — the caller compares the two and prints
+   * the difference (`settingsNotHonoured` in `web/app/console/permalink.ts`).
+   */
+  readonly initial?: PanelValues;
 }
 
 export interface PanelHandle {
@@ -47,7 +60,9 @@ export interface PanelHandle {
 
 export const SEED_COUNT_CHOICES: readonly number[] = Object.freeze([1, 2, 4, 8, 16]);
 
-/** Above this crowd, the preview waits for the end of the drag. 92 ms a frame is not a preview. */
+/** At this crowd and above, the preview waits for the end of the drag rather than re-simulating
+ *  on every keystroke of the slider. 92 ms a frame is not a preview. The comparison is `>=` and
+ *  this is exactly `crowdSize`'s own maximum, so a strict `>` would make the note unreachable. */
 export const PREVIEW_DEBOUNCE_PEOPLE = 44;
 
 const DEFAULT_BAND_REPLICATES = 8;
@@ -165,6 +180,28 @@ function sweepValuesFor(key: AxisKey): readonly number[] {
     }
   }
   return out;
+}
+
+/**
+ * The nearest crowd count this panel actually offers.
+ *
+ * The seed picker is a fixed list, not a number field, so a link asking for three crowds has no
+ * option to select. Assigning an unlisted value to a `<select>` leaves it reading the empty
+ * string, which `makePanelValues` would then reject as a crowd count of zero — a legal link
+ * crashing the boot. Snapping to the nearest offered choice is what the control can honestly do;
+ * saying so is the caller's job.
+ */
+function nearestSeedCount(requested: number): number {
+  let best = 1;
+  let bestGap = Number.POSITIVE_INFINITY;
+  for (const choice of SEED_COUNT_CHOICES) {
+    const gap = Math.abs(requested - choice);
+    if (gap < bestGap) {
+      best = choice;
+      bestGap = gap;
+    }
+  }
+  return best;
 }
 
 function movesSentence(key: AxisKey): string {
@@ -421,7 +458,15 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
     });
   }
 
-  function refresh(): void {
+  /**
+   * Everything the panel says about its own state, and nothing about anybody else's.
+   *
+   * Split out of `refresh` so the initial application below can bring the readouts and the
+   * debounce note into line with the values it just wrote WITHOUT calling `onInput`. Mounting has
+   * never pushed the settings it starts at (`web/console.ts` pulls them from `read()` instead),
+   * and a permalink must not be the one case that changes that.
+   */
+  function paintReadouts(): void {
     for (const key of AXIS_ORDER) {
       const slider = sliders.get(key);
       const readout = outputs.get(key);
@@ -439,9 +484,48 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
       people >= PREVIEW_DEBOUNCE_PEOPLE
         ? "This many people take long enough to simulate that the preview waits until you let go of the slider."
         : "";
+  }
 
+  function refresh(): void {
+    paintReadouts();
     const values = read();
     options.onInput(values);
+  }
+
+  const initial = options.initial;
+  if (initial !== undefined) {
+    for (const key of AXIS_ORDER) {
+      const slider = sliders.get(key);
+      if (slider !== undefined) {
+        // Assignment, then read back: a range input sanitises what it is given against its own
+        // min, max and step, so this line is where a link's 18.5 people quietly becomes 18. The
+        // caller is what makes that audible.
+        slider.value = String(initial.axisValues[key]);
+      }
+    }
+    seeRobot.checked = initial.pedestriansSeeRobot;
+    if (initial.sweepAxis === null) {
+      axisSelect.value = "";
+      valuesField.value = "";
+      valuesField.disabled = true;
+    } else {
+      axisSelect.value = initial.sweepAxis;
+      valuesField.disabled = false;
+      const written: string[] = [];
+      for (const value of initial.sweepValues) {
+        written.push(String(value));
+      }
+      valuesField.value = written.join(" ");
+    }
+    seedSelect.value = String(nearestSeedCount(initial.seedCount));
+    bandToggle.checked = initial.bandReplicates !== null;
+    if (initial.bandReplicates !== null) {
+      bandCount.value = String(initial.bandReplicates);
+    }
+    floorToggle.checked = initial.detectionFloor;
+    frechetToggle.checked = initial.frechet;
+    zeroToggle.checked = initial.zeroReferenceRun;
+    paintReadouts();
   }
 
   for (const key of AXIS_ORDER) {

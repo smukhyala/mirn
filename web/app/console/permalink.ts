@@ -9,6 +9,13 @@ import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "./s
  * with the new page's authority. Determinism is what makes the recipe sufficient — reloading a
  * permalink shows an empty ledger and a primed Run that reproduces the sweep exactly.
  *
+ * Both halves are wired. `encodeSettings` is what the Copy-link button writes into the address
+ * bar; `decodeSettings` is what `web/console.ts` reads out of `window.location.search` before it
+ * mounts the panel, so a link opens at its own settings rather than at the defaults. A link whose
+ * settings the panel cannot actually take is not silently rounded off either: `settingsNotHonoured`
+ * below compares what was asked for against what the mounted panel reads back, and the console
+ * prints the difference.
+ *
  * Decoding never throws. A hand-edited query string is a reader poking at a URL bar, not a
  * programming error, so an unknown key is ignored with a notice and an out-of-range value is
  * brought back into range with a notice. `makeConsoleSettings` still throws if this file ever
@@ -45,6 +52,27 @@ const BAND = "band";
 const FLOOR = "floor";
 const FRECHET = "frechet";
 const ZERO = "zero";
+
+/**
+ * One spelling per setting, for every sentence this file writes about one.
+ *
+ * The decoder's own notices and `settingsNotHonoured`'s both name these things to a reader, and
+ * two hand-written spellings of "the recovery dwell" would eventually disagree. Guardrail 12
+ * forbids the query key itself reaching a reader, so `recovery_dwell` is never what is printed.
+ */
+const SETTING_LABEL = Object.freeze({
+  pedestriansSeeRobot: "Whether the people notice the robot",
+  nearMissThresholdM: "The near-miss line",
+  recoveryToleranceFraction: "The recovery tolerance",
+  recoveryDwellSteps: "The recovery dwell",
+  seedCount: "The number of crowds",
+  bandReplicates: "The number of band replicates",
+  withFloor: "The detection floor",
+  withFrechet: "The walked-together ruler",
+  withZeroReference: "The zero-effect reference run",
+  sweepAxis: "The setting being varied",
+  sweepValues: "The values it is varied over",
+});
 
 export const SETTING_QUERY_KEYS: readonly string[] = Object.freeze([
   NOTICE_ROBOT,
@@ -297,7 +325,7 @@ export function decodeSettings(query: string): DecodeResult {
     params,
     NOTICE_ROBOT,
     DEFAULT_SETTINGS.pedestriansSeeRobot,
-    "Whether the people notice the robot",
+    SETTING_LABEL.pedestriansSeeRobot,
     notices,
   );
   const nearMissThresholdM = readBounded(
@@ -308,7 +336,7 @@ export function decodeSettings(query: string): DecodeResult {
       low: 0.05,
       high: 5,
       wholeNumber: false,
-      label: "The near-miss line",
+      label: SETTING_LABEL.nearMissThresholdM,
     },
     notices,
   );
@@ -320,7 +348,7 @@ export function decodeSettings(query: string): DecodeResult {
       low: 0.01,
       high: 1,
       wholeNumber: false,
-      label: "The recovery tolerance",
+      label: SETTING_LABEL.recoveryToleranceFraction,
     },
     notices,
   );
@@ -332,7 +360,7 @@ export function decodeSettings(query: string): DecodeResult {
       low: 1,
       high: 400,
       wholeNumber: true,
-      label: "The recovery dwell",
+      label: SETTING_LABEL.recoveryDwellSteps,
     },
     notices,
   );
@@ -344,7 +372,7 @@ export function decodeSettings(query: string): DecodeResult {
       low: 1,
       high: 32,
       wholeNumber: true,
-      label: "The number of seeds",
+      label: SETTING_LABEL.seedCount,
     },
     notices,
   );
@@ -357,7 +385,7 @@ export function decodeSettings(query: string): DecodeResult {
       low: 0,
       high: 32,
       wholeNumber: true,
-      label: "The number of band replicates",
+      label: SETTING_LABEL.bandReplicates,
     },
     notices,
   );
@@ -369,13 +397,13 @@ export function decodeSettings(query: string): DecodeResult {
     bandReplicates = 0;
   }
 
-  const withFloor = readFlag(params, FLOOR, DEFAULT_SETTINGS.withFloor, "The detection floor", notices);
-  const withFrechet = readFlag(params, FRECHET, DEFAULT_SETTINGS.withFrechet, "The Frechet ruler", notices);
+  const withFloor = readFlag(params, FLOOR, DEFAULT_SETTINGS.withFloor, SETTING_LABEL.withFloor, notices);
+  const withFrechet = readFlag(params, FRECHET, DEFAULT_SETTINGS.withFrechet, SETTING_LABEL.withFrechet, notices);
   const withZeroReference = readFlag(
     params,
     ZERO,
     DEFAULT_SETTINGS.withZeroReference,
-    "The zero-effect reference run",
+    SETTING_LABEL.withZeroReference,
     notices,
   );
 
@@ -399,4 +427,191 @@ export function decodeSettings(query: string): DecodeResult {
     settings,
     notices: Object.freeze(notices),
   });
+}
+
+/**
+ * Two numbers are the same setting.
+ *
+ * `String` writes the shortest text that reads back as the identical double, so a value that
+ * survives a control untouched comes back bit for bit. What does not is a value the browser
+ * snapped: a range input rounds to its own notches, and the rounding arithmetic can land a
+ * fraction of a last bit away from the notch it aimed at. Exact equality would then report a
+ * setting as lost that is in fact exactly where the operator can see it, so the comparison is
+ * made at the scale of the numbers rather than at the scale of a double.
+ */
+function sameSetting(asked: number, applied: number): boolean {
+  let scale = 1;
+  if (Math.abs(asked) > scale) {
+    scale = Math.abs(asked);
+  }
+  if (Math.abs(applied) > scale) {
+    scale = Math.abs(applied);
+  }
+  return Math.abs(asked - applied) <= 1e-9 * scale;
+}
+
+function describeNumber(value: number): string {
+  return String(value);
+}
+
+function describeFlag(value: boolean): string {
+  return value ? "on" : "off";
+}
+
+function sameValues(asked: readonly number[], applied: readonly number[]): boolean {
+  if (asked.length !== applied.length) {
+    return false;
+  }
+  for (let i = 0; i < asked.length; i++) {
+    const askedValue = asked[i];
+    const appliedValue = applied[i];
+    if (askedValue === undefined || appliedValue === undefined) {
+      return false;
+    }
+    if (!sameSetting(askedValue, appliedValue)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function describeList(values: readonly number[]): string {
+  if (values.length === 0) {
+    return "nothing";
+  }
+  const written: string[] = [];
+  for (const value of values) {
+    written.push(String(value));
+  }
+  return written.join(", ");
+}
+
+function notHonoured(label: string, asked: string, applied: string): string {
+  return `The link asked for ${label} to be ${asked}, which no control here can be set to, so it is ${applied}.`;
+}
+
+/**
+ * What the link asked for and the panel could not take.
+ *
+ * A permalink is a hand-editable string and the panel is a fixed set of controls, so the two can
+ * disagree in three ways: a setting with no control at all (the near-miss line, the recovery
+ * tolerance and the recovery dwell are decoded and validated but have no slider yet), a control
+ * that offers a fixed list (the crowd count), and a slider that snaps to its own notches. Every
+ * one of them silently changes a number the operator is about to read, so every one of them is
+ * said out loud instead. The comparison is made against what the mounted panel actually reads
+ * back, not against a list of fields believed to be uncontrolled, so a control added later stops
+ * producing its sentence without anybody having to remember this function exists.
+ */
+export function settingsNotHonoured(
+  asked: ConsoleSettings,
+  applied: ConsoleSettings,
+): readonly string[] {
+  const lines: string[] = [];
+
+  for (const key of AXIS_ORDER) {
+    const askedValue = asked.axisValues[key];
+    const appliedValue = applied.axisValues[key];
+    if (!sameSetting(askedValue, appliedValue)) {
+      lines.push(
+        notHonoured(AXES[key].label, describeNumber(askedValue), describeNumber(appliedValue)),
+      );
+    }
+  }
+
+  if (asked.pedestriansSeeRobot !== applied.pedestriansSeeRobot) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.pedestriansSeeRobot,
+        describeFlag(asked.pedestriansSeeRobot),
+        describeFlag(applied.pedestriansSeeRobot),
+      ),
+    );
+  }
+  if (!sameSetting(asked.nearMissThresholdM, applied.nearMissThresholdM)) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.nearMissThresholdM,
+        describeNumber(asked.nearMissThresholdM),
+        describeNumber(applied.nearMissThresholdM),
+      ),
+    );
+  }
+  if (!sameSetting(asked.recoveryToleranceFraction, applied.recoveryToleranceFraction)) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.recoveryToleranceFraction,
+        describeNumber(asked.recoveryToleranceFraction),
+        describeNumber(applied.recoveryToleranceFraction),
+      ),
+    );
+  }
+  if (!sameSetting(asked.recoveryDwellSteps, applied.recoveryDwellSteps)) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.recoveryDwellSteps,
+        describeNumber(asked.recoveryDwellSteps),
+        describeNumber(applied.recoveryDwellSteps),
+      ),
+    );
+  }
+  if (asked.sweepAxis !== applied.sweepAxis) {
+    const askedName = asked.sweepAxis === null ? "nothing" : AXES[asked.sweepAxis].label;
+    const appliedName = applied.sweepAxis === null ? "nothing" : AXES[applied.sweepAxis].label;
+    lines.push(notHonoured(SETTING_LABEL.sweepAxis, askedName, appliedName));
+  } else if (!sameValues(asked.sweepValues, applied.sweepValues)) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.sweepValues,
+        describeList(asked.sweepValues),
+        describeList(applied.sweepValues),
+      ),
+    );
+  }
+  if (!sameSetting(asked.seedCount, applied.seedCount)) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.seedCount,
+        describeNumber(asked.seedCount),
+        describeNumber(applied.seedCount),
+      ),
+    );
+  }
+  if (!sameSetting(asked.bandReplicates, applied.bandReplicates)) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.bandReplicates,
+        describeNumber(asked.bandReplicates),
+        describeNumber(applied.bandReplicates),
+      ),
+    );
+  }
+  if (asked.withFloor !== applied.withFloor) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.withFloor,
+        describeFlag(asked.withFloor),
+        describeFlag(applied.withFloor),
+      ),
+    );
+  }
+  if (asked.withFrechet !== applied.withFrechet) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.withFrechet,
+        describeFlag(asked.withFrechet),
+        describeFlag(applied.withFrechet),
+      ),
+    );
+  }
+  if (asked.withZeroReference !== applied.withZeroReference) {
+    lines.push(
+      notHonoured(
+        SETTING_LABEL.withZeroReference,
+        describeFlag(asked.withZeroReference),
+        describeFlag(applied.withZeroReference),
+      ),
+    );
+  }
+
+  return Object.freeze(lines);
 }

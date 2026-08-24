@@ -11,6 +11,7 @@ import {
   shouldDebounce,
   stampsFor,
 } from "../preview.js";
+import { unitSuffix } from "../tile.js";
 
 /**
  * The preview is the page's honesty at the moment of turning a knob: what the arena shows and what
@@ -74,9 +75,18 @@ describe("the live preview", () => {
   it("stamps every readout with the settings it was measured at", () => {
     const stamps = stampsFor(runPreview(settings));
     const labels = stamps.map((stamp) => stamp.label);
-    expect(labels).toContain("people");
+    expect(labels).toContain("crowd");
     expect(labels).toContain("forecast horizon");
     expect(labels).toContain("measured at");
+  });
+
+  it("never labels a stamp with its own unit, which would print the word twice", () => {
+    // "people 18 people": the label sits before the value and the unit suffix after it.
+    for (const stamp of stampsFor(runPreview(settings))) {
+      expect(stamp.label, `the ${stamp.label} stamp repeats its unit`).not.toBe(
+        unitSuffix(stamp.unit),
+      );
+    }
   });
 
   it("debounces at the crowd size the panel warns about, which is also the slider's own max", () => {
