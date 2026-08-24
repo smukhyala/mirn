@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
+import { makeRunConfig } from "../../../engine/contracts/config.js";
 import { ContractError } from "../../../engine/core/errors.js";
-import type { Reading, ZeroReference } from "../../../engine/job/columns.js";
+import { COLUMNS, COLUMN_ORDER, type Reading, type ZeroReference } from "../../../engine/job/columns.js";
+import { buildContext, type MeasurementParams, type ReportContext } from "../../../engine/job/report.js";
+import { runPair } from "../../../engine/sim/run.js";
+import { anchorFor } from "../../../ui/labels.js";
 import {
   BAND_NOT_MEASURED,
   makeTileProps,
@@ -38,7 +42,14 @@ const EXACT_ZERO: ZeroReference = {
 
 const GEOMETRIC_BOUND: ZeroReference = {
   kind: "geometricBound",
+  noRunReadsBelow: true,
   how: "the shortest crossing this room allows",
+};
+
+const GEOMETRIC_REFERENCE: ZeroReference = {
+  kind: "geometricBound",
+  noRunReadsBelow: false,
+  how: "the point at which the two outlines touch, which readings sit on both sides of",
 };
 
 const BASE: TilePropsInit = {
@@ -67,6 +78,53 @@ function leafText(root: Element): readonly { readonly className: string; readonl
     }
   }
   return leaves;
+}
+
+/**
+ * The four leaves that exist to print a number, and are the only ones allowed to contain one.
+ *
+ * `tile-zero-how` is deliberately absent. It is the phrase beside the zero's own value slot, and
+ * six catalogue entries used to spell the value out inside it as well, so the rendered tile read
+ * "0.000 m  ... and this reads 0.000 m". The phrase is the one leaf most likely to acquire a
+ * hardcoded figure, which is exactly why it is scanned rather than excused.
+ */
+const VALUE_SLOTS: readonly string[] = ["tile-number", "tile-zero-value", "stamp-value", "gauge-number"];
+
+function literalsOutsideValueSlots(tile: Element): readonly string[] {
+  const literal = /\d+\.\d+\s*(m|s)\b/;
+  const offenders: string[] = [];
+  for (const leaf of leafText(tile)) {
+    if (VALUE_SLOTS.includes(leaf.className)) {
+      continue;
+    }
+    if (literal.test(leaf.text)) {
+      offenders.push(`${leaf.className}: ${leaf.text}`);
+    }
+  }
+  return offenders;
+}
+
+const PARAMS: MeasurementParams = Object.freeze({
+  kind: "measurementParams" as const,
+  forecastHorizonSteps: 60,
+  forecastEndStep: 200,
+  nearMissThresholdM: 0.5,
+  recoveryToleranceFraction: 0.25,
+  recoveryDwellSteps: 20,
+});
+
+/** One real paired run, so every descriptor's `assumption(ctx)` is the string a reader gets. */
+function realContext(): ReportContext {
+  const config = makeRunConfig({});
+  return buildContext({
+    config,
+    params: PARAMS,
+    run: runPair(config),
+    band: null,
+    floor: null,
+    zeroRun: null,
+    frechetMeanM: null,
+  });
 }
 
 describe("the headline tile", () => {
@@ -107,6 +165,40 @@ describe("the headline tile", () => {
     expect(tile.querySelector(".tile-zero-unit")?.textContent).toBe("s");
   });
 
+  it("renders a plain zero as a plain number, with no bound and no sign", () => {
+    // The assertion guardrail 6 most wants and the one branch of this ternary nothing pinned.
+    const props = makeTileProps({ ...BASE, zero: zeroRenderingFor(EXACT_ZERO, 0, "metres") });
+    const tile = renderTile(doc, props);
+    expect(tile.querySelector(".tile-zero-value")?.textContent).toBe("0.000");
+    expect(tile.querySelector(".tile-zero-unit")?.textContent).toBe("m");
+  });
+
+  it("prints no bound on a geometric zero that readings sit below", () => {
+    // Minimum clearance: its zero is where the two outlines touch, and an overlap reads below it.
+    // A "greater than" sign here would contradict both the phrase beside it and the value above.
+    const props = makeTileProps({
+      ...BASE,
+      reading: measured(-0.05),
+      anchor: null,
+      zero: zeroRenderingFor(GEOMETRIC_REFERENCE, 0, "metres"),
+    });
+    const tile = renderTile(doc, props);
+    expect(tile.querySelector(".tile-zero-value")?.textContent).toBe("0.000");
+  });
+
+  it("gives minimum clearance a zero that is not a floor, and the two cost columns ones that are", () => {
+    // Pinned against the real catalogue, not a fixture: the rendering above is only correct
+    // because these three declare what they declare.
+    const clearance = COLUMNS.minClearanceM.zero;
+    expect(clearance.kind).toBe("geometricBound");
+    expect(clearance.kind === "geometricBound" && clearance.noRunReadsBelow).toBe(false);
+    for (const key of ["robotPathM", "robotArrivalS"] as const) {
+      const zero = COLUMNS[key].zero;
+      expect(zero.kind).toBe("geometricBound");
+      expect(zero.kind === "geometricBound" && zero.noRunReadsBelow).toBe(true);
+    }
+  });
+
   it("prints no metre or second value outside a value slot", () => {
     const tile = renderTile(
       doc,
@@ -115,18 +207,7 @@ describe("the headline tile", () => {
         gauge: { kind: "bandMeasured", bandM: 0.311, nReplicates: 8 },
       }),
     );
-    const slots = ["tile-number", "tile-zero-value", "stamp-value", "gauge-number"];
-    const literal = /\d+\.\d+\s*(m|s)\b/;
-    const offenders: string[] = [];
-    for (const leaf of leafText(tile)) {
-      if (slots.includes(leaf.className)) {
-        continue;
-      }
-      if (literal.test(leaf.text)) {
-        offenders.push(`${leaf.className}: ${leaf.text}`);
-      }
-    }
-    expect(offenders).toEqual([]);
+    expect(literalsOutsideValueSlots(tile)).toEqual([]);
   });
 
   it("says the band is unmeasured rather than drawing one", () => {
@@ -145,5 +226,63 @@ describe("the headline tile", () => {
     expect(tile.querySelectorAll(".gauge-tick").length).toBe(1);
     expect(tile.querySelector(".gauge-number")?.textContent).toBe("8");
     expect(tile.querySelector(".gauge-figure")?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("the real column catalogue, rendered", () => {
+  /**
+   * The guard CLAUDE.md's "no numeric literal appears in console copy" sentence claims, pointed at
+   * the strings that are actually shipped.
+   *
+   * It used to run on the `BASE` fixture above, whose label, assumption, anchor and zero phrase are
+   * all written in this file — so the only real strings it ever scanned were the three hardcoded
+   * inside `tile.ts`, and six catalogue phrases carrying literal metres went unnoticed for the
+   * whole of the console's life. Every column is rendered here, not just the seven headlines: a
+   * column nobody has ticked yet is still copy a reader can reach through the column picker.
+   */
+  const context = realContext();
+
+  it("prints no metre or second value outside a value slot, for any column", () => {
+    const offenders: string[] = [];
+    for (const key of COLUMN_ORDER) {
+      const descriptor = COLUMNS[key];
+      // The zero's resolved VALUE is not what is under test — the strings are — so every column
+      // that needs a finite one is handed the same plausible number. `notAPerturbation` is the
+      // one kind whose value is NaN by contract, and `zeroRenderingFor` refuses a NaN for any
+      // other kind, which is why this is not simply zero everywhere.
+      const resolved = descriptor.zero.kind === "notAPerturbation" ? Number.NaN : 0.25;
+      const value = 0.352;
+      const tile = renderTile(
+        doc,
+        makeTileProps({
+          column: key,
+          label: descriptor.label,
+          unit: descriptor.unit,
+          reading: measured(value),
+          zero: zeroRenderingFor(descriptor.zero, resolved, descriptor.unit),
+          gauge: { kind: "bandMeasured", bandM: 0.311, nReplicates: 8 },
+          stamps: [{ kind: "settingStamp", label: "people", value: 18, unit: "people" }],
+          assumption: descriptor.assumption(context),
+          anchor: descriptor.needsAnchor ? anchorFor(value) : null,
+        }),
+      );
+      for (const offender of literalsOutsideValueSlots(tile)) {
+        offenders.push(`${key} -> ${offender}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("renders a bound only where the column says no run reads below its zero", () => {
+    for (const key of COLUMN_ORDER) {
+      const descriptor = COLUMNS[key];
+      if (descriptor.zero.kind === "notAPerturbation") {
+        continue;
+      }
+      const rendering = zeroRenderingFor(descriptor.zero, 0.25, descriptor.unit);
+      const expected =
+        descriptor.zero.kind === "geometricBound" ? descriptor.zero.noRunReadsBelow : false;
+      expect(rendering.bound, `${key} renders the wrong kind of zero`).toBe(expected);
+    }
   });
 });

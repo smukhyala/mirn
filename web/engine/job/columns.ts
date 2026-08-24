@@ -93,7 +93,18 @@ function notApplicable(why: string): Reading {
 export type ZeroReference =
   | { readonly kind: "exactZero"; readonly how: string }
   | { readonly kind: "companionColumn"; readonly column: ColumnKey; readonly how: string }
-  | { readonly kind: "geometricBound"; readonly how: string }
+  /**
+   * A number the geometry of the room fixes, rather than a measurement.
+   *
+   * `noRunReadsBelow` is what the tile renders as a "greater than" sign in front of the value,
+   * and it is a separate question from the kind. Two of these three really are floors: an empty
+   * room still costs the robot the straight line to its goal, so no run can travel less far or
+   * arrive sooner. The third is the coordinate zero of a clearance, where the two outlines touch
+   * — a perfectly ordinary reading sits below it, because the outlines overlap. Rendering that
+   * one as a floor put a "greater than zero" claim directly underneath a negative number, with
+   * the phrase beside it explaining that negative numbers happen.
+   */
+  | { readonly kind: "geometricBound"; readonly how: string; readonly noRunReadsBelow: boolean }
   | { readonly kind: "notAPerturbation"; readonly how: string };
 
 export interface ColumnDescriptor {
@@ -176,7 +187,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: true,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "Switch off the setting that lets people notice the robot and this reads 0.000 m, exactly and every time.",
+      how: "Switch off the setting that lets people notice the robot and this reads exactly zero, every time.",
     }),
     assumption: pairedAssumption,
     extract: (ctx: ReportContext): Reading => measured(paired(ctx.run.pair).value),
@@ -232,7 +243,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: true,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "Nobody in this reference run responded to the robot, so the honest answer for it is 0.000 m and whatever appears here is the forecaster's own error.",
+      how: "Nobody in this reference run responded to the robot, so the honest answer for it is zero and whatever appears here is the forecaster's own error.",
     }),
     assumption: forecastAssumption,
     extract: (ctx: ReportContext): Reading => {
@@ -332,6 +343,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: false,
     zero: Object.freeze({
       kind: "geometricBound" as const,
+      noRunReadsBelow: true,
       how: "An empty room still costs the robot the straight line from where it started to the edge of its goal, so no run can read below that.",
     }),
     assumption: (): string =>
@@ -357,6 +369,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: false,
     zero: Object.freeze({
       kind: "geometricBound" as const,
+      noRunReadsBelow: true,
       how: "The shortest crossing that counts as arriving, walked flat out at the robot's own speed limit, is the fastest this could possibly read.",
     }),
     assumption: (): string =>
@@ -391,7 +404,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: true,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "A treatment that changed nothing about the robot's route leaves this at exactly 0.000 m.",
+      how: "A treatment that changed nothing about the robot's route leaves this at exactly zero.",
     }),
     assumption: (): string =>
       "The difference between the robot's two routes. It exists only when the robot is in both " +
@@ -403,7 +416,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
             "subtract and no difference to report.",
         );
       }
-      const cost = robotCost(ctx.run.treated, ctx.run.control, ctx.config.dt);
+      const cost = robotCost(ctx.run.treated, ctx.run.control);
       // Unreachable today: `robotCost` only returns a non-finite `extraPathM` when either arm's
       // robot is missing, the control-arm case is already caught above, and `runPair` always
       // puts a robot in the treated arm. Kept because `RobotCost.extraPathM` is typed to allow
@@ -427,7 +440,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: false,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "If nobody was slowed or hurried, every person settles at the same instant in both runs and this reads exactly 0.0 s.",
+      how: "If nobody was slowed or hurried, every person settles at the same instant in both runs and this reads exactly zero.",
     }),
     assumption: (): string =>
       "Each person is compared with themselves in the other run, and anyone who never settled " +
@@ -455,6 +468,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: false,
     zero: Object.freeze({
       kind: "geometricBound" as const,
+      noRunReadsBelow: false,
       how: "Zero means the two outlines just touched; below zero they overlapped, and above zero that is the gap between them.",
     }),
     assumption: (): string =>
@@ -531,7 +545,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: false,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "A crowd that never left the tolerance in the first place is back inside it at 0.0 s.",
+      how: "A crowd that never left the tolerance in the first place is already back inside it, so this reads zero.",
     }),
     assumption: (): string =>
       "Recovered is a property of the tolerance that was chosen, not of the room. The tolerance " +
@@ -567,7 +581,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: true,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "Two identical paths need no leash at all, so this reads exactly 0.000 m when nobody moved differently.",
+      how: "Two identical paths need no leash at all, so this reads exactly zero when nobody moved differently.",
     }),
     assumption: (): string =>
       "The shortest leash that would let somebody walk both of their paths at once without ever " +

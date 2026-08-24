@@ -47,11 +47,22 @@ export function unitSuffix(unit: UnitKey): string {
 
 export interface ZeroRendering {
   readonly kind: "zeroRendering";
-  /** The phrase alone. It never contains a number — the number is `value`. */
+  /**
+   * The phrase alone. It never contains a number — the number is `value`, printed immediately
+   * before it. Six catalogue phrases used to say "…reads 0.000 m" beside a slot already printing
+   * 0.000 m, and `tile.test.ts` now renders every real column to keep that from coming back.
+   */
   readonly how: string;
   /** NaN only when the reference is `notAPerturbation`. */
   readonly value: number;
   readonly unit: UnitKey;
+  /**
+   * Whether to print the value as a floor, with a "greater than" sign in front of it.
+   *
+   * Read off the reference's own `noRunReadsBelow` field, never off its `kind`. Deriving it from
+   * the kind put "> 0.000 m" under a minimum clearance of -0.050 m, beside a phrase saying that
+   * clearances go below zero: one line contradicting itself and the number above it.
+   */
   readonly bound: boolean;
 }
 
@@ -68,7 +79,7 @@ export function zeroRenderingFor(
   if (reference.kind === "notAPerturbation") {
     value = Number.NaN;
   } else if (reference.kind === "geometricBound") {
-    bound = true;
+    bound = reference.noRunReadsBelow;
   }
   if (reference.kind !== "notAPerturbation" && !Number.isFinite(value)) {
     throw new ContractError(
