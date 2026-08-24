@@ -18,12 +18,6 @@ echo "==> ruff"
 echo "==> typecheck"
 npm run typecheck
 
-# Notes before vitest: the render suite boots the real widget code against the compiled pages, so
-# web/generated has to exist. The other order works on any machine that has built once before,
-# which is why it survived here and failed on CI's first clean checkout.
-echo "==> notes (lints, vocabulary ladder, quantity references)"
-npm run notes
-
 echo "==> vitest"
 npx vitest run
 

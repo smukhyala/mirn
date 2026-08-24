@@ -27,11 +27,21 @@ describe("the console page is the page the build ships", () => {
     expect(run().trim()).toBe("web/console.html");
   });
 
-  it("is a Vite entry point, beside index and instrument", () => {
+  it("is the build's only entry point", () => {
     const config = readFileSync("vite.config.ts", "utf8");
     expect(config).toContain('console: resolve(__dirname, "web/console.html")');
-    expect(config).toContain('index: resolve(__dirname, "web/index.html")');
-    expect(config).toContain('instrument: resolve(__dirname, "web/instrument.html")');
+    // Asserting the ABSENCE is the point. A surviving `instrument` entry would mean the build is
+    // still emitting a page whose source this task deleted.
+    expect(config).not.toContain("instrument");
+    expect(config).not.toContain("generatedPages");
+  });
+
+  it("builds workers as modules, because every sweep runs in one", () => {
+    const config = readFileSync("vite.config.ts", "utf8");
+    // This assertion exists because a rewrite of vite.config.ts once dropped the line silently.
+    // Vite's default worker output is iife, which cannot serve the `{ type: "module" }` worker
+    // web/app/worker/client.ts constructs, and the failure surfaces at runtime rather than here.
+    expect(config).toContain('format: "es"');
   });
 
   it("leaves the generated contents page and the ignore list alone", () => {
