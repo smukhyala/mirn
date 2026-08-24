@@ -98,37 +98,53 @@ describe("the keyboard is not left behind by the notebook's deletion", () => {
   });
 });
 
-describe("the console's own .readouts rule wins the cascade over the one borrowed from the deleted instrument page", () => {
+describe("the readouts grid narrows on a narrow viewport", () => {
   /**
-   * web/console.css now carries two .readouts rules at the same specificity: one folded in
-   * verbatim from the deleted web/style.css (task 36), written originally for the also-deleted
-   * web/instrument.html, and the console's own further down. Same-specificity rules are decided by
-   * source order, so the console's own rule must keep appearing AFTER the borrowed one and must
-   * keep neutralising the properties the borrowed one sets — otherwise the console inherits a
-   * hairline rule and top padding that nothing in its design asked for.
+   * web/console.css used to carry two .readouts rules at the same specificity — one folded in from
+   * the deleted web/style.css and the console's own further down — plus a single-column breakpoint
+   * written above both of them. Media queries add no specificity, so that breakpoint lost to every
+   * later rule at every width and the tiles stayed two across on a phone. There is one base rule
+   * now, and the breakpoints come after it, narrowest last.
+   *
+   * This reads the file rather than a rendered page because jsdom implements no cascade: it parses
+   * the stylesheet but resolves nothing, so a booted-page assertion here would pass whatever the
+   * order was.
    */
-  it("still has padding-top and border-top in the borrowed .readouts rule, so this is a real collision to guard against", () => {
-    const css = readFileSync("web/console.css", "utf8");
-    // Anchored to the start of a line: this file's own convention is that a rule nested inside a
-    // multi-line @media block is indented, and a rule folded onto one line with its @media wrapper
-    // (as the borrowed 720px breakpoint is) never starts the line either. Both of the file's two
-    // @media .readouts breakpoint overrides are excluded this way, leaving just the two base rules.
-    const rules = [...css.matchAll(/^\.readouts\s*\{([^}]*)\}/gm)];
-    expect(rules, "expected exactly two .readouts rules in web/console.css").toHaveLength(2);
-    expect(rules[0]?.[1]).toMatch(/padding-top:/);
-    expect(rules[0]?.[1]).toMatch(/border-top:/);
+  const css = readFileSync("web/console.css", "utf8");
+
+  it("declares .readouts exactly once outside a breakpoint", () => {
+    // Anchored to the start of a line: a rule nested inside a multi-line @media block in this file
+    // is indented, so this matches base rules only.
+    const base = [...css.matchAll(/^\.readouts\s*\{([^}]*)\}/gm)];
+    expect(base, "expected exactly one base .readouts rule in web/console.css").toHaveLength(1);
   });
 
-  it("places its own .readouts rule after the borrowed one, and neutralises padding-top and border-top", () => {
-    const css = readFileSync("web/console.css", "utf8");
-    // Anchored to the start of a line: this file's own convention is that a rule nested inside a
-    // multi-line @media block is indented, and a rule folded onto one line with its @media wrapper
-    // (as the borrowed 720px breakpoint is) never starts the line either. Both of the file's two
-    // @media .readouts breakpoint overrides are excluded this way, leaving just the two base rules.
-    const rules = [...css.matchAll(/^\.readouts\s*\{([^}]*)\}/gm)];
-    expect(rules, "expected exactly two .readouts rules in web/console.css").toHaveLength(2);
-    const own = rules[1]?.[1] ?? "";
-    expect(own).toMatch(/padding-top:\s*0\b/);
-    expect(own).toMatch(/border-top:\s*none\b/);
+  it("puts every column-count breakpoint after that rule, narrowest last", () => {
+    const base = css.search(/^\.readouts\s*\{/m);
+    expect(base).toBeGreaterThan(-1);
+    const twoAcross = css.indexOf("repeat(2, minmax(0, 1fr))");
+    const oneAcross = css.search(/^\s+\.readouts \{ grid-template-columns: minmax\(0, 1fr\); \}/m);
+    expect(twoAcross, "the two-column breakpoint is missing").toBeGreaterThan(base);
+    expect(oneAcross, "the single-column breakpoint is missing").toBeGreaterThan(twoAcross);
+  });
+
+  it("declares the single-column breakpoint at a narrower width than the two-column one", () => {
+    const widths: number[] = [];
+    for (const match of css.matchAll(/@media \(max-width: (\d+(?:\.\d+)?)rem\)/g)) {
+      widths.push(Number(match[1]));
+    }
+    expect(widths.length).toBeGreaterThanOrEqual(2);
+    let previous = Number.POSITIVE_INFINITY;
+    for (const width of widths) {
+      expect(width, "breakpoints must be written widest first").toBeLessThan(previous);
+      previous = width;
+    }
+  });
+
+  it("lets the ledger scroll sideways rather than the whole document", () => {
+    // .ledger-wrap is the only element around a table that can be ten columns wide.
+    const rule = /^\.ledger-wrap\s*\{([^}]*)\}/m.exec(css);
+    expect(rule, ".ledger-wrap has no rule at all").not.toBeNull();
+    expect(rule?.[1]).toMatch(/overflow-x:\s*auto/);
   });
 });

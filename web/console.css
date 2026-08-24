@@ -5,17 +5,21 @@
  *
  * .legend-grey-0, .legend-grey-1 and .legend-grey-2 (in the sweep-legend swatches below) are easy
  * to think unused: no source file spells them as literal text. web/console.ts builds the class
- * name as `legend-grey-${greyIndex % 3}`, so searching for the string finds nothing.
+ * name as `legend-grey-${greyIndex % 3}`, so searching for the string finds nothing. They are the
+ * only classes in this file that a grep will not find; anything else with no producer in web/ is
+ * dead and should go, which is how the .readouts, .tile-label, .tile-value, .legend, .tile-note,
+ * .accent, .ledger-note and .kept-line duplicates left over from the deleted web/style.css were
+ * found. Two same-specificity rules for one selector is not a cascade trick worth keeping: the
+ * later one silently owns every property both declare, and an editor changing the earlier one
+ * sees no effect at all.
  */
 
-/* ---------------------------------------------------------------- base and borrowed rules */
+/* ---------------------------------------------------------------- base rules */
 
 /*
- * Moved here from web/style.css (task 36), which styled the deleted notebook pages and has been
- * deleted along with them. These are the rules the console itself was actually relying on; they
- * sit first in the file, in their original relative order, so any console-specific rule below
- * that shares a selector with one of these — .readouts, .tile-label, .tile-value — continues to
- * win the cascade for it exactly as it did when style.css was a separate, earlier-linked file.
+ * Inherited from web/style.css (task 36), which styled the deleted notebook pages and has been
+ * deleted along with them. These are the rules the console itself was actually relying on, and
+ * each one is now the only rule in the file for its selector.
  */
 
 * { box-sizing: border-box; }
@@ -40,20 +44,17 @@ body {
 }
 .standfirst { margin: 0; max-width: 38rem; color: var(--mirn-ink-muted); }
 
-main {
-  max-width: 72rem;
-  margin: 2rem auto 0;
-  padding: 0 2rem;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 17rem;
-  gap: 2rem;
-  align-items: start;
-}
-@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+/*
+ * The page's one <main> carries class="console-main", and every property this used to set is set
+ * again by .console-main below — at (0,1,0) against this selector's (0,0,1), so the class wins
+ * whatever the source order and whatever the viewport. The layout, its narrow-viewport collapse
+ * and the one property nothing else declared (align-items) all live there now. A `main` rule and
+ * a `.console-main` rule for the same element is a trap: an editor changing the former sees the
+ * page not move.
+ */
 
 #arena {
   width: 100%;
-  aspect-ratio: 22 / 13;
   display: block;
   background: var(--mirn-paper);
   border: 1px solid var(--mirn-rule);
@@ -69,7 +70,6 @@ main {
   color: var(--mirn-ink-muted);
 }
 .transport output { color: var(--mirn-ink); font-variant-numeric: tabular-nums; }
-.transport .accent output { color: var(--mirn-perturbation); }
 .scrub { flex: 1; display: flex; }
 .scrub input { width: 100%; }
 
@@ -85,19 +85,6 @@ button {
   cursor: pointer;
 }
 button:hover { background: var(--mirn-surface); }
-
-.legend {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.2rem;
-  margin: 0.9rem 0 0;
-  padding: 0;
-  font-family: var(--mirn-font-mono);
-  font-size: 0.72rem;
-  color: var(--mirn-ink-muted);
-}
-.legend li { display: flex; align-items: center; gap: 0.45rem; }
 
 .panel-title {
   margin: 0;
@@ -118,6 +105,27 @@ button:hover { background: var(--mirn-surface); }
 .control output { color: var(--mirn-ink); font-variant-numeric: tabular-nums; }
 .toggle { display: flex; align-items: center; gap: 0.5rem; }
 
+/* A knob's name, the note under it and guardrail 3's "Moves:" sentence are three different kinds
+   of thing and were three identical lines of grey mono. The name is the label; the note is prose;
+   the moves sentence is the guarantee that this control changes a readout you can see, so it is
+   the one that must not read as decoration. */
+.control-label { color: var(--mirn-ink); }
+.control-note { font-family: var(--mirn-font-sans); font-size: 0.74rem; line-height: 1.45; }
+.control-moves { color: var(--mirn-ink-faint); letter-spacing: 0.03em; }
+
+/* Three sections in one narrow column with nothing between them read as one long list. */
+.panel { display: flex; flex-direction: column; gap: 1.6rem; }
+.panel-group { display: flex; flex-direction: column; gap: 0.9rem; }
+
+/* Set as prose, not as another control: it is a sentence about the preview, not a knob. */
+.panel-note { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--mirn-ink-muted); }
+.panel-note:empty { display: none; }
+
+/* What a link could not carry, printed above the controls it is about. Empty on an ordinary
+   visit, and an empty paragraph must not open a gap where no message is. */
+.link-notice { margin: 0 0 1.2rem; font-size: 0.74rem; line-height: 1.5; color: var(--mirn-ink-muted); }
+.link-notice:empty { display: none; }
+
 input[type="range"] { width: 100%; accent-color: var(--mirn-ink); }
 input[type="checkbox"] { accent-color: var(--mirn-ink); }
 
@@ -128,35 +136,14 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-.readouts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.25rem;
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--mirn-rule);
-}
-@media (max-width: 720px) { .readouts { grid-template-columns: minmax(0, 1fr); } }
-
-.tile-label {
-  margin: 0 0 0.3rem;
-  font-family: var(--mirn-font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.62rem;
-  color: var(--mirn-ink-faint);
-}
-.tile-value {
-  margin: 0 0 0.4rem;
-  font-family: var(--mirn-font-mono);
-  font-size: 1.6rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-/* The one coloured number on the page is the perturbation itself. */
-.tile-value.accent output { color: var(--mirn-perturbation); }
-.tile-value .unit { font-size: 0.8rem; color: var(--mirn-ink-faint); }
-.tile-note { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--mirn-ink-muted); }
+/*
+ * .readouts, .tile-label and .tile-value each had a second, earlier declaration here, moved in
+ * from web/style.css. Every property all three declared was declared again by the console's own
+ * rules further down the file, so the earlier copies decided nothing; .tile-value.accent output
+ * and .tile-value .unit decided nothing either, because no element on this page is given class
+ * "accent" and the unit span's class is .tile-unit. --mirn-perturbation still reaches the one
+ * number it belongs to, through .gauge-tick, and the accent is spent nowhere else.
+ */
 
 /* Each swatch reproduces its line's actual stroke. Weight and dash are the only thing
    distinguishing series once hue is gone, so a shared swatch would make the legend useless. */
@@ -179,6 +166,7 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   max-width: 76rem;
   margin: 0 auto;
   padding: 0 2rem;
+  align-items: start;
 }
 .console-masthead { max-width: 52rem; margin: 0 auto; padding: 3rem 2rem 1.5rem; }
 
@@ -222,20 +210,12 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 /* The transport's seed stepper: a cell has no seed, so this picks which run inside it plays. */
 .seed-picker { display: inline-flex; align-items: center; gap: 0.4rem; }
 
-/*
- * This file's own borrowed .readouts rule above (moved from the deleted web/style.css, written
- * originally for web/instrument.html) is at the same specificity as this one. Because it appears
- * earlier in the file, this rule only wins the properties it declares — so padding-top and
- * border-top must be neutralised explicitly here, or the instrument page's hairline rule and top
- * padding leak onto the console for no reason this page's design asked for.
- */
+/* The only .readouts rule in the file. Its column count is narrowed twice at the bottom. */
 .readouts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.4rem 1.6rem;
   margin: 1.4rem 0;
-  padding-top: 0;
-  border-top: none;
 }
 
 .ledger-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
@@ -244,22 +224,21 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 /* ---------------------------------------------------------------- the kept-results ledger */
 
 /*
- * This block was the task-28 brief's own `web/style.css` addition. CLAUDE.md's "Code conventions"
- * section is explicit that console styling goes in this file, never style.css — the same
- * disagreement task 27's brief hit over the run block above, and the contract wins again. Set as a
- * financial table: tabular figures, hairline row rules, no cell borders, no zebra.
+ * Set as a financial table: tabular figures, hairline row rules, no cell borders, no zebra.
  *
- * The brief's own `.ledger-row.is-selected` rule spent `--mirn-perturbation` on a selection
- * highlight, which is chrome, not a perturbation-related number — `web/ui/theme.ts`'s own header
- * comment is explicit that the token exists so it CANNOT be reached for a button, a link or a
- * focus ring without the code visibly lying, and `web/style.css`'s `.start-link` comment says the
- * same about the page's one inverted link ("the accent belongs to the perturbation, nowhere
- * else"). Selection here is plain ink instead, the same family as `.verdict`'s left rule.
- * `.compare-number` keeps the accent: unlike a selection outline, it prints a measured delta
- * between two pinned cells' own perturbation readings — the same use `web/notes.ts`'s several
- * `accent-number` spans already make for a measured quantity mid-sentence, not chrome.
+ * `.ledger-row.is-selected` does not spend `--mirn-perturbation` on a selection highlight, which
+ * is chrome rather than a perturbation-related number — `web/ui/theme.ts`'s own header comment is
+ * explicit that the token exists so it CANNOT be reached for a button, a link or a focus ring
+ * without the code visibly lying. Selection here is plain ink instead. `.compare-number` keeps the
+ * accent: unlike a selection outline, it prints a measured delta between two pinned cells' own
+ * perturbation readings, which is exactly what the token is for.
+ *
+ * The table is the one thing on this page that can be wider than the viewport — ten columns of
+ * numbers do not fold — so it carries its own horizontal scroll rather than making the whole
+ * document slide sideways under everything else.
  */
-.ledger-note, .ledger-stale { margin: 0.5rem 0 0; font-size: 0.74rem; color: var(--mirn-ink-faint); }
+.ledger-wrap { overflow-x: auto; }
+.ledger-stale { margin: 0.5rem 0 0; font-size: 0.74rem; color: var(--mirn-ink-faint); }
 .ledger { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.82rem; margin-top: 0.8rem; }
 .ledger th { text-align: left; font-weight: 500; font-family: var(--mirn-font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--mirn-ink-faint); padding: 0.3rem 0.6rem 0.4rem 0; cursor: pointer; }
 .ledger .col-unit { display: block; color: var(--mirn-rule); }
@@ -312,12 +291,6 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 
 /* ---------------------------------------------------------------- Run: the button, its cost, its progress */
 
-/*
- * The task-27 brief put this block in web/style.css. CLAUDE.md's own "Code conventions" section is
- * explicit that console styling goes in this file, never style.css, so it lands here instead — the
- * brief and the project's own operating contract disagreed, and the contract wins.
- */
-
 /* The one inverted element on the page. One solid mass tells the eye where the verb is. It does
  * not spend --mirn-perturbation: that token belongs to the perturbation alone (CLAUDE.md). */
 .run {
@@ -352,10 +325,24 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   width: calc(var(--mirn-progress, 0) * 100%);
   background: var(--mirn-ink);
 }
-.kept-line { margin: 0.3rem 0; font-family: var(--mirn-font-mono); font-size: 0.72rem; }
 .kept-empty { color: var(--mirn-ink-muted); font-size: 0.82rem; }
 
+/*
+ * Last in the file on purpose. Media queries add no specificity, so a narrowing rule only wins if
+ * it comes after every wider rule for the same selector — the single-column .readouts rule this
+ * replaces sat above two later three- and two-column ones and could not fire at any width at all.
+ * Narrowest last, so each one overrides the one above it.
+ */
 @media (max-width: 60rem) {
   .console-main { grid-template-columns: minmax(0, 1fr); }
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* A tile carries a 1.6rem value, an anchor sentence, a gauge, a zero row and a stamp row. Two of
+   them across a phone is about 150px each, which is not enough for any of it. */
+@media (max-width: 45rem) {
+  .console-main { padding: 0 1.2rem; }
+  .console-masthead { padding: 2rem 1.2rem 1.2rem; }
+  .ledger-region { padding: 0 1.2rem; }
+  .readouts { grid-template-columns: minmax(0, 1fr); }
 }
