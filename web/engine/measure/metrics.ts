@@ -13,7 +13,7 @@ import { argmax, mean, pathLength, perStepDistance } from "./kernels.js";
  *
  * These functions compute values. They do not carry a description of how the value was reached:
  * the arithmetic runs here, over the kernels in `kernels.ts`, and the wording a reader opens
- * underneath a number is built by hand in `web/notes.ts`. Keeping the two in step is a convention
+ * underneath a number is written by hand in `web/engine/job/columns.ts`. Keeping the two in step is a convention
  * and not a mechanism — a derivation panel has already once explained a different quantity from
  * the one printed above it — so a change to any formula below is a change to its builder as well.
  */
@@ -62,26 +62,28 @@ export function deviation(pair: PairedRun): Deviation {
 }
 
 /**
- * How much further the robot travelled, and how much longer it took.
+ * How much further the robot travelled.
  *
- * Signed, deliberately. A shove toward the goal genuinely shortens the path and saves time, and
- * clipping that to zero would be a lie — which is why these do not go through
- * `PerturbationEstimate`, whose `value >= 0` rule is correct for divergences and wrong here.
+ * Signed, deliberately. A shove toward the goal genuinely shortens the path, and clipping that to
+ * zero would be a lie — which is why this does not go through `PerturbationEstimate`, whose
+ * `value >= 0` rule is correct for divergences and wrong here.
  *
- * `timeLostS` is censored when an arm never reaches the goal: the tile must then render "> 4.2 s"
- * rather than a number, because a bound is not a measurement.
+ * It used to carry four more fields — a time lost, a censoring flag and both arrival times — all
+ * of them derived from a "first step after which the path stops moving" heuristic. That heuristic
+ * is the one that reported a 1.1 m/s robot arriving at 2.26 m/s under a heavy deflection weight,
+ * because a robot pinned against the crowd stops moving without having arrived. Nothing ever read
+ * those four: the console's arrival column goes through `arrivalSecondsOf`, which asks the
+ * simulator when the robot actually came inside its goal radius rather than guessing from the
+ * shape of the path. They are gone rather than merely unused, because the next author of a
+ * time-to-goal column would have found `treatedArrivalS` sitting here and reached for it.
  */
 export interface RobotCost {
   readonly extraPathM: number;
   readonly treatedPathM: number;
   readonly controlPathM: number;
-  readonly timeLostS: number;
-  readonly censored: boolean;
-  readonly treatedArrivalS: number;
-  readonly controlArrivalS: number;
 }
 
-export function robotCost(treated: RunResult["treated"], control: RunResult["control"], dt: number): RobotCost {
+export function robotCost(treated: RunResult["treated"], control: RunResult["control"]): RobotCost {
   const a = treated.robotPositions;
   const b = control.robotPositions;
   if (a === null) {
@@ -89,55 +91,26 @@ export function robotCost(treated: RunResult["treated"], control: RunResult["con
       extraPathM: Number.NaN,
       treatedPathM: Number.NaN,
       controlPathM: b === null ? Number.NaN : pathLength(b),
-      timeLostS: Number.NaN,
-      censored: true,
-      treatedArrivalS: Number.NaN,
-      controlArrivalS: Number.NaN,
     };
   }
   if (b === null) {
     // A robot-presence pair has no robot in the control arm, so there is nothing to compare the
-    // robot's own journey AGAINST — but the treated robot still has a path and an arrival time,
-    // and those are the whole x-axis of the politeness trade-off. The first version discarded
-    // them along with the comparison and every time-to-goal came back NaN.
-    const treatedArrivalOnly = arrivalStep(a);
+    // robot's own journey AGAINST — but the treated robot still has a path of its own, and
+    // discarding that along with the comparison would lose a measurement that is perfectly well
+    // defined.
     return {
       extraPathM: Number.NaN,
       treatedPathM: pathLength(a),
       controlPathM: Number.NaN,
-      timeLostS: Number.NaN,
-      censored: true,
-      treatedArrivalS: treatedArrivalOnly < 0 ? Number.NaN : treatedArrivalOnly * dt,
-      controlArrivalS: Number.NaN,
     };
   }
   const treatedPathM = pathLength(a);
   const controlPathM = pathLength(b);
-  const treatedArrival = arrivalStep(a);
-  const controlArrival = arrivalStep(b);
-  const censored = treatedArrival < 0 || controlArrival < 0;
   return {
     extraPathM: treatedPathM - controlPathM,
     treatedPathM,
     controlPathM,
-    timeLostS: censored ? Number.NaN : (treatedArrival - controlArrival) * dt,
-    censored,
-    treatedArrivalS: treatedArrival < 0 ? Number.NaN : treatedArrival * dt,
-    controlArrivalS: controlArrival < 0 ? Number.NaN : controlArrival * dt,
   };
-}
-
-/** First step after which the path never moves again: the robot has stopped at its goal. */
-function arrivalStep(path: Float64Array): number {
-  const nSteps = path.length / 2;
-  for (let s = 1; s < nSteps; s++) {
-    const dx = (path[2 * s] as number) - (path[2 * s - 2] as number);
-    const dy = (path[2 * s + 1] as number) - (path[2 * s - 1] as number);
-    if (Math.sqrt(dx * dx + dy * dy) < 1e-4) {
-      return s;
-    }
-  }
-  return -1;
 }
 
 /**

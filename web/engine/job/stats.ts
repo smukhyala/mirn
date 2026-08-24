@@ -2,17 +2,16 @@ import { fail } from "../core/errors.js";
 import type { ColumnKey, Reading } from "./columns.js";
 
 /**
- * The numeric helpers the experiment script and the console both average with.
+ * The numeric helpers the console averages a swept cell with.
  *
  * This file must never import from `web/engine/measure/`. That directory is checked against a
  * Python oracle and `web/engine/job/` deliberately is not (CLAUDE.md, guardrails 8 and 9), so a
  * shared dependency between them would drag one into the other's parity obligations for no
  * benefit.
  *
- * These three were lifted verbatim out of scripts/measure-experiments.ts. The filter/reduce form
- * survives the house preference for explicit loops on purpose: web/data/experiment-facts.json is
- * committed and diffed byte for byte, so the summation order here is observable output rather
- * than style.
+ * These three were lifted verbatim out of the research era's own measurement script, which is
+ * deleted. The filter/reduce form survives the house preference for explicit loops because the
+ * summation order is observable in an exported CSV rather than a matter of style.
  */
 
 /**
@@ -95,13 +94,18 @@ export function aggregate(readings: readonly Reading[]): Aggregate {
   const value = meanOf(values);
   const sd = sdOf(values);
 
-  let reason: AggregateReason = { kind: "measured" };
+  // No initializer: the chain below is exhaustive and assigns in every branch, and one here
+  // would be a value no path can reach.
+  let reason: AggregateReason;
   if (nUsed === nAttempted) {
     reason = { kind: "measured" };
   } else if (nUsed > 0) {
     reason = {
       kind: "partiallyCensored",
-      why: `averaged ${nUsed} of ${nAttempted} runs; the rest were not measured: ${firstReason(
+      // "did not produce one" rather than "were not measured": an entry can be dropped because it
+      // was censored OR because it did not apply to that run, and not applicable is not the same
+      // claim as not measured. `firstReason` names which of the two it was.
+      why: `averaged ${nUsed} of ${nAttempted} runs; the rest did not produce one: ${firstReason(
         censoredWhy,
         notApplicableWhy,
       )}`,
