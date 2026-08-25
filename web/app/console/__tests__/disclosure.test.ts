@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DISCLOSURE_CLAUSES } from "../csv.js";
 
@@ -29,13 +29,26 @@ describe("the console page is the page the build ships", () => {
     expect(run().trim()).toBe("web/index.html");
   });
 
-  it("is the build's only entry point", () => {
+  it("is an entry point, alongside the working page and nothing else", () => {
     const config = readFileSync("vite.config.ts", "utf8");
     expect(config).toContain('index: resolve(__dirname, "web/index.html")');
-    // Asserting the ABSENCE is the point. A surviving `instrument` entry would mean the build is
-    // still emitting a page whose source this task deleted.
+    expect(config).toContain('how: resolve(__dirname, "web/how.html")');
+    // Asserting the ABSENCE is still the point, and it is what this test is actually for. A
+    // surviving `instrument` entry would mean the build is still emitting a page whose source an
+    // earlier task deleted.
     expect(config).not.toContain("instrument");
     expect(config).not.toContain("generatedPages");
+    // The entry map used to be guarded by being a single named page. It is two now, so the guard
+    // is stated directly instead of implied: every entry names a file that exists, and there are
+    // exactly as many entries as there are hand-written pages. An entry whose HTML has been
+    // deleted fails here rather than at deploy, which is the same defect the `instrument`
+    // assertion above catches for one particular name.
+    const entries = [...config.matchAll(/(\w+): resolve\(__dirname, "([^"]+)"\)/g)];
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      const page = entry[2] as string;
+      expect(existsSync(page), `${page} is an entry point with no source file`).toBe(true);
+    }
   });
 
   it("boots from its own top-level script, not from the token-mounting helper module", () => {

@@ -397,6 +397,182 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   color: var(--mirn-ink-muted);
 }
 
+/* ---------------------------------------------------------------- the working page */
+
+/*
+ * web/how.html: what every readout on the console actually computes. It shares this stylesheet
+ * because it shares the voice, the palette and the typographic scale, and a second stylesheet
+ * would be a second place for a colour literal to appear.
+ *
+ * These rules sit ABOVE the breakpoint block that closes the file, and their narrow-viewport
+ * overrides sit inside it, for the reason that block's own comment gives: a media query adds no
+ * specificity, so a narrowing rule written above a base rule for the same selector can never fire.
+ * Do not append a new @media block after that one either — every breakpoint in this file is
+ * written widest first, and the narrow rules for this page belong in the existing 45rem block.
+ *
+ * The accent appears once, in .perturbation-term, and it is spent on exactly one thing: the symbol
+ * standing for the gap between a person's two paths, wherever a formula uses it. That gap IS the
+ * perturbation, which is the only thing web/ui/theme.ts allows this token to mark. Nothing else on
+ * this page — not a heading, not a link, not the warning below the two nulls — may reach for it.
+ */
+
+.how-main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Used on both pages, so it is not scoped to .how. Set as a mono line with an underline that
+   darkens, matching .ways-in's links rather than inventing a second link style. */
+.how-backlink {
+  margin: 1.1rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.how-backlink a {
+  color: var(--mirn-ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--mirn-rule);
+  padding-bottom: 0.1rem;
+}
+.how-backlink a:hover { border-bottom-color: var(--mirn-ink); }
+
+.how-main p { max-width: 40rem; }
+.how-main a { color: var(--mirn-ink); }
+
+.how-intro, .how-vocab, .how-contents, .how-close { margin: 2.6rem 0; }
+
+/* The vocabulary list. The term hangs in mono above its definition rather than beside it: five
+   terms with two-to-four sentence definitions do not fit a two-column list at any width worth
+   supporting, and a term that wraps to two lines beside its own definition reads as a mistake. */
+.how-terms { margin: 1rem 0 0; }
+.how-terms dt {
+  margin-top: 1.5rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+.how-terms dd {
+  margin: 0.4rem 0 0;
+  max-width: 40rem;
+  border-left: 1px solid var(--mirn-grid);
+  padding-left: 1rem;
+}
+
+/* Fifteen measurements is too many to hunt through. Numbered, because the page has an order. */
+.how-contents ol {
+  margin: 0.8rem 0 0;
+  padding-left: 1.4rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem 1.6rem;
+  font-size: 0.86rem;
+}
+.how-contents li { color: var(--mirn-ink-faint); }
+.how-contents a { color: var(--mirn-ink-muted); text-decoration: none; border-bottom: 1px solid var(--mirn-grid); }
+.how-contents a:hover { color: var(--mirn-ink); border-bottom-color: var(--mirn-ink); }
+
+/* A group heading is a heavier rule than a measurement's, so the seven groups read as the page's
+   spine and the fifteen measurements as entries hung off it. */
+.how-group { margin: 3.5rem 0 0; }
+.how-group-title {
+  margin: 0;
+  padding-top: 0.7rem;
+  border-top: 2px solid var(--mirn-ink);
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.how-group-note { margin: 0.7rem 0 0; color: var(--mirn-ink-muted); font-size: 0.9rem; }
+
+.how-measure { margin: 2.4rem 0 0; border-top: 1px solid var(--mirn-rule); padding-top: 0.9rem; }
+.how-measure h3 { margin: 0; font-size: 1.25rem; line-height: 1.25; font-weight: 600; }
+
+/* The four parts. The first is the lead and is set as such; the other three are announced by a
+   mono kicker that hangs above its paragraph. */
+.how-measure h4 {
+  margin: 1.5rem 0 0.35rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+.how-measure p { margin: 0.6rem 0 0; }
+
+/* The lead paragraph: what the measurement reads when the true effect is nothing. Given the only
+   filled ground on the page, because it is the thing a reader should take away if they take away
+   one sentence. */
+.how-zero {
+  margin: 0.9rem 0 0;
+  background: var(--mirn-surface);
+  border-left: 2px solid var(--mirn-ink);
+  padding: 0.8rem 1.1rem;
+  max-width: 42rem;
+}
+.how-kicker {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+
+/* A formula is the one thing on this page that cannot be reflowed, so it scrolls inside its own
+   box rather than making the document slide sideways under the prose.
+   The max-width override is not cosmetic: .how-main p holds prose to a readable 40rem measure, and
+   a formula inheriting that measure was silently clipping its right-hand half behind a scrollbar
+   nobody would think to drag. Formulas get the whole column, and the long ones are broken by hand
+   rather than left to overflow. */
+.how-formula {
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 0 0.7rem 1rem;
+  border-left: 1px solid var(--mirn-rule);
+  overflow-x: auto;
+  max-width: none;
+}
+.how-symbol {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.84rem;
+  line-height: 1.9;
+  color: var(--mirn-ink);
+  white-space: nowrap;
+}
+.how-terms dd.how-formula { border-left-color: var(--mirn-rule); }
+
+/* The one place the accent is spent on this page. See the header comment above. */
+.perturbation-term { color: var(--mirn-perturbation); }
+
+.how-note {
+  margin: 0.8rem 0 0;
+  font-size: 0.86rem;
+  color: var(--mirn-ink-muted);
+  border-left: 1px solid var(--mirn-grid);
+  padding-left: 1rem;
+}
+
+/* The two nulls' warning. Rules top and bottom rather than a box: it is the loudest thing on the
+   page and a full border would make it look like a callout in a manual. */
+.how-warning {
+  margin: 2.6rem 0 0;
+  padding: 1.2rem 0;
+  border-top: 2px solid var(--mirn-ink);
+  border-bottom: 2px solid var(--mirn-ink);
+}
+.how-warning h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.how-warning p { margin: 0.7rem 0 0; }
+
+.how-close { margin-top: 3.5rem; border-top: 1px solid var(--mirn-rule); padding-top: 0.9rem; }
+
 /*
  * Last in the file on purpose. Media queries add no specificity, so a narrowing rule only wins if
  * it comes after every wider rule for the same selector — the single-column .readouts rule this
@@ -423,5 +599,12 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   .readouts { grid-template-columns: minmax(0, 1fr); }
   .ways-in { padding: 0 1.2rem 1.2rem; }
   .ways-in ul { grid-template-columns: minmax(0, 1fr); }
+  /* The working page rides in the existing block rather than opening a new one, because every
+     breakpoint in this file is written widest first and a new @media below this would have to be
+     narrower than 45rem to keep that order. Its two-column contents list and its formulas are the
+     only things on it that do not reflow on their own. */
+  .how-main { padding: 0 1.2rem; }
+  .how-contents ol { grid-template-columns: minmax(0, 1fr); }
+  .how-zero { padding: 0.7rem 0.9rem; }
 }
 

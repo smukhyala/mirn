@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The working — MIRN</title>
+<link rel="stylesheet" href="./console.css">
+</head>
+<!--
+  The console's companion page: what every readout on it actually computes.
+
+  Two rules govern this file and both are load-bearing.
+
+  One: the invented-crowd disclosure is the first prose in the document, before anything that
+  could be read as a measurement. web/app/how.test.ts asserts that ordering against the FILE, not
+  against a booted DOM, for the same reason web/app/console/__tests__/disclosure.test.ts does — a
+  script can move a paragraph after load, and what is being defended is the order a reader with no
+  scripting, a screen reader or a print stylesheet actually gets.
+
+  Two: this page quotes no measured value at all. Not one metre, not one second. Every number it
+  contains is a constant of a method — a percentile, a count of arms — and none of them moves when
+  the simulator does. The console's own front page holds the same line and says why: a caption
+  that has gone stale is the failure this project exists to argue against. Where a magnitude
+  really is the lesson, the page tells the reader which control to move and what to watch instead
+  of printing a figure that only holds at one setting.
+-->
+<body class="console how">
+
+<header class="console-masthead">
+  <p class="eyebrow">The working</p>
+  <h1>How every number on the console is worked out</h1>
+  <p class="standfirst" id="disclosure">
+    Everything described here is simulated. The crowd is a social-force model — invented people
+    obeying invented rules — and no number here is a measurement of real pedestrians. What is
+    real is the ruler: the same room is run twice, once with a robot and once without, from the
+    same starting positions and the same random wobble, and the difference between a person's
+    two paths is the robot's effect on them.
+  </p>
+  <p class="how-backlink"><a href="./index.html">Back to the console</a></p>
+</header>
+
+<main class="how-main">
+
+  <section class="how-intro" aria-labelledby="reading-title">
+    <h2 class="region-title" id="reading-title">How to read this</h2>
+    <p>
+      Every measurement below is set out the same way, and it starts in the same place: with what
+      the measurement reads when the true effect is exactly nothing. That is the most useful thing
+      anyone can tell you about a number. A reading with no stated zero cannot be judged — you
+      cannot tell a large effect from a large habit of the ruler — and the whole argument of this
+      site is that the second is easy to mistake for the first.
+    </p>
+    <p>
+      After the zero comes what the measurement is, then the arithmetic in words and in ordinary
+      notation, then what it takes for granted and what goes wrong when that fails.
+    </p>
+  </section>
+
+  <section class="how-vocab" aria-labelledby="vocab-title">
+    <h2 class="region-title" id="vocab-title">The words the formulas use</h2>
+    <p>
+      Five terms, defined once here and used everywhere below.
+    </p>
+    <dl class="how-terms">
+      <dt>An instant</dt>
+      <dd>
+        The simulator moves the world forward in equal ticks and writes down where everybody is
+        after each one. An instant is one of those written-down moments. The gap in time between
+        two of them is written <span class="how-symbol">&Delta;t</span>, and the number of
+        instants in a run is written <span class="how-symbol">T</span>. There are
+        <span class="how-symbol">N</span> people in the room.
+      </dd>
+
+      <dt>The two runs</dt>
+      <dd>
+        Every result on the console comes from a pair of runs of the same room. The two share a
+        seed, the same people in the same starting places, and the same random wobble tick by
+        tick. They differ in one thing only — on the console as it stands, whether the robot is
+        there at all. So a person exists twice, and walks two paths.
+      </dd>
+
+      <dt>The gap</dt>
+      <dd>
+        For one person at one instant, the gap is the distance in metres between where they are in
+        the run with the robot and where they are in the run without it, at that same instant. It
+        is written <span class="how-symbol perturbation-term">d</span><span class="how-symbol">(t)</span>,
+        or <span class="how-symbol perturbation-term">d</span><span class="how-symbol"><sub>i</sub>(t)</span>
+        when it matters whose gap it is. Because the two runs differ in nothing else, this gap
+        <em>is</em> the robot's effect on that person, at that moment. Nothing is estimated.
+      </dd>
+
+      <dt>The curve</dt>
+      <dd>
+        Average the gap over everybody in the room, instant by instant, and you get a single curve
+        running the length of the episode: how far the crowd, on average, has been moved at each
+        moment. It is written <span class="how-symbol">g(t)</span>. Two of the headline readouts
+        are just the mean and the maximum of this one curve, which is why they can disagree so
+        loudly.
+      </dd>
+      <dd class="how-formula">
+        <span class="how-symbol">g(t) &nbsp;=&nbsp; (1 / N) &nbsp;&times;&nbsp; &Sigma;<sub>i</sub>
+        &nbsp;<span class="perturbation-term">d</span><sub>i</sub>(t)</span>
+      </dd>
+
+      <dt>The reference run in which nobody notices the robot</dt>
+      <dd>
+        A second pair of runs at the very same settings, with one thing changed: people are not
+        allowed to react to the robot. The robot still crosses the room; nobody moves out of its
+        way. In that pair the true effect is exactly nothing, by construction, so any measurement
+        that reports something on it is reporting something other than the robot. The console buys
+        this pair whenever it can, and one of the readouts below exists for no other purpose than
+        to show what it says.
+      </dd>
+    </dl>
+  </section>
+
+  <nav class="how-contents" aria-labelledby="contents-title">
+    <h2 class="region-title" id="contents-title">The measurements</h2>
+    <ol>
+      <li><a href="#m-true-effect">How far the crowd was moved</a></li>
+      <li><a href="#m-worst-moment">Worst moment</a></li>
+      <li><a href="#m-forecast-report">What a forecaster would report</a></li>
+      <li><a href="#m-forecast-zero">What the forecaster reports when the answer is zero</a></li>
+      <li><a href="#m-band">Ordinary difference between two runs</a></li>
+      <li><a href="#m-band-peak">Widest ordinary difference between two runs</a></li>
+      <li><a href="#m-floor">Smallest effect this crowd could resolve</a></li>
+      <li><a href="#m-robot-path">How far the robot travelled</a></li>
+      <li><a href="#m-robot-arrival">How long the robot took to arrive</a></li>
+      <li><a href="#m-extra-path">Extra distance the robot walked because of the treatment</a></li>
+      <li><a href="#m-time-lost">How much longer people took to settle</a></li>
+      <li><a href="#m-clearance">Closest the robot came to anybody</a></li>
+      <li><a href="#m-near-miss">Separate occasions it came closer than the near-miss line</a></li>
+      <li><a href="#m-recovery">How long until the crowd was back inside tolerance</a></li>
+      <li><a href="#m-frechet">Shortest leash between a person's two paths</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============================================================ the effect itself -->
+  <section class="how-group" aria-labelledby="group-effect">
+    <h2 class="how-group-title" id="group-effect">The effect itself</h2>
+    <p class="how-group-note">
+      Two numbers, both taken from the one curve defined above. One is its mean, the other its
+      maximum. That single difference is the whole reason they can tell different stories about
+      the same run.
+    </p>
+
+    <article class="how-measure" id="m-true-effect">
+      <h3>How far the crowd was moved</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        It reads exactly zero, to the last digit — not nearly zero. Switch off the setting that
+        lets people notice the robot and every gap in the room is exactly nought, because the two
+        runs then agree tick for tick and bit for bit. That is not a coincidence of arithmetic. It
+        is what the paired construction buys: the two runs share the same random draws, so with
+        nothing to react to there is nothing left to differ.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The average distance, over everybody and over the whole episode, between where a person
+        went with the robot in the room and where the same person went without it.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Take one person. At each instant, measure the gap between their two positions. Average
+        those gaps over the whole episode: that is that person's own number. Do it for everybody,
+        and average the results. Averaging each person first and then averaging the people comes
+        to the same thing as averaging the curve from end to end.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          (1 / N) &nbsp;&times;&nbsp; &Sigma;<sub>i</sub> &nbsp;[ &nbsp;(1 / T)
+          &nbsp;&times;&nbsp; &Sigma;<sub>t</sub> &nbsp;<span class="perturbation-term">d</span><sub>i</sub>(t)
+          &nbsp;]
+        </span>
+      </p>
+      <p class="how-note">
+        Every instant counts the same. A person standing still at the far end of the room for most
+        of the episode contributes a long stretch of near-zero gaps, which pulls the average down
+        as surely as a stretch of calm would.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That the two runs really do differ in one thing only. That is enforced rather than hoped
+        for: the pair is built by one function from one shared tape of random numbers, and it
+        refuses to exist if the two arms disagree about where anybody started or how long the
+        episode ran.
+      </p>
+      <p>
+        What it cannot do is survive leaving this simulator. Nobody can run a real corridor twice
+        with the same people making the same accidental choices, which is exactly why real studies
+        reach for something like the forecaster below. This number is the answer that method is
+        trying to approximate, available here only because the room is invented.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-worst-moment">
+      <h3>Worst moment</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        It reads exactly zero as well, for the same reason. But zero is not the line it is judged
+        against on the console: two runs of this room with nothing done to either of them still
+        drift apart, and the widest that drift ever gets — the measurement further down this page
+        called the widest ordinary difference between two runs — is the reference printed beneath
+        this one. A worst moment is compared with a worst moment, never with an average.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The single most displaced the crowd ever was, at any one instant of the episode.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Take the curve: at each instant, the average gap across everybody in the room. Then take
+        its largest value. Where two instants tie exactly, the earlier one wins.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">max<sub>t</sub> &nbsp;g(t)</span>
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        Read the order of operations carefully, because it is not the obvious one. The crowd is
+        averaged first and the maximum is taken second. So this is the worst moment for the
+        <em>room</em>, not the worst moment for any one person in it. One person swerving hard
+        while seventeen others carry on undisturbed shows up here divided by eighteen. If you want
+        the worst thing that happened to a person, this is not that number, and nothing on the
+        console is.
+      </p>
+      <p>
+        A maximum also grows with the length of the episode for reasons that have nothing to do
+        with the robot: the longer you watch, the more chances there are for one bad instant. The
+        control that sets how long the episode runs moves this number without changing the physics
+        at all, which is why it is compared against a reference measured over the same episode
+        rather than against zero.
+      </p>
+    </article>
+  </section>
+
+  <!-- ============================================================ the forecaster -->
+  <section class="how-group" aria-labelledby="group-forecast">
+    <h2 class="how-group-title" id="group-forecast">The forecaster</h2>
+    <p class="how-group-note">
+      This is the method being criticised, and it is here because it is what you have to do when
+      you cannot run the room twice. It never looks at the second run. It guesses where somebody
+      was about to walk and calls the guess's error the robot's doing.
+    </p>
+
+    <article class="how-measure" id="m-forecast-report">
+      <h3>What a forecaster would report</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        It does not read zero. On a run where nobody reacts to the robot at all — where the honest
+        answer is nothing, exactly — this method still reports a distance, because what it is
+        actually measuring is how wrong a straight-line guess about a walking person turns out to
+        be. People turn, slow down and step around each other whether or not there is a robot in
+        the room, and every one of those is scored here as the robot's effect. That reading has a
+        readout of its own; it is the next one on this page, and the two are meant to be looked at
+        together.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        A prediction error, presented as an effect. Look at a person's recent past, assume they
+        carry straight on at the speed they were going, and see how far from that guess they
+        actually ended up.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Two settings fix the window. One says how far ahead the forecaster guesses — call that
+        length <span class="how-symbol">h</span>, counted in instants. The other says when the
+        forecaster is checked — call that instant <span class="how-symbol">w</span>. Working
+        backwards from the moment it is checked gives the instant the guess is made from:
+        <span class="how-symbol">a = w &minus; h</span>.
+      </p>
+      <p>
+        At that anchor instant, take the person's velocity from their last single step — the
+        anchor position minus the position one instant earlier, divided by the length of an
+        instant. Two positions, not a fit over a window.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">v &nbsp;=&nbsp; ( p(a) &minus; p(a &minus; 1) ) &nbsp;/&nbsp; &Delta;t</span>
+      </p>
+      <p>
+        Now roll that velocity forward without ever looking again. For each step
+        <span class="how-symbol">k</span> from one up to the horizon, the guess is
+        <span class="how-symbol">p(a) + v &times; &Delta;t &times; k</span>, and the error is the
+        distance from that guess to where the person really was. Average those errors over the
+        horizon to get one number per person, then average over everybody.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          (1 / N) &nbsp;&times;&nbsp; &Sigma;<sub>i</sub> &nbsp;[ &nbsp;(1 / h)
+          &nbsp;&times;&nbsp; &Sigma;<sub>k = 1..h</sub> &nbsp;&#8214; p<sub>i</sub>(a + k)
+          &minus; ( p<sub>i</sub>(a) + v<sub>i</sub> &times; &Delta;t &times; k ) &#8214;
+          &nbsp;]
+        </span>
+      </p>
+      <p class="how-note">
+        Only the run with the robot in it is read. The run without the robot is used to decide
+        whose paths to look at and for nothing else. That is not an oversight in the port — it is
+        the defining feature of the method, and the reason it can be used on real footage.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That people walk in straight lines at a constant speed, and that where they fail to is the
+        robot's fault. Both halves fail. A crowd is full of people not walking in straight lines
+        for reasons of their own, and this number contains all of them.
+      </p>
+      <p>
+        Two controls will show you that directly. Turn the crowd's random wobble up with nobody
+        allowed to notice the robot: the true effect stays pinned at nothing and this number
+        climbs. Then push <em>when the forecaster is checked</em> late into the episode: by then
+        everybody has arrived and stopped, a straight-line guess about a stationary person is
+        exactly right, and this number falls towards nothing. Neither move told you anything about
+        the robot. The second one is the more dangerous, because a metric that quietly reports
+        almost nothing looks like good news.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-forecast-zero">
+      <h3>What the forecaster reports when the answer is zero</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        This readout <em>is</em> that case. It is the same forecaster, run at the same settings, on
+        the reference pair in which nobody responds to the robot. The honest answer for that pair
+        is zero. Whatever appears here is the forecaster's own error and nothing else — the
+        distance a published method would attribute to a robot that moved nobody.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The forecaster's floor: what it reports with nothing to find.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Exactly the arithmetic of the previous measurement, with one substitution. Instead of the
+        pair on screen, it reads the reference pair — the same room, the same seed, the same
+        settings, with people not permitted to react to the robot — and it reads that pair's
+        robot-carrying run.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        The same broken assumption, deliberately. What makes this readout worth its place is that
+        it is measured <em>at the settings on screen</em> and nowhere else. The forecaster's floor
+        moves substantially between an empty room and a crowded one, so quoting one room's floor
+        beneath another room's reading would be the same error the whole page is about, committed
+        one level up.
+      </p>
+      <p>
+        Compare the two forecaster readouts and you have the argument in two numbers: one is what
+        the method says about a robot that did something, the other is what the same method says
+        about a robot that did nothing.
+      </p>
+    </article>
+  </section>
+
+  <!-- ============================================================ the two nulls -->
+  <section class="how-group" aria-labelledby="group-null">
+    <h2 class="how-group-title" id="group-null">The two nulls</h2>
+    <p class="how-group-note">
+      A null is a number measured where there is definitely nothing to find. The console computes
+      two of them. They are not two views of one quantity, they are not interchangeable, and one
+      is not a scaled version of the other. The note after them says why, and it is the subtlest
+      thing on this page.
+    </p>
+
+    <article class="how-measure" id="m-band">
+      <h3>Ordinary difference between two runs</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        This is not a reading judged against a zero. It is a zero line itself. Nothing was done to
+        any of the runs behind it: they are all robot-free crossings of the same empty room, and
+        whatever they differ by is what the room does on its own. There is no treatment here to
+        switch off.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        How far apart two runs of this same room land when nothing whatever distinguishes them
+        except which throw of the dice they got.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Take the settings on screen and simulate the room several times over with no robot in it
+        at all. Every one of these replicate runs starts with the same people standing in the same
+        places; they differ only in the random wobble they are given, tick by tick. None of them
+        is the run you are looking at.
+      </p>
+      <p>
+        Then compare every replicate with every other one — all the unordered pairs, not just
+        neighbouring ones. For a given pair, a person exists in both, so measure the gap between
+        their two paths instant by instant exactly as the effect is measured, average over the
+        episode and over the room, and you have one number for that pair. Sort those numbers and
+        take the 95th percentile.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          for each pair (u, v):
+          <br>
+          &nbsp;&nbsp;&nbsp;m<sub>uv</sub> &nbsp;=&nbsp; (1 / N) &nbsp;&times;&nbsp;
+          &Sigma;<sub>i</sub> &nbsp;[ (1 / T) &nbsp;&times;&nbsp; &Sigma;<sub>t</sub>
+          &nbsp;&#8214; x<sub>i</sub><sup>u</sup>(t) &minus; x<sub>i</sub><sup>v</sup>(t) &#8214; ]
+          <br>
+          the band &nbsp;=&nbsp; the 95th percentile of all the m<sub>uv</sub>
+        </span>
+      </p>
+      <p class="how-note">
+        The replicates carry no robot, and that matters more than it looks. An earlier version left
+        the robot in both arms of each replicate, which quietly folded the robot's own capacity to
+        stir up a crowd into a quantity that is supposed to describe a room with no robot in it.
+        The tell was that turning up how much space the robot demands moved the band.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That an effect worth believing should be bigger than the room's own moods. It answers a
+        real question — how much does this crowd vary from one morning to the next? — and it is
+        the right thing to hold a single run against before getting excited.
+      </p>
+      <p>
+        It is not a statement about the measurement's precision. A room full of people is chaotic:
+        two identical rooms diverge because crowds diverge, not because the ruler is blunt. Raise
+        the number of people or the random wobble and this grows, which is the room becoming less
+        repeatable rather than the arithmetic becoming less sure.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-band-peak">
+      <h3>Widest ordinary difference between two runs</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        A zero line again, not a reading. It is the same set of robot-free runs as the measurement
+        above, reduced the way a worst moment is reduced instead of the way an average is.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The widest the crowd ever drifted apart, at any single instant, between two runs with
+        nothing done to either of them.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Same replicates, same pairs, same gaps. The only change is the last step: for each pair,
+        build the curve of the average gap at each instant and take its maximum rather than its
+        mean. Then take the 95th percentile of those maxima.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          for each pair (u, v):
+          <br>
+          &nbsp;&nbsp;&nbsp;k<sub>uv</sub> &nbsp;=&nbsp; max<sub>t</sub>
+          &nbsp;[ (1 / N) &nbsp;&times;&nbsp; &Sigma;<sub>i</sub> &nbsp;&#8214;
+          x<sub>i</sub><sup>u</sup>(t) &minus; x<sub>i</sub><sup>v</sup>(t) &#8214; ]
+          <br>
+          the widest &nbsp;=&nbsp; the 95th percentile of all the k<sub>uv</sub>
+        </span>
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That a reference must be reduced the same way the reading it judges is reduced. This one
+        exists because the previous one would have been the wrong line for a worst moment, and
+        wrong in a flattering direction: a maximum is never smaller than a mean, so any worst
+        moment held up against an average reference clears it for free and looks like a finding
+        every time. Both come from the same simulations and the same pairs. Only the last step
+        differs, and that is the whole point of having two.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-floor">
+      <h3>Smallest effect this crowd could resolve</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Everything behind this number comes from a single robot-free crowd split in half, so there
+        is nothing to find in it at all and whatever it reports is the measurement's own sampling
+        noise. It is the third zero line on this page, and it is measured on a different footing
+        from the other two.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        How different two halves of one crowd look, when the only thing separating them is which
+        people happened to fall on which side of the coin.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Start from the robot-free run of the pair on screen. Thin each person's path, keeping only
+        one instant in every so many — a fixed stride, the same for every floor the console
+        computes — because the arithmetic below compares every kept point with every other kept
+        point and a full-length path makes that impossible to finish.
+      </p>
+      <p>
+        Now throw away who is who and when anything happened. Shuffle the people, put the first
+        half on one side and the second half on the other — if the crowd is an odd size the spare
+        person is dropped, so the two sides are the same size — and pour each side's kept positions
+        into a single heap of points. Two heaps, no names, no clock.
+      </p>
+      <p>
+        The distance between two heaps is worked out symmetrically: for every point in the first
+        heap find the nearest point in the second and average those distances; do the same starting
+        from the second heap; average the two answers.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          nearest from A &nbsp;=&nbsp; (1 / |A|) &nbsp;&times;&nbsp; &Sigma;<sub>a in A</sub>
+          &nbsp;min<sub>b in B</sub> &nbsp;&#8214; a &minus; b &#8214;
+          <br>
+          nearest from B &nbsp;=&nbsp; (1 / |B|) &nbsp;&times;&nbsp; &Sigma;<sub>b in B</sub>
+          &nbsp;min<sub>a in A</sub> &nbsp;&#8214; a &minus; b &#8214;
+          <br>
+          D(A, B) &nbsp;=&nbsp; ( nearest from A &nbsp;+&nbsp; nearest from B ) &nbsp;/&nbsp; 2
+          <br>
+          the floor &nbsp;=&nbsp; the 95th percentile of D(A, B) over many shuffles
+        </span>
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That an effect smaller than the difference between two arbitrary halves of the same crowd
+        could not have been told apart from nothing. It is a property of how many people were
+        pooled and how finely their paths were kept, not of the room.
+      </p>
+      <p>
+        Which means it moves with the thinning. Sparser heaps put every point further from its
+        nearest neighbour, so a coarser stride raises this number without anything in the world
+        changing. Two of these computed at different strides are not comparable with each other,
+        and the console therefore holds the stride fixed rather than offering it as a control.
+      </p>
+    </article>
+
+    <aside class="how-warning" aria-labelledby="never-divide">
+      <h3 id="never-divide">Why the two nulls must never be divided by one another</h3>
+      <p>
+        It is tempting to put the reading over one of these and call the answer a signal-to-noise
+        ratio. It is more tempting still to put one null over the other. Both are mistakes, and the
+        second is the one that looks most like arithmetic.
+      </p>
+      <p>
+        <strong>They answer different questions.</strong> The ordinary difference between two runs
+        asks how much this room varies from one morning to the next. The smallest resolvable effect
+        asks how much a measurement wobbles because it was taken on a finite number of people.
+        One is about the world; the other is about the sample.
+      </p>
+      <p>
+        <strong>They are different shapes of quantity that happen to share a unit.</strong> The
+        band is a displacement: a named person, at a named instant, in two worlds. The floor is a
+        nearest-neighbour distance between two heaps of anonymous points, computed after who is who
+        and when it happened have been deliberately discarded. Both come out in metres. Neither is
+        a rescaling of the other, and no conversion between them exists.
+      </p>
+      <p>
+        <strong>They are driven by different things.</strong> Fill the room with more people and
+        the band grows, because a fuller room is a less repeatable one. Fill the room with more
+        people and the floor falls, because a larger sample is a steadier one. They can move in
+        opposite directions in response to a single control, which is the clearest possible
+        demonstration that neither is measuring the other's quantity.
+      </p>
+      <p>
+        <strong>One of them moves with a setting the other has never heard of.</strong> The floor
+        depends on the thinning stride. Divide by it and you have built a ratio that changes when
+        you change how often the simulator was sampled.
+      </p>
+      <p>
+        So on the console they are kept under separate names, shown as separate readings, and
+        nothing is divided by either. The worst moment is held against the widest ordinary
+        difference, and the plain reading against the plain ordinary difference — like against
+        like, each reduced the same way. The smallest resolvable effect stands alone: it is
+        reported, and nothing on the console is divided by it.
+      </p>
+    </aside>
+  </section>
+
+  <!-- ============================================================ what the crossing cost -->
+  <section class="how-group" aria-labelledby="group-cost">
+    <h2 class="how-group-title" id="group-cost">What the crossing cost</h2>
+    <p class="how-group-note">
+      The first four measurements ask what the robot did to the crowd. These ask what the crossing
+      cost the robot, and what it cost everybody's schedule.
+    </p>
+
+    <article class="how-measure" id="m-robot-path">
+      <h3>How far the robot travelled</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        There is no zero here, because this is not a comparison with anything — it is a length, and
+        a robot that disturbed nobody still had to cross the room. What is printed beneath it
+        instead is a floor the geometry fixes: the straight line from where the robot started to
+        the edge of its goal. Even with nobody in the way the robot has to cover that much, so no
+        run can read below it.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The length of the line the robot actually walked.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Join the robot's recorded positions in order, measure each straight segment, and add them
+        up.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          &Sigma;<sub>t = 1..T&minus;1</sub> &nbsp;&#8214; r(t) &minus; r(t &minus; 1) &#8214;
+        </span>
+      </p>
+      <p class="how-note">
+        The floor beneath it is the straight-line distance from start to goal, less the radius
+        inside which the robot counts as having arrived — it never has to walk the last stretch to
+        the exact point.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        Only that a polyline through the recorded positions is a fair stand-in for the path between
+        them. That holds while the steps are short. It would stop holding if the simulator were run
+        with a much coarser tick, which would cut corners the robot actually rounded and quietly
+        shorten every route on the console.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-robot-arrival">
+      <h3>How long the robot took to arrive</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Again not a comparison, and again a floor from the geometry: the shortest crossing that
+        counts as arriving, walked flat out at the robot's own speed limit. Nothing can beat that.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The first moment the robot came inside the radius that counts as reaching its goal.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        The simulator records the tick on which the robot first got inside the goal radius, and
+        that tick's position is written down as the next recorded instant — so the answer is one
+        more than the recorded tick, multiplied by the length of an instant.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">( the arriving tick &nbsp;+&nbsp; 1 ) &nbsp;&times;&nbsp; &Delta;t</span>
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That arriving means what the simulator says it means: being inside a fixed radius of the
+        goal, not stopping. The distinction was learned the hard way. An earlier version guessed
+        the arrival time from the shape of the path — the moment it stopped changing — and reported
+        a robot pinned against a crowd, motionless and nowhere near its goal, as having arrived
+        early. Worse, it reported it as having arrived at twice its own top speed.
+      </p>
+      <p>
+        A robot that never gets there is reported as not having arrived. It is never reported as a
+        time, and never as zero. A number that averages happily is precisely the wrong way to
+        record a failure to finish.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-extra-path">
+      <h3>Extra distance the robot walked because of the treatment</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Exactly zero. A treatment that changed nothing about the robot's route leaves its two
+        routes identical and their difference is nought.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The difference between the robot's two routes — how much further it went with the treatment
+        than without it.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Measure the length of the robot's path in each of the two runs, the same way as above, and
+        subtract.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          length of the robot's path with the treatment &nbsp;&minus;&nbsp; length of it without
+        </span>
+      </p>
+      <p class="how-note">
+        The subtraction is signed and stays signed. A shove aimed at the goal genuinely shortens
+        the robot's route, and clipping that back to zero to keep the number tidy would be a lie
+        about what happened.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That the robot exists in both runs. On the console as it stands it does not: the run without
+        the treatment is the run with no robot in it at all, so there is no second route to subtract
+        and this readout declines to report rather than printing a zero. It becomes measurable only
+        for a treatment that leaves the robot in both runs and changes something else about them.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-time-lost">
+      <h3>How much longer people took to settle</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Exactly zero. If nobody was slowed or hurried, every person comes to rest at the very same
+        instant in both runs, every difference is nought, and so is their average.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        How much later people finished moving with the robot in the room than without it, averaged
+        over the people it can be worked out for.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Settling is defined mechanically: the first instant at which a person has not moved at all
+        since the instant before. Not "has slowed down" — has not moved, to within a
+        billionth of a metre. That works because a person who has arrived is frozen outright by the
+        simulator, so two consecutive positions are identical down to the last bit.
+      </p>
+      <p>
+        Find that instant for a person in each run, subtract, and multiply by the length of an
+        instant. Average over everybody who settled in <em>both</em> runs.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          (1 / n) &nbsp;&times;&nbsp; &Sigma;<sub>i settled in both</sub> &nbsp;( s<sub>i</sub>
+          &minus; s<sub>i</sub><sup>&prime;</sup> ) &nbsp;&times;&nbsp; &Delta;t
+        </span>
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That somebody who never came to rest should be left out rather than counted as having lost
+        no time. They are dropped and counted, and if nobody settled in both runs the readout says
+        so instead of reporting an average of nothing.
+      </p>
+      <p>
+        The number is signed, and it is quite normal for it to be negative: the robot pushes some
+        people along their way, and they finish sooner. Nothing about being disturbed obliges you
+        to be delayed.
+      </p>
+    </article>
+  </section>
+
+  <!-- ============================================================ how close it came -->
+  <section class="how-group" aria-labelledby="group-safety">
+    <h2 class="how-group-title" id="group-safety">How close it came</h2>
+    <p class="how-group-note">
+      Both measurements here start counting late, and for the same reason: people are placed in the
+      room without being told where the robot is, so somebody standing on top of it before anybody
+      has moved is an accident of the placement rather than something the robot did.
+    </p>
+
+    <article class="how-measure" id="m-clearance">
+      <h3>Closest the robot came to anybody</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Zero here is not "nothing happened" — it is the coordinate zero of a gap. Zero means the
+        two outlines were just touching. Above zero is clear air between them; below zero they
+        overlapped, and a negative reading is perfectly ordinary rather than a fault.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        The narrowest gap between the robot's outline and the nearest person's outline at any point
+        in the crossing.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        At each instant, measure centre to centre from the robot to each person, then subtract both
+        bodies — the robot's radius and a person's radius — to get surface to surface. Keep the
+        smallest such gap at that instant, and then the smallest over the whole crossing.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          gap<sub>i</sub>(t) &nbsp;=&nbsp; &#8214; x<sub>i</sub>(t) &minus; r(t) &#8214;
+          &nbsp;&minus;&nbsp; ( robot radius &nbsp;+&nbsp; person radius )
+          <br>
+          the reading &nbsp;=&nbsp; min over qualifying t, over qualifying i, of gap<sub>i</sub>(t)
+        </span>
+      </p>
+      <p>
+        Qualifying is the gate. The robot starts qualifying at the first instant it is further from
+        its own starting spot than its own radius. A person starts qualifying at the first instant
+        they are further from theirs than a person's radius. A robot-and-person pair counts only
+        from the later of those two moments, and a person who never leaves their spot never counts
+        at all.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That both bodies are circles of fixed size, which is the simulator's own assumption and not
+        an extra one made by the ruler.
+      </p>
+      <p>
+        The gate is doing real work and it can remove the reading entirely. If the robot never
+        leaves its starting spot — turn its speed limit down far enough and it will not — then no
+        pair ever qualifies, and this readout declines to report rather than printing whatever the
+        first instant happened to look like.
+      </p>
+    </article>
+
+    <article class="how-measure" id="m-near-miss">
+      <h3>Separate occasions it came closer than the near-miss line</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Exactly zero occasions. A robot that never came closer to anybody than the near-miss line
+        reads nought, and that nought is a real measurement rather than an absence.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        How many separate times the robot came closer to somebody than a chosen line — not how many
+        instants it spent there.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Walk the qualifying instants in order with the same gap as above. Each time the gap crosses
+        from at-or-above the line to below it, add one. While it stays below, add nothing. An
+        instant where nobody qualifies ends the occasion, so the next dip below the line counts
+        again.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          count of maximal runs of consecutive qualifying instants with gap(t) &lt; the line
+        </span>
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That an occasion is the thing worth counting. Counting instants instead would be easier and
+        would be a trap: halve the length of a tick and the simulator writes down twice as many
+        instants, so the same single near miss would score twice as high. That would be a number
+        describing the simulator's settings rather than the room.
+      </p>
+      <p>
+        As with the gap above, a run where the robot and everybody near it never leave their
+        starting places reports nothing rather than zero. A finite zero is the dangerous answer
+        here: it averages happily and reads like a measurement, and nothing to miss with is not the
+        same as nothing missed.
+      </p>
+    </article>
+  </section>
+
+  <!-- ============================================================ coming back -->
+  <section class="how-group" aria-labelledby="group-recovery">
+    <h2 class="how-group-title" id="group-recovery">Coming back</h2>
+
+    <article class="how-measure" id="m-recovery">
+      <h3>How long until the crowd was back inside tolerance</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Exactly zero. With nothing to recover from, the curve is flat at nought, the tolerance is
+        nought, and the crowd is already inside it at the very first instant it is asked about.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        How long after the crowd's worst moment it took to get back inside a chosen tolerance and
+        stay there.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        The clock starts at the worst moment — the instant the curve peaked — not at the moment
+        anything was done to the crowd. The tolerance is a share of that same peak: a fraction you
+        choose, times this run's own worst moment.
+      </p>
+      <p>
+        From the peak onwards, look for the first instant from which the curve stays at or below
+        the tolerance for a whole dwell window without once poking above it. The answer is the
+        distance from the peak to that instant, in seconds. A brief dip below the line that does
+        not hold for the full window does not count.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          tolerance &nbsp;=&nbsp; fraction &nbsp;&times;&nbsp; max<sub>t</sub> g(t)
+          <br>
+          s &nbsp;=&nbsp; the first instant at or after the peak with
+          <br>
+          &nbsp;&nbsp;&nbsp;g(u) &le; tolerance for every u in [ s, s + dwell ]
+          <br>
+          the reading &nbsp;=&nbsp; ( s &minus; the peak ) &nbsp;&times;&nbsp; &Delta;t
+        </span>
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That "recovered" is a property of the tolerance you picked, not of the room. It is the one
+        measurement on the console that makes the reader carry its arbitrary choice, and it is
+        written that way on purpose.
+      </p>
+      <p>
+        Because the tolerance is a share of <em>this run's own</em> peak, two runs with different
+        peaks are being held to different lines, and their recovery times cannot be compared
+        directly. And an episode that ends before the crowd comes back is reported as not having
+        recovered — never as a number, and never as the length of the episode, which would say the
+        crowd recovered at the exact moment you stopped watching.
+      </p>
+    </article>
+  </section>
+
+  <!-- ============================================================ a different ruler -->
+  <section class="how-group" aria-labelledby="group-other">
+    <h2 class="how-group-title" id="group-other">A different ruler</h2>
+
+    <article class="how-measure" id="m-frechet">
+      <h3>Shortest leash between a person's two paths</h3>
+      <p class="how-zero">
+        <span class="how-kicker">When the true effect is exactly zero</span>
+        Exactly zero. Two identical paths need no leash at all.
+      </p>
+      <h4>What it is</h4>
+      <p>
+        Imagine walking a person's two paths at once, one in each hand, joined by a leash. You may
+        pause on either path, and you may go at any speed, but you may never step backwards on
+        either. The shortest leash that gets you from both starts to both finishes is this
+        measurement — worked out for each person, then averaged over the room.
+      </p>
+      <h4>How it is worked out</h4>
+      <p>
+        Every way of walking the two paths together has a worst moment: the point at which the
+        leash is stretched furthest. Take the smallest such worst moment over every legal way of
+        walking them.
+      </p>
+      <p class="how-formula">
+        <span class="how-symbol">
+          min over every forward-only pairing of the two paths
+          <br>
+          &nbsp;&nbsp;&nbsp;of &nbsp;max over that pairing&nbsp; of the distance between two
+          paired points
+        </span>
+      </p>
+      <p class="how-note">
+        It is worked out by filling in a table rather than by trying every pairing, of which there
+        are far too many: the best leash for a pair of part-walked paths is whichever of the three
+        ways of arriving there was cheapest, held against the distance where you now stand. The
+        table carries no running total, only comparisons — which is why this is the one ruler here
+        that is not at the mercy of the order its arithmetic happens to be done in.
+      </p>
+      <h4>What it assumes</h4>
+      <p>
+        That shape matters and timing does not. This is a genuinely different question from the
+        gap, and the two disagree in both directions.
+      </p>
+      <p>
+        It sees things the gap misses: a detour that swings wide and returns to the same place is a
+        long leash, whereas an average over instants can wash it out. And it misses things the gap
+        sees: a person who took the identical route but was held up for a few seconds needs almost
+        no leash, because pausing is allowed — while the gap, which compares the same instant in
+        both runs, records that delay at its full size. Neither is more correct. They answer
+        different questions, and knowing which one you asked is the entire skill.
+      </p>
+    </article>
+  </section>
+
+  <section class="how-close" aria-labelledby="close-title">
+    <h2 class="region-title" id="close-title">What none of this establishes</h2>
+    <p>
+      These formulas are exact and the room they are applied to is made up. The crowd is a
+      social-force model: invented people obeying invented rules, tuned to look plausible and
+      calibrated against nothing. What the console can show is that a measurement can be confounded
+      and how a paired design removes the confound. It cannot tell you how large any of these
+      effects are for a real robot in a real corridor, which method wins in the field, or that
+      anybody's published number is wrong.
+    </p>
+    <p>
+      Where you want one of those, the useful thing this page can give you is the shape of what
+      would have to be measured to find out: two runs of the same situation that differ in one
+      thing, a stated zero for every number reported, and a reference reduced the same way the
+      reading is.
+    </p>
+    <p class="how-backlink"><a href="./index.html">Back to the console</a></p>
+  </section>
+
+</main>
+
+<script type="module" src="./how.ts"></script>
+</body>
+</html>
