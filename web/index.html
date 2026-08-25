@@ -64,6 +64,29 @@
     <h2 class="region-title" id="stage-title">Stage</h2>
     <p class="region-note">Simulated crowd. Every number below comes from a model.</p>
     <canvas id="arena" aria-label="Two crowds, one with a robot and one without"></canvas>
+    <!--
+      What is on the canvas.
+
+      Static, because every mark below is drawn on every frame: the console builds its view with
+      the control run and the gaps both switched on and never turns either off. A key that lists a
+      mark the reader cannot find would be worse than none.
+
+      The swatches take their colours from the same tokens the canvas does, so there is one
+      definition of "the colour of a person" and the picture and its key cannot drift apart.
+    -->
+    <ul class="arena-key" id="arena-key" aria-label="What the marks mean">
+      <li><span class="key-mark key-treated"></span>A person, in the run with the robot</li>
+      <li><span class="key-mark key-control"></span>The same person, in the run without it</li>
+      <li><span class="key-mark key-gap"></span>The distance between those two, which is the
+        robot's effect on that person</li>
+      <li><span class="key-mark key-robot"></span>The robot</li>
+      <li><span class="key-mark key-path-treated"></span>A path walked with the robot in the room</li>
+      <li><span class="key-mark key-path-control"></span>The same path, walked without it</li>
+    </ul>
+    <p class="region-note key-note">
+      Switch off the setting that lets people notice the robot and every pair lands on top of
+      itself, because then the robot changes nothing and there is no distance left to draw.
+    </p>
     <div class="transport" id="transport"></div>
     <div class="readouts" id="readouts"></div>
     <p class="region-note" id="readouts-note">

@@ -585,6 +585,72 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
  * width, and the four link cards never actually collapsed to one column on a phone. Moving the
  * whole block below .ways-in is the fix; nothing inside it changed.
  */
+/*
+ * The key to the canvas.
+ *
+ * Every colour here is the token the canvas itself draws with, so the picture and its key have one
+ * definition between them: a person is `--mirn-ink-muted` in both places, the run without the robot
+ * is that same ink hollowed out against `--mirn-paper`, and the distance between a person's two
+ * positions is the one accented thing on the page.
+ *
+ * The two dots differ by fill and the two paths by dash, not by hue. That is deliberate and it is
+ * the same reason the sweep curve's lines do: the distinction has to survive greyscale, print and
+ * every form of colour blindness, and the single accent has to stay spent on the perturbation.
+ */
+.arena-key {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.3rem 1.4rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--mirn-ink-muted);
+}
+.arena-key li {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr;
+  align-items: baseline;
+}
+.key-mark {
+  display: inline-block;
+  position: relative;
+  top: 0.05rem;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.key-treated {
+  border-radius: 50%;
+  background: var(--mirn-ink-muted);
+}
+.key-control {
+  border-radius: 50%;
+  background: var(--mirn-paper);
+  border: 1.5px solid var(--mirn-ink-muted);
+}
+.key-robot {
+  width: 0.72rem;
+  height: 0.72rem;
+  background: var(--mirn-ink);
+}
+.key-gap {
+  height: 0;
+  border-top: 2px solid var(--mirn-perturbation);
+  top: -0.2rem;
+}
+.key-path-treated {
+  height: 0;
+  border-top: 2px solid var(--mirn-ink);
+  top: -0.2rem;
+}
+.key-path-control {
+  height: 0;
+  border-top: 1.5px dashed var(--mirn-ink-muted);
+  top: -0.2rem;
+}
+.key-note { margin-top: 0.5rem; }
+
 @media (max-width: 60rem) {
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
