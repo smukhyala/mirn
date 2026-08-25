@@ -171,7 +171,9 @@ function forecastAssumption(): string {
     "This does not identify the robot's effect. It guesses where each person was about to walk " +
     "from their own recent past, assuming they carry straight on, then reports how wrong the " +
     "guess was as if that were the robot's doing. The number contains every reason a person " +
-    "might not walk in a straight line, all of which would be there with no robot in the room."
+    "might not walk in a straight line, all of which would be there with no robot in the room. " +
+    "How far ahead it guesses and when it is checked decide how large it comes out, and neither " +
+    "of those controls changes the room."
   );
 }
 

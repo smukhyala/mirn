@@ -18,14 +18,23 @@ import { quantileLinear } from "../kernels.js";
  * separate lesson about how much a room varies from one morning to the next.
  *
  * This comment used to say the band is large and this is small. That is not true, and it is not
- * even true in one direction: the two CROSS as the room fills. Measured on the default room, at
- * eight replicates and twenty-four splits — 4 people: band 0.077 m against a floor of 1.073 m,
- * the floor fourteen times larger. 18 people, which is the console's default: band 0.311 m,
- * floor 0.425 m. 44 people: band 0.512 m, floor 0.246 m, and now the band is the larger one.
- * Emptier rooms give the split-half floor fewer people per half and it climbs; fuller rooms give
- * the band more chaos to accumulate and it climbs instead. So neither is reliably the bigger,
- * a sentence claiming one is would be false at the setting a first-time reader arrives on, and
- * dividing one by the other stays meaningless in both directions.
+ * even true in one direction: the two CROSS as the room fills. Measured on the default room at
+ * the console's own settings — eight replicates for the band, and for the floor 200 splits at the
+ * 95th percentile with a stride of 20 — 4 people: band 0.077 m against a floor of 1.672 m, the
+ * floor twenty-two times larger. 18 people, which is the console's default: band 0.311 m, floor
+ * 0.822 m. 44 people: band 0.512 m, floor 0.435 m, and now the band is the larger one. Emptier
+ * rooms give the split-half floor fewer people per half and it climbs; fuller rooms give the band
+ * more chaos to accumulate and it climbs instead. So neither is reliably the bigger, a sentence
+ * claiming one is would be false at the setting a first-time reader arrives on, and dividing one
+ * by the other stays meaningless in both directions.
+ *
+ * The three floor figures above were 1.073, 0.425 and 0.246 when this paragraph was first
+ * written, "measured with eight replicates and twenty-four splits". The band figures reproduce
+ * exactly at that description. The floors do not reproduce at any stride, split count or arm —
+ * twenty-four splits gives 1.672, 0.716 and 0.421 — so they were replaced with what the
+ * console's own job pipeline hands the detection-floor readout. Whatever produced the old three
+ * is not recoverable from this file, which is the argument for writing down the settings beside
+ * every figure rather than the figure alone. The crossing the paragraph is about is unaffected.
  *
  * The permutation is INJECTABLE rather than drawn internally. numpy's PCG64 cannot be reproduced
  * in JavaScript without reimplementing a numpy internal, so a parity fixture supplies the exact
