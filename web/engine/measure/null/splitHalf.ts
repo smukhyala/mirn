@@ -13,9 +13,19 @@ import { quantileLinear } from "../kernels.js";
  *
  * This is a DIFFERENT quantity from `replicateBand`, and confusing the two is easy and costly.
  * The band asks "how far apart are two runs of the same room?" and is dominated by the crowd
- * being chaotic — it is large. This asks "how far apart are two samples of the same crowd?" and
- * is dominated by sample size — it is small. An effect is judged against this one; the band
- * teaches a separate lesson about how much a room varies from one morning to the next.
+ * being chaotic. This asks "how far apart are two samples of the same crowd?" and is dominated by
+ * how many people are in the sample. An effect is judged against this one; the band teaches a
+ * separate lesson about how much a room varies from one morning to the next.
+ *
+ * This comment used to say the band is large and this is small. That is not true, and it is not
+ * even true in one direction: the two CROSS as the room fills. Measured on the default room, at
+ * eight replicates and twenty-four splits — 4 people: band 0.077 m against a floor of 1.073 m,
+ * the floor fourteen times larger. 18 people, which is the console's default: band 0.311 m,
+ * floor 0.425 m. 44 people: band 0.512 m, floor 0.246 m, and now the band is the larger one.
+ * Emptier rooms give the split-half floor fewer people per half and it climbs; fuller rooms give
+ * the band more chaos to accumulate and it climbs instead. So neither is reliably the bigger,
+ * a sentence claiming one is would be false at the setting a first-time reader arrives on, and
+ * dividing one by the other stays meaningless in both directions.
  *
  * The permutation is INJECTABLE rather than drawn internally. numpy's PCG64 cannot be reproduced
  * in JavaScript without reimplementing a numpy internal, so a parity fixture supplies the exact
