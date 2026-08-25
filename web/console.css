@@ -345,4 +345,51 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   .console-masthead { padding: 2rem 1.2rem 1.2rem; }
   .ledger-region { padding: 0 1.2rem; }
   .readouts { grid-template-columns: minmax(0, 1fr); }
+  .ways-in { padding: 0 1.2rem 1.2rem; }
+  .ways-in ul { grid-template-columns: minmax(0, 1fr); }
 }
+
+/*
+ * The ways in.
+ *
+ * A reader who has just arrived has met none of the fourteen controls, and the most interesting
+ * figure on the page is drawn only after a sweep is run. These four links set the panel up and say
+ * what to watch, so the first thing a stranger does is look rather than hunt.
+ *
+ * The accent stays where it belongs. These are links, not perturbations, so they are ink.
+ */
+.ways-in {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 0 2rem 1.6rem;
+}
+.ways-in ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1.6rem;
+}
+.ways-in li {
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 0.5rem;
+}
+.ways-in a {
+  display: block;
+  color: var(--mirn-ink);
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px solid var(--mirn-rule);
+  padding-bottom: 0.1rem;
+  margin-bottom: 0.25rem;
+  width: fit-content;
+}
+.ways-in a:hover { border-bottom-color: var(--mirn-ink); }
+.ways-in span {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--mirn-ink-muted);
+}
+
