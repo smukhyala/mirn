@@ -15,9 +15,8 @@ it.
 [![CI](https://github.com/smukhyala/mirn/actions/workflows/ci.yml/badge.svg)](https://github.com/smukhyala/mirn/actions/workflows/ci.yml)
 [![Deploy](https://github.com/smukhyala/mirn/actions/workflows/pages.yml/badge.svg)](https://github.com/smukhyala/mirn/actions/workflows/pages.yml)
 
-![The console: an arena you can scrub, seven readouts, and a ledger of kept runs](docs/media/mirn-console.gif)
-<!-- GIF: press Run on a 9-value sweep, then click a ledger row to play that run back.
-     Drop the file at docs/media/mirn-console.gif. -->
+![Three views of the console: the room being simulated, the readouts with their zero-effect
+references, and a sweep curve plotted against the run-to-run noise band](docs/media/mirn-console.gif)
 
 ---
 
