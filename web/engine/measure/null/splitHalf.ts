@@ -29,12 +29,18 @@ import { quantileLinear } from "../kernels.js";
  * by the other stays meaningless in both directions.
  *
  * The three floor figures above were 1.073, 0.425 and 0.246 when this paragraph was first
- * written, "measured with eight replicates and twenty-four splits". The band figures reproduce
- * exactly at that description. The floors do not reproduce at any stride, split count or arm —
- * twenty-four splits gives 1.672, 0.716 and 0.421 — so they were replaced with what the
- * console's own job pipeline hands the detection-floor readout. Whatever produced the old three
- * is not recoverable from this file, which is the argument for writing down the settings beside
- * every figure rather than the figure alone. The crossing the paragraph is about is unaffected.
+ * written. They were not irreproducible and they were not arithmetic errors: they reproduce to
+ * the last digit, at twenty-four splits with the same permutation seed, from a pool of BOTH
+ * arms' pedestrians. The console pools one arm — `web/engine/job/runner.ts` hands this function
+ * `run.control.positions` and nothing else — so the old figures described a quantity the product
+ * never computes.
+ *
+ * That is the failure worth keeping, because it is not a slip anyone would catch by rerunning:
+ * pooling both arms doubles the number of people, halves nothing about the geometry, and returns
+ * a smaller floor — 0.425 against 0.822 at the default crowd. A floor quoted without saying which
+ * pedestrians went into the pool is underspecified by a factor of two, and both numbers look
+ * equally plausible printed beside a metre. Hence the settings named in the paragraph above, and
+ * hence this one. The crossing the paragraph is about is unaffected either way.
  *
  * The permutation is INJECTABLE rather than drawn internally. numpy's PCG64 cannot be reproduced
  * in JavaScript without reimplementing a numpy internal, so a parity fixture supplies the exact
