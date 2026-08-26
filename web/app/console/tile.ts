@@ -308,3 +308,27 @@ export function renderTile(doc: Document, props: TileProps): HTMLElement {
 
   return tile;
 }
+
+/**
+ * A measurement the reader is not being shown yet.
+ *
+ * There is deliberately no value slot. A withheld tile is not a tile with a blank number in it —
+ * it is the shape of the thing a real corridor cannot give you, and the sentence says which thing
+ * that is. A reader told only that something is hidden assumes the site is being coy; a reader
+ * told the second run does not exist outside a simulator has learnt the point of the drill.
+ */
+export function renderWithheldTile(doc: Document, label: string): HTMLElement {
+  const tile = doc.createElement("section");
+  tile.className = "tile tile-withheld";
+  tile.appendChild(element(doc, "p", "tile-label", label));
+  tile.appendChild(
+    element(
+      doc,
+      "p",
+      "tile-withheld-note",
+      "This measurement is withheld: it needs the second run, the one without the robot, which a " +
+        "real corridor does not have.",
+    ),
+  );
+  return tile;
+}

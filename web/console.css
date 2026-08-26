@@ -651,6 +651,18 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 }
 .key-note { margin-top: 0.5rem; }
 
+/*
+ * A withheld tile keeps the shape of a readout so the strip does not jump when the answer arrives,
+ * but carries no number and no gauge. Muted, because it is not the thing to look at yet.
+ */
+.tile-withheld { opacity: 0.72; }
+.tile-withheld-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--mirn-ink-faint);
+}
+
 @media (max-width: 60rem) {
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

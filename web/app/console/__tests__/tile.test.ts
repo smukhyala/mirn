@@ -10,6 +10,7 @@ import {
   BAND_NOT_MEASURED,
   makeTileProps,
   renderTile,
+  renderWithheldTile,
   zeroRenderingFor,
   type TilePropsInit,
 } from "../tile.js";
@@ -284,5 +285,25 @@ describe("the real column catalogue, rendered", () => {
         descriptor.zero.kind === "geometricBound" ? descriptor.zero.noRunReadsBelow : false;
       expect(rendering.bound, `${key} renders the wrong kind of zero`).toBe(expected);
     }
+  });
+});
+
+describe("a withheld tile", () => {
+  it("shows the label and says the number is withheld, with no value anywhere", () => {
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const el = renderWithheldTile(dom.window.document, "How far the crowd was moved");
+    expect(el.textContent).toContain("How far the crowd was moved");
+    expect(el.textContent).toContain("withheld");
+    // No value slot at all, so guardrail 6 cannot be violated here: there is no number to
+    // show without its zero.
+    expect(el.querySelector(".tile-value")).toBeNull();
+    expect(el.textContent).not.toMatch(/\d+\.\d+/);
+  });
+
+  it("says why it is withheld, not merely that it is", () => {
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const el = renderWithheldTile(dom.window.document, "How far the crowd was moved");
+    // A reader who is told a number is hidden and not why assumes the site is being coy.
+    expect(el.textContent).toMatch(/second run|without the robot|corridor/i);
   });
 });
