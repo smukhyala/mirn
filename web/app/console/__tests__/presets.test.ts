@@ -25,6 +25,11 @@ import { panelValuesFromSettings, settingsFromPanel } from "../preview.js";
  * checked the way it can actually be checked: `presetHrefs()` still goes through the settings
  * decoder, and `pageHrefs()` is checked for what a page link can go wrong in a way a preset cannot —
  * carrying a query string of its own, which nothing on this page would ever read back out.
+ *
+ * The sixth way in — the method card — is a second page link, and the split above absorbed it
+ * without an argument, which is what the split was for. The count of page links is raised to two
+ * and each is NAMED below, so a page link silently replaced by another still fails: a bare count
+ * would go green the moment somebody swapped the drill for something else.
  */
 
 const HTML = readFileSync("web/index.html", "utf8");
@@ -54,9 +59,9 @@ function pageHrefs(): readonly string[] {
 }
 
 describe("the ways in", () => {
-  it("offers four presets and one page link", () => {
+  it("offers four presets and two page links", () => {
     expect(presetHrefs()).toHaveLength(4);
-    expect(pageHrefs()).toHaveLength(1);
+    expect(pageHrefs()).toHaveLength(2);
   });
 
   it("names what to watch without quoting a number", () => {
@@ -77,8 +82,12 @@ describe("the ways in", () => {
     });
   }
 
-  it("points its one page link at the drill", () => {
+  it("points its page links at the drill and the method card", () => {
+    // Named, not counted. The length assertion above and these two together say the page links are
+    // these two and nothing else — which is what a count on its own would not say, and what a
+    // `toContain` on its own would not say either.
     expect(pageHrefs()).toContain("./drill.html");
+    expect(pageHrefs()).toContain("./method.html");
   });
 
   it("gives no page link a query string of its own", () => {

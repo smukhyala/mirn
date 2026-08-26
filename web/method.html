@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The method card — MIRN</title>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body class="console">
+<!--
+  The masthead and the disclosure are the console's, word for word.
+
+  Not a shortcut. Guardrail 1 asks that a beginner reads that the crowd is invented BEFORE any
+  number, in document order, on every surface that shows one — and this page shows numbers. Copying
+  the paragraph keeps the pages saying the same thing; rewriting it would make one of them the
+  softer version, and the softer version would be this one, on the page a stranger arrives at with
+  a question about their own work. web/app/console/__tests__/method-dom.test.ts checks both halves:
+  every clause the CSV's own disclosure carries appears here, and it appears above the
+  questionnaire, the Run button and the verdict.
+-->
+<header class="console-masthead">
+  <p class="eyebrow">A bench for one question</p>
+  <h1>What does a method like yours read when the answer is nothing?</h1>
+  <p class="standfirst" id="disclosure">
+    Everything on this page is simulated. The crowd is a social-force model — invented people
+    obeying invented rules — and no number here is a measurement of real pedestrians. What is
+    real is the ruler: the same room is run twice, once with a robot and once without, from the
+    same starting positions and the same random wobble, and the difference between a person's
+    two paths is the robot's effect on them.
+  </p>
+  <p class="how-backlink"><a href="./how.html">How every number here is worked out</a></p>
+  <p class="how-backlink"><a href="./index.html">Open the console and build a room yourself</a></p>
+</header>
+
+<main class="console-main">
+  <section class="method-intro" aria-labelledby="intro-title">
+    <h2 class="region-title" id="intro-title">What this does</h2>
+    <p class="verdict-line">
+      You have written a disturbance metric, or you are about to. Describe how it is computed and
+      this bench will run the nearest thing it can run on a world where the robot's true effect on
+      every person is exactly nothing — not nearly nothing, exactly — and tell you what a method of
+      that shape reads there.
+    </p>
+    <p class="verdict-line">
+      Nothing of yours is read in. No code, no file, no data. You answer five closed questions,
+      those answers name one of a handful of families this bench already implements, and it runs its
+      own estimator on its own rooms and reports its own numbers. What leaves this page is a claim
+      about a shape of measurement, never a claim about your robot.
+    </p>
+  </section>
+
+  <!--
+    Empty unless a hand-edited link asked for an answer this bench does not offer. The permalink
+    carries the five answers, so a link naming an answer the closed table has never held has to be
+    answered out loud rather than rounded off in silence — the same rule the console and the drill
+    both follow above their own controls.
+  -->
+  <div class="link-notices" id="link-notices" hidden></div>
+
+  <!--
+    Filled by web/method.ts from the closed question table in web/engine/job/questions.ts. Empty
+    here on purpose: a hand-written copy of the questions in this file would be a second catalogue
+    that nothing checks against the first, and the test that walks every answer a reader can give
+    walks the table rather than this markup.
+  -->
+  <form class="method-questions" id="questions" aria-labelledby="questions-title">
+    <h2 class="region-title" id="questions-title">Five questions about how your number is computed</h2>
+    <div id="question-list"></div>
+    <div class="method-run">
+      <button id="run" type="button" disabled>Measure this method</button>
+      <button id="copy-link" type="button">Copy a link to these answers</button>
+    </div>
+    <p class="method-status" id="status"></p>
+    <p class="region-note">
+      The link carries your five answers and nothing that was measured. There is no server behind
+      this page, nothing is saved on this machine, and reloading re-runs the simulation on today's
+      code rather than showing you an old answer.
+    </p>
+  </form>
+
+  <!--
+    Empty until a measurement has finished. web/method.ts builds the whole verdict into it: the
+    family and its confound, what was actually run in place of what you described, the two measured
+    numbers with their zeroes, and the refusal. Nothing claims to be a verdict before there is one,
+    so a test looking for the verdict before the run finds nothing rather than an empty shell.
+  -->
+  <section class="method-result" id="result" aria-labelledby="result-title" hidden>
+    <h2 class="region-title" id="result-title">The verdict</h2>
+    <div id="verdict"></div>
+  </section>
+</main>
+
+<script type="module" src="./method.ts"></script>
+</body>
+</html>

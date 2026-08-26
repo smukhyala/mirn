@@ -2,16 +2,18 @@ import { defineConfig } from "vite";
 import { resolve } from "node:path";
 
 /**
- * Three pages, three entry points, all listed by hand.
+ * Four pages, four entry points, all listed by hand.
  *
  * A helper used to sweep web/generated/*.html into the input map here, because every notes page
  * was compiled to real HTML before Vite ran. There are no notes and no pre-build step: every page
  * is hand-written HTML that Vite reads directly, and each is named below rather than discovered.
  *
  * `index` is the console. `how` is the page explaining what every readout on it computes. `drill`
- * is the referee drill's card, which shows a room with the run without the robot withheld. A name
- * here without a hand-written file behind it is a build emitting a page whose source is gone,
- * which is what `web/app/console/__tests__/disclosure.test.ts` checks this map for.
+ * is the referee drill's card, which shows a room with the run without the robot withheld.
+ * `method` is the method card, which takes five closed answers describing a disturbance metric and
+ * measures what a method of that shape reads where the answer is exactly nothing. A name here
+ * without a hand-written file behind it is a build emitting a page whose source is gone, which is
+ * what `web/app/console/__tests__/disclosure.test.ts` checks this map for.
  */
 export default defineConfig({
   root: "web",
@@ -30,6 +32,7 @@ export default defineConfig({
         index: resolve(__dirname, "web/index.html"),
         how: resolve(__dirname, "web/how.html"),
         drill: resolve(__dirname, "web/drill.html"),
+        method: resolve(__dirname, "web/method.html"),
       },
     },
   },

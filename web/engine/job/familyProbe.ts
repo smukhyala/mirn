@@ -245,75 +245,96 @@ function readFamily(
 }
 
 /**
- * Run one family across the seeds and report what it read where the answer was nothing.
+ * One seed's worth of the probe: one room, one band, one reading.
  *
- * The return is frozen and made of plain records and numbers, so it survives a structured clone
- * out of a worker. Nothing in it is a function.
+ * Split out of `probeFamily` so a caller that has to report progress can take the seeds one at a
+ * time. It is the whole of the per-seed work and there is no second copy of it — `probeFamily`
+ * below is a loop over this function and nothing else, so a worker driving the seeds by hand and
+ * the test suite calling `probeFamily` are running identical arithmetic rather than two
+ * implementations that happen to agree today.
+ *
+ * The return is frozen plain data, so it survives a structured clone out of a worker.
  */
-export function probeFamily(family: MethodFamily, settings: FamilyProbeSettings): FamilyProbe {
-  const perSeed: FamilyProbeSeed[] = [];
+export function probeSeed(
+  family: MethodFamily,
+  settings: FamilyProbeSettings,
+  seed: number,
+): FamilyProbeSeed {
+  const config = zeroEffectConfig(settings, seed);
+  const run = runPair(config);
+  const truthM = paired(run.pair).value;
+  const band = replicateBand(config, settings.bandReplicates);
+  const reading = readFamily(family, settings, config, run);
+
+  // `truthUnderBand` is recorded and asserted, never branched on. It used to gate the line
+  // below, and that gate could not fail: the truth here is exactly 0 and a band is a positive
+  // length, so the condition was true on every seed of every family and the conjunct did no
+  // work. Dropping it is not a loosening -- on a world whose true effect is exactly zero, "the
+  // reading cleared the band" IS the false positive and there is no second condition to check.
+  // What the conjunct expressed is worth keeping, so it is checked directly instead: a seed
+  // whose truth is not beneath the band means this is not the zero-effect world the probe
+  // claims to run, which is a failure to shout about rather than a seed to quietly skip.
+  const truthUnderBand = truthM < band.value;
+  let clearedBand = false;
+  if (reading.availability.kind === "measured") {
+    clearedBand = reading.value > band.value;
+  }
+
+  return Object.freeze({
+    kind: "familyProbeSeed" as const,
+    seed,
+    reading,
+    bandM: band.value,
+    peakBandM: band.peakValue,
+    truthM,
+    truthUnderBand,
+    clearedBand,
+  });
+}
+
+/**
+ * The counting and the averaging, over seeds already run.
+ *
+ * Every aggregate on a `FamilyProbe` is computed here and nowhere else. That matters because the
+ * browser's worker runs the seeds one at a time so it can post progress between them, and the
+ * test suite runs them in a single call: if the aggregation lived inside the loop, the page and
+ * the pinned measurements would be two implementations of the same eight counts.
+ * `familyProbe.slow.test.ts` asserts the two routes agree field for field.
+ */
+export function aggregateProbe(
+  family: MethodFamily,
+  perSeed: readonly FamilyProbeSeed[],
+): FamilyProbe {
   const readings: number[] = [];
   const bands: number[] = [];
   let nClearedBand = 0;
   let nTruthsExactlyZero = 0;
   let nTruthsUnderBand = 0;
 
-  for (const seed of settings.seeds) {
-    const config = zeroEffectConfig(settings, seed);
-    const run = runPair(config);
-    const truthM = paired(run.pair).value;
-    const band = replicateBand(config, settings.bandReplicates);
-    const reading = readFamily(family, settings, config, run);
-
+  for (const seed of perSeed) {
     // Exact, not approximate. The two arms of this pair are driven by the same forces from the
     // same tape, so every path is bit-identical and the estimator returns a hard zero. Anything
     // else means the arms have drifted, and a probe run on a world whose truth is merely small
     // would be reporting a false-positive count against an unstated non-zero effect.
-    if (truthM === 0) {
+    if (seed.truthM === 0) {
       nTruthsExactlyZero = nTruthsExactlyZero + 1;
     }
-    // `truthUnderBand` is recorded and asserted, never branched on. It used to gate the line
-    // below, and that gate could not fail: the truth here is exactly 0 and a band is a positive
-    // length, so the condition was true on every seed of every family and the conjunct did no
-    // work. Dropping it is not a loosening -- on a world whose true effect is exactly zero, "the
-    // reading cleared the band" IS the false positive and there is no second condition to check.
-    // What the conjunct expressed is worth keeping, so it is checked directly instead: a seed
-    // whose truth is not beneath the band means this is not the zero-effect world the probe
-    // claims to run, which is a failure to shout about rather than a seed to quietly skip.
-    const truthUnderBand = truthM < band.value;
-    if (truthUnderBand) {
+    if (seed.truthUnderBand) {
       nTruthsUnderBand = nTruthsUnderBand + 1;
     }
-    let clearedBand = false;
-    if (reading.availability.kind === "measured") {
-      clearedBand = reading.value > band.value;
-    }
-    if (clearedBand) {
+    if (seed.clearedBand) {
       nClearedBand = nClearedBand + 1;
     }
-
-    readings.push(reading.value);
-    bands.push(band.value);
-    perSeed.push(
-      Object.freeze({
-        kind: "familyProbeSeed" as const,
-        seed,
-        reading,
-        bandM: band.value,
-        peakBandM: band.peakValue,
-        truthM,
-        truthUnderBand,
-        clearedBand,
-      }),
-    );
+    readings.push(seed.reading.value);
+    bands.push(seed.bandM);
   }
 
   return Object.freeze({
     kind: "familyProbe" as const,
     family: family.key,
     unit: family.unit,
-    perSeed: Object.freeze(perSeed),
-    nAttempted: settings.seeds.length,
+    perSeed: Object.freeze([...perSeed]),
+    nAttempted: perSeed.length,
     nUsed: finiteCount(readings),
     nClearedBand,
     nTruthsExactlyZero,
@@ -322,6 +343,20 @@ export function probeFamily(family: MethodFamily, settings: FamilyProbeSettings)
     sdReading: sdOf(readings),
     meanBandM: meanOf(bands),
   });
+}
+
+/**
+ * Run one family across the seeds and report what it read where the answer was nothing.
+ *
+ * The return is frozen and made of plain records and numbers, so it survives a structured clone
+ * out of a worker. Nothing in it is a function.
+ */
+export function probeFamily(family: MethodFamily, settings: FamilyProbeSettings): FamilyProbe {
+  const perSeed: FamilyProbeSeed[] = [];
+  for (const seed of settings.seeds) {
+    perSeed.push(probeSeed(family, settings, seed));
+  }
+  return aggregateProbe(family, perSeed);
 }
 
 /** Every family, in the catalogue's own order, on the same seeds and the same rooms. */

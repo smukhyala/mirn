@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { FAMILIES, FAMILY_ORDER, makeMethodFamily, type FamilyKey } from "../families.js";
 import {
+  aggregateProbe,
   makeFamilyProbeSettings,
   probeAllFamilies,
   probeFamily,
+  probeSeed,
   PROBE_SEEDS,
   type FamilyProbe,
+  type FamilyProbeSeed,
 } from "../familyProbe.js";
 
 /**
@@ -342,5 +345,36 @@ describe("what the four families read where the answer is nothing", () => {
       PROBE_SEEDS[3],
       PROBE_SEEDS[5],
     ]);
+  }, PROBE_TIMEOUT_MS);
+
+  it("gives the same probe seed by seed as it does in one call", () => {
+    // The method card's worker runs the seeds ONE AT A TIME so it can post progress between them,
+    // then hands the list to `aggregateProbe`. Everything pinned in this file is measured through
+    // `probeFamily` instead. If those two routes could drift, the page and the baseline above
+    // would be two measurements of the same room with nothing comparing them — so they are
+    // compared here, field for field, on the family whose seeds actually fall on both sides of
+    // the band.
+    //
+    // `toEqual`, not `toBeCloseTo`: the aggregation is a sum and a divide over identical inputs
+    // in identical order, so the two routes agree bitwise or the refactor has changed something.
+    const cheap = makeFamilyProbeSettings({
+      seeds: [PROBE_SEEDS[0] as number, PROBE_SEEDS[3] as number, PROBE_SEEDS[4] as number],
+      bandReplicates: 3,
+    });
+    const family = FAMILIES.forecastCounterfactual;
+    const oneCall = probeFamily(family, cheap);
+    const bySeed: FamilyProbeSeed[] = [];
+    for (const seed of cheap.seeds) {
+      bySeed.push(probeSeed(family, cheap, seed));
+    }
+    expect(bySeed.length, "the seed-by-seed route ran no seeds").toBe(cheap.seeds.length);
+    const assembled = aggregateProbe(family, bySeed);
+    expect(assembled).toEqual(oneCall);
+    // And the aggregate is not vacuous: a probe of three seeds that counted nothing would satisfy
+    // the line above by agreeing on a row of zeroes.
+    expect(assembled.nAttempted).toBe(cheap.seeds.length);
+    expect(assembled.nUsed).toBe(cheap.seeds.length);
+    expect(Number.isFinite(assembled.meanReading)).toBe(true);
+    expect(assembled.meanBandM).toBeGreaterThan(0);
   }, PROBE_TIMEOUT_MS);
 });

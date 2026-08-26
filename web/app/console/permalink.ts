@@ -2,6 +2,15 @@ import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
 import { CARD_ORDER, type CardKey } from "../../engine/job/cards.js";
 import type { UnitKey } from "../../engine/job/columns.js";
 import { unitLabel } from "../../ui/labels.js";
+import {
+  EMPTY_DRAFT,
+  QUESTIONS,
+  QUESTION_ORDER,
+  optionFor,
+  type MethodDraft,
+  type OptionKey,
+  type QuestionKey,
+} from "../../engine/job/questions.js";
 import type { DrillState } from "./drill.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "./state.js";
 
@@ -784,6 +793,78 @@ export function decodeDrill(query: string): DrillLinkResult {
   return Object.freeze({
     kind: "drillLinkResult" as const,
     cards: Object.freeze(cards),
+    notices: Object.freeze(notices),
+  });
+}
+
+/**
+ * The method card's link: five answers, and nothing that was measured.
+ *
+ * The console's link carries thirteen axes because a room has that many knobs, and the drill's
+ * carries which cards a drill was. This one carries the five answers a reader gave, which is the
+ * recipe in the most literal sense available on this site: the answers name a family, the family
+ * names an estimator, and the estimator re-runs on today's code. A link carrying "cleared on six
+ * of eight" would be the exact failure guardrail 10 names — a measurement quoted with the new
+ * page's authority, after a physics change may have moved it.
+ *
+ * Both halves are wired. `web/method.ts` calls `decodeMethod` on `window.location.search` before
+ * it paints the questionnaire and pre-selects whatever the link named; the Copy-link button calls
+ * `encodeMethod`. A write-only permalink looks like it works and loses its payload in silence,
+ * which the guardrail calls worse than no link at all.
+ *
+ * A partial link is legal and ordinary: it pre-selects what it names and leaves the rest blank,
+ * because that is what a reader who copied a link mid-questionnaire would expect back.
+ *
+ * The notices deliberately do NOT quote the offending value. The drill's do, and can, because a
+ * card key is a word; an answer this table does not have is whatever somebody typed into a URL
+ * bar, and echoing it into a sentence is how a code identifier reaches a reader on a page whose
+ * every other string is held to a regex.
+ */
+
+export interface MethodLinkResult {
+  readonly kind: "methodLinkResult";
+  readonly draft: MethodDraft;
+  readonly notices: readonly string[];
+}
+
+/** The five answers, in the order they are asked. Never what any of them measured. */
+export function encodeMethod(draft: MethodDraft): string {
+  const parts: string[] = [];
+  for (const key of QUESTION_ORDER) {
+    const chosen = draft[key];
+    if (chosen === null) {
+      continue;
+    }
+    parts.push(`${QUESTIONS[key].queryKey}=${encodeURIComponent(chosen)}`);
+  }
+  return parts.join("&");
+}
+
+export function decodeMethod(query: string): MethodLinkResult {
+  const trimmed = query.startsWith("?") ? query.slice(1) : query;
+  const params = new URLSearchParams(trimmed);
+  const notices: string[] = [];
+  const draft: Record<QuestionKey, OptionKey | null> = { ...EMPTY_DRAFT };
+
+  for (const key of QUESTION_ORDER) {
+    const question = QUESTIONS[key];
+    const raw = params.get(question.queryKey);
+    if (raw === null || raw.length === 0) {
+      continue;
+    }
+    if (optionFor(key, raw) === null) {
+      notices.push(
+        `The link gave an answer this bench does not offer, for the question about ` +
+          `${question.about}. It was left blank for you to answer.`,
+      );
+      continue;
+    }
+    draft[key] = raw;
+  }
+
+  return Object.freeze({
+    kind: "methodLinkResult" as const,
+    draft: Object.freeze({ ...draft }),
     notices: Object.freeze(notices),
   });
 }

@@ -826,6 +826,191 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 }
 .link-notices .region-note { margin: 0.2rem 0; max-width: 42rem; }
 
+/*
+ * The method card.
+ *
+ * Two shapes, deliberately unlike each other, because the page turns on a distinction a reader
+ * will otherwise flatten. A family that compares gets a headline numeral for the rooms it cleared
+ * on — a rate, read at a glance. The family that compares nothing gets no numeral at all: its
+ * count sits inside a sentence, behind a rule, because a big "8 of 8" beside another family's
+ * "6 of 8" invites the comparison the whole console argues against. The CSS is half of that
+ * refusal; web/app/console/method.ts is the other half, and method-dom.test.ts holds both.
+ *
+ * The accent stays where it belongs. --mirn-perturbation is spent on exactly one thing here: the
+ * metres this method read where the answer was nothing, which is a perturbation reading and a
+ * false one. Counts, rules, buttons and headings are ink.
+ */
+.method-intro { margin: 0 0 2rem; }
+.method-intro .verdict-line:first-of-type { margin-top: 0; }
+
+.method-questions {
+  margin: 0 0 2rem;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 1.2rem;
+}
+/* A fieldset carries a browser border and inline padding no reset removes; both are cleared here
+   so the questions read as a list rather than as five boxes. */
+.method-question {
+  margin: 0 0 1.6rem;
+  border: 0;
+  border-left: 1px solid var(--mirn-rule);
+  padding: 0 0 0 1.1rem;
+  min-inline-size: 0;
+}
+.method-prompt {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0;
+  max-width: 42rem;
+}
+/* The position in the questionnaire, not a measurement. Set in the mono face so it reads as a
+   marker rather than as a figure, and small enough not to compete with the question. */
+.method-ordinal {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  color: var(--mirn-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.method-prompt-text { font-size: 1.02rem; line-height: 1.45; color: var(--mirn-ink); }
+.method-answer {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  margin: 0.55rem 0 0;
+  max-width: 42rem;
+  cursor: pointer;
+}
+.method-answer-text { font-size: 0.92rem; line-height: 1.5; color: var(--mirn-ink-muted); }
+.method-answer input:checked + .method-answer-text { color: var(--mirn-ink); }
+
+.method-run { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: baseline; margin-top: 1.4rem; }
+.method-status {
+  margin: 0.8rem 0 0.9rem;
+  max-width: 42rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--mirn-ink);
+}
+.status-count { font-variant-numeric: tabular-nums; }
+/* Same rule as .figure-of: the progress line is a sentence, and a sentence spaced only by
+   margins is spelled "1of8rooms done" to anything that reads the text rather than the pixels. */
+.status-of { color: var(--mirn-ink-faint); white-space: pre; }
+.status-phase { color: var(--mirn-ink-muted); }
+
+.method-result { margin: 2.4rem 0 0; border-top: 1px solid var(--mirn-rule); padding-top: 1.2rem; }
+.method-verdict { margin: 0; }
+.verdict-part {
+  margin: 0 0 2rem;
+  background: var(--mirn-surface);
+  border: 1px solid var(--mirn-rule);
+  padding: 1.3rem 1.4rem 1.5rem;
+}
+.verdict-part-title {
+  margin: 0 0 0.7rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mirn-ink-faint);
+}
+.verdict-eyebrow {
+  margin: 0 0 0.5rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mirn-ink-faint);
+}
+.method-family-name { margin: 0; max-width: 40rem; font-size: 1.3rem; line-height: 1.3; color: var(--mirn-ink); }
+.method-decided {
+  margin: 0.8rem 0 0;
+  max-width: 42rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--mirn-ink);
+}
+.method-what { margin: 1rem 0 0; max-width: 42rem; line-height: 1.65; color: var(--mirn-ink-muted); }
+.method-confound-lead {
+  margin: 1.3rem 0 0.3rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mirn-ink-faint);
+}
+/* Set against a rule rather than in the accent: it is the substance of the verdict, and the
+   accent is not chrome to emphasise with. */
+.method-confound {
+  margin: 0;
+  max-width: 42rem;
+  border-left: 2px solid var(--mirn-ink);
+  padding-left: 1rem;
+  line-height: 1.65;
+  color: var(--mirn-ink);
+}
+
+.method-approximations { margin: 1rem 0 0; padding-left: 1.1rem; max-width: 42rem; }
+.method-approximation { margin: 0 0 0.7rem; line-height: 1.6; color: var(--mirn-ink-muted); }
+
+.method-figure { margin: 1.4rem 0 0; }
+.method-figure:first-of-type { margin-top: 1rem; }
+.figure-label { margin: 0; max-width: 34rem; font-size: 0.86rem; line-height: 1.5; color: var(--mirn-ink-muted); }
+.figure-value { margin: 0.35rem 0 0; display: flex; gap: 0.3rem; align-items: baseline; }
+.figure-number {
+  font-family: var(--mirn-font-mono);
+  font-size: 2rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--mirn-ink);
+}
+.figure-unit { font-family: var(--mirn-font-mono); font-size: 0.9rem; color: var(--mirn-ink-muted); }
+/* The word carries its own spaces so the value reads as "six of eight" to a screen reader as
+   well as on the page; a CSS margin alone leaves the text content spelled "6of8". */
+.figure-of { font-family: var(--mirn-font-mono); font-size: 0.9rem; color: var(--mirn-ink-faint); white-space: pre; }
+.figure-denominator { font-size: 1.2rem; color: var(--mirn-ink-muted); }
+/* The one place the accent is spent: metres this method reported where the true answer was
+   nothing. It is a perturbation reading, and a false one, which is what the token is for. */
+.method-figure[data-number="reading"] .figure-number { color: var(--mirn-perturbation); }
+/* The drift line is the thing the reading is judged against, not a second reading, so it is set
+   below it. Two figures at the same size read as a pair of results rather than as one and its
+   ruler. */
+.method-figure[data-number="drift"] .figure-number { font-size: 1.5rem; }
+.figure-anchor { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--mirn-ink-faint); }
+.figure-zero {
+  margin: 0.5rem 0 0;
+  max-width: 40rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--mirn-ink-muted);
+}
+.figure-zero-value { font-family: var(--mirn-font-mono); font-variant-numeric: tabular-nums; color: var(--mirn-ink); }
+.figure-zero-unit { margin-left: 0.15rem; font-family: var(--mirn-font-mono); color: var(--mirn-ink); }
+.figure-zero-how { margin-left: 0.45rem; }
+.figure-note { margin: 0.6rem 0 0; max-width: 40rem; font-size: 0.84rem; line-height: 1.6; color: var(--mirn-ink); }
+
+/* The family that is not detecting anything. No headline numeral, on purpose: the count lives in
+   a sentence, and the block is set apart by a rule so it does not read as a fourth reading in the
+   same series as the three above it. */
+.method-nondetection {
+  border-left: 2px solid var(--mirn-ink);
+  padding: 0.4rem 0 0.4rem 1rem;
+}
+.figure-plain { margin: 0.35rem 0 0; max-width: 40rem; font-size: 0.98rem; line-height: 1.55; color: var(--mirn-ink); }
+.figure-inline { font-family: var(--mirn-font-mono); font-variant-numeric: tabular-nums; }
+
+.method-spread { margin-top: 1.1rem; }
+.method-stamps {
+  margin: 1.2rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  color: var(--mirn-ink-faint);
+}
+/* The refusal is the last thing on the page and the flattest. Same weight as the numbers, which
+   is the point of it. */
+.verdict-part[data-part="refusal"] .verdict-claim:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+
 @media (max-width: 60rem) {
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -847,5 +1032,11 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   .how-main { padding: 0 1.2rem; }
   .how-contents ol { grid-template-columns: minmax(0, 1fr); }
   .how-zero { padding: 0.7rem 0.9rem; }
+  /* The method card rides in this block for the same reason the working page does:
+     every breakpoint in this file is written widest first, and a new @media below
+     this one would have to be narrower than 45rem to keep that order. */
+  .verdict-part { padding: 1rem 1rem 1.2rem; }
+  .method-figure .figure-number { font-size: 1.6rem; }
+  .method-run { flex-direction: column; align-items: stretch; }
 }
 

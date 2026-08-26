@@ -4,11 +4,21 @@ import { CARD_ORDER } from "../../../engine/job/cards.js";
 import { answer, makeDrillState, reveal, type DrillState } from "../drill.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "../state.js";
 import {
+  EMPTY_DRAFT,
+  QUESTIONS,
+  QUESTION_ORDER,
+  makeMethodAnswers,
+  resolveFamily,
+  type MethodDraft,
+} from "../../../engine/job/questions.js";
+import {
   AXIS_QUERY_KEY,
   SETTING_QUERY_KEYS,
   decodeDrill,
+  decodeMethod,
   decodeSettings,
   encodeDrill,
+  encodeMethod,
   encodeSettings,
   settingsNotHonoured,
 } from "../permalink.js";
@@ -449,5 +459,110 @@ describe("the drill's own link", () => {
     for (const notice of decoded.notices) {
       expect(identifier.test(notice), `"${notice}" carries a code identifier`).toBe(false);
     }
+  });
+});
+
+/**
+ * The method card's link: the five answers, and nothing that was measured.
+ *
+ * Same three obligations the other two links carry. It round-trips exactly; it says out loud what
+ * it could not take rather than rounding it off; and it carries no result. The third is the one
+ * with teeth — a link asserting "cleared on six of eight" would quote an old measurement with the
+ * new page's authority after a physics change had moved it.
+ */
+const FULL_ANSWERS: MethodDraft = Object.freeze({
+  controlRun: "none",
+  counterfactualSource: "learned",
+  stretch: "moving",
+  aggregation: "crossings",
+  zeroReference: "no",
+});
+
+describe("the method card's link carries the answers and never the answer", () => {
+  it("round-trips every answer a reader can give", () => {
+    let round = 0;
+    for (const key of QUESTION_ORDER) {
+      for (const option of QUESTIONS[key].options) {
+        const draft: MethodDraft = { ...FULL_ANSWERS, [key]: option.key };
+        const decoded = decodeMethod(encodeMethod(draft));
+        expect(decoded.draft, `${key}/${option.key} did not survive the round trip`).toEqual(draft);
+        expect(decoded.notices).toEqual([]);
+        round = round + 1;
+      }
+    }
+    expect(round, "no answer was round-tripped").toBeGreaterThan(15);
+  });
+
+  it("writes one pair per answered question, spelled the way the table spells it", () => {
+    const parts = encodeMethod(FULL_ANSWERS).split("&");
+    expect(parts.length).toBe(QUESTION_ORDER.length);
+    for (const key of QUESTION_ORDER) {
+      expect(parts).toContain(`${QUESTIONS[key].queryKey}=${FULL_ANSWERS[key] ?? ""}`);
+    }
+  });
+
+  it("carries nothing at all before a single question has been answered", () => {
+    expect(encodeMethod(EMPTY_DRAFT)).toBe("");
+    expect(decodeMethod("").draft).toEqual(EMPTY_DRAFT);
+  });
+
+  it("keeps a partial answer set partial, rather than filling it in", () => {
+    // A reader who copied a link half way through gets back what they had, not a guess at the rest.
+    const partial: MethodDraft = { ...EMPTY_DRAFT, controlRun: "stranger" };
+    const decoded = decodeMethod(encodeMethod(partial));
+    expect(decoded.draft).toEqual(partial);
+    expect(() => makeMethodAnswers(decoded.draft)).toThrow();
+  });
+
+  it("drops an answer no question offers, and says so in plain English", () => {
+    const decoded = decodeMethod("control=sideways&source=straight");
+    expect(decoded.draft.controlRun).toBeNull();
+    expect(decoded.draft.counterfactualSource).toBe("straight");
+    expect(decoded.notices.length).toBe(1);
+  });
+
+  it("writes its notices in plain English", () => {
+    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
+    // Deliberately hostile: the offending value is exactly the shape of thing that would read as a
+    // code identifier if the notice quoted it back. It must not.
+    const decoded = decodeMethod("control=someWeird_value&source=alsoBad_one");
+    expect(decoded.notices.length).toBe(2);
+    for (const notice of decoded.notices) {
+      expect(identifier.test(notice), `"${notice}" carries a code identifier`).toBe(false);
+      expect(notice).not.toContain("someWeird");
+    }
+  });
+
+  it("never throws, whatever is in it", () => {
+    const hostile: readonly string[] = [
+      "",
+      "?",
+      "control",
+      "control=",
+      "control=%00",
+      "unrelated=1",
+      "control=twin&control=stranger",
+      "source=" + "x".repeat(500),
+    ];
+    for (const query of hostile) {
+      const result = decodeMethod(query);
+      expect(result.kind).toBe("methodLinkResult");
+    }
+  });
+
+  it("tolerates a leading question mark", () => {
+    const decoded = decodeMethod(`?${encodeMethod(FULL_ANSWERS)}`);
+    expect(decoded.draft).toEqual(FULL_ANSWERS);
+  });
+
+  it("carries a recipe rather than a result, and the recipe is enough", () => {
+    // The whole of guardrail 10 for this page: what comes out of the link is a family to measure,
+    // not a measurement. Nothing in the query names a reading, a count or a line.
+    const query = encodeMethod(FULL_ANSWERS);
+    expect(query).not.toMatch(/\d/);
+    const reopened = decodeMethod(query).draft;
+    expect(resolveFamily(makeMethodAnswers(reopened)).family).toBe(
+      resolveFamily(makeMethodAnswers(FULL_ANSWERS)).family,
+    );
   });
 });
