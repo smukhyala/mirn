@@ -811,6 +811,20 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   color: var(--mirn-ink);
 }
 .verdict-link { color: var(--mirn-ink); }
+/* The console's ledger bar, on the verdict. Same row of plain buttons, same sentence underneath
+   saying what each one carries, because a reader who has used one page should recognise the other.
+   Not the call buttons' pill: these two take a finished drill away, they do not commit an opinion. */
+.verdict-bar { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: baseline; margin-top: 1.6rem; }
+.verdict-bar + .region-note { max-width: 42rem; margin-top: 0.7rem; }
+/* Empty on every ordinary visit, and shown only when a hand-edited link asked for a card this
+   drill does not have. Set apart by a rule rather than by colour: it is a correction, not a
+   warning, and nothing on this page spends the accent on chrome. */
+.link-notices {
+  margin: 0.8rem 0 0;
+  border-left: 2px solid var(--mirn-rule);
+  padding-left: 0.9rem;
+}
+.link-notices .region-note { margin: 0.2rem 0; max-width: 42rem; }
 
 @media (max-width: 60rem) {
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

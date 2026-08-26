@@ -194,6 +194,26 @@ function draw(view: ArenaView): Recorder {
   return recorder;
 }
 
+describe("the highlight is a control-arm mark, and is gated like one", () => {
+  const HIGHLIGHT = { agentIndex: 1, labelP: "with the robot", labelQ: "without it" };
+
+  it("draws the spotlight when the run without the robot is on screen", () => {
+    const plain = draw(makeView({ highlight: null })).ops.length;
+    const lit = draw(makeView({ highlight: HIGHLIGHT })).ops.length;
+    expect(lit, "the highlight drew nothing at all").toBeGreaterThan(plain);
+  });
+
+  it("draws nothing at all when the run without the robot is withheld", () => {
+    // The drill's card. `drawHighlight` puts the control arm's own position and the gap between
+    // the two arms on the canvas, which is exactly what a withheld card must not show — and the
+    // safety property must rest on the flag, not on the drill remembering to pass no highlight.
+    const withheld = { showControl: false, showGaps: false } as const;
+    const plain = draw(makeView({ ...withheld, highlight: null })).ops.length;
+    const lit = draw(makeView({ ...withheld, highlight: HIGHLIGHT })).ops.length;
+    expect(lit, "a withheld card drew the run it is withholding").toBe(plain);
+  });
+});
+
 function discFills(recorder: Recorder): Op[] {
   const found: Op[] = [];
   for (const op of recorder.ops) {

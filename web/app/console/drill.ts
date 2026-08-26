@@ -1,5 +1,5 @@
 import { fail } from "../../engine/core/errors.js";
-import { CARD_ORDER, type CardKey } from "../../engine/job/cards.js";
+import { CARD_ORDER, DRILL_CARDS, type CardKey } from "../../engine/job/cards.js";
 
 /**
  * The drill's pure state: which card is up, whether it has been answered and revealed yet, and
@@ -61,10 +61,23 @@ export interface DrillCallRecord {
   readonly correct: boolean;
 }
 
+/**
+ * `order` is which cards this drill is, in the order they are put to the reader.
+ *
+ * It is on the state rather than read out of `CARD_ORDER` at each use because the drill's own
+ * permalink carries exactly this list and nothing else (see `encodeDrill`), and a link whose
+ * payload the page then ignored would be the write-only permalink guardrail 10 names as worse than
+ * no link at all. It defaults to the catalogue's own order, which is what every reader arriving
+ * without a link gets, so the shared case is unchanged.
+ *
+ * It is a list of keys and never a list of cards: a key resolves to settings and a seed through
+ * the closed catalogue, so no link can introduce a room the catalogue does not already hold.
+ */
 export interface DrillState {
   readonly kind: "drillState";
   readonly index: number;
   readonly revealed: boolean;
+  readonly order: readonly CardKey[];
   readonly calls: readonly DrillCallRecord[];
 }
 
@@ -76,17 +89,26 @@ export interface DrillTally {
   readonly cannotTell: number;
 }
 
-export function makeDrillState(): DrillState {
+export function makeDrillState(order: readonly CardKey[] = CARD_ORDER): DrillState {
+  if (order.length === 0) {
+    fail("a drill needs at least one card; the order handed in was empty");
+  }
+  for (const key of order) {
+    if (!(key in DRILL_CARDS)) {
+      fail(`the drill order names a card the catalogue does not have: '${String(key)}'`);
+    }
+  }
   return Object.freeze({
     kind: "drillState" as const,
     index: 0,
     revealed: false,
+    order: Object.freeze([...order]),
     calls: Object.freeze([]),
   });
 }
 
 export function isComplete(state: DrillState): boolean {
-  return state.index >= CARD_ORDER.length;
+  return state.index >= state.order.length;
 }
 
 /**
@@ -109,7 +131,7 @@ export function answer(state: DrillState, call: DrillCall, honest: HonestCall): 
         "on the same card",
     );
   }
-  const cardKey = CARD_ORDER[state.index];
+  const cardKey = state.order[state.index];
   if (cardKey === undefined) {
     fail(`the drill has no card at index ${String(state.index)}`);
     return state;
@@ -128,6 +150,7 @@ export function answer(state: DrillState, call: DrillCall, honest: HonestCall): 
     kind: "drillState" as const,
     index: state.index,
     revealed: true,
+    order: state.order,
     calls: Object.freeze([...state.calls, record]),
   });
 }
@@ -146,6 +169,7 @@ export function reveal(state: DrillState): DrillState {
     kind: "drillState" as const,
     index: state.index + 1,
     revealed: false,
+    order: state.order,
     calls: state.calls,
   });
 }

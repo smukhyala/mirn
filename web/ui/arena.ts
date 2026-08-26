@@ -276,7 +276,14 @@ export function drawArena(
     dot(context, buffer, view.sample, view.pedRadiusM, t, true, PALETTE.inkMuted);
   }
 
-  if (view.highlight !== null) {
+  // Gated on `showControl` as well as on the highlight itself, and that second half is the
+  // load-bearing one. `drawHighlight` draws the CONTROL arm's position and the segment between the
+  // two arms — both of which are the answer on a withheld card — so a view with the control run
+  // switched off and a highlight set would put the withheld run on the canvas. Nothing does that
+  // today, because web/drill.ts passes `highlight: null`; but that file's own comment says every
+  // control mark in this renderer is gated on these two flags, and until this line existed that
+  // was a comment a reader would believe and a gate that was not there.
+  if (view.highlight !== null && view.showControl) {
     drawHighlight(context, view, view.highlight, t);
   }
 

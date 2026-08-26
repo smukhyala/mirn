@@ -727,9 +727,13 @@ export function settingsNotHonoured(
  * `DrillCallRecord` also carries `call`, `honest` and `correct`, and none of the three is read here.
  * A link that carried `correct=false` would be exactly the failure guardrail 10 exists to name: a
  * score quoted with the new page's authority, on a page whose whole point is that the score is not
- * the thing worth carrying. `web/drill.ts` does not yet write this link anywhere a reader can copy
- * — building the encoder and decoder first, and proving neither can leak a result, is what this file
- * does; wiring a button to it is later work.
+ * the thing worth carrying.
+ *
+ * Both halves are wired, and that is the other half of guardrail 10. The verdict's Copy-link button
+ * calls `encodeDrill` and puts the query in the address bar; `web/drill.ts` calls `decodeDrill` on
+ * `window.location.search` before it builds the first card and runs exactly the cards it names, in
+ * the order it names them. A page that wrote this payload and then ignored it on the way back in
+ * would be the write-only permalink the guardrail calls worse than no link at all.
  *
  * `decodeDrill` follows `decodeSettings`'s own convention: an unknown card key is ignored, with a
  * notice a reader can read, never silently and never by throwing.

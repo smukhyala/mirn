@@ -3,7 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { AXIS_QUERY_KEY } from "../permalink.js";
+import { AXIS_QUERY_KEY, decodeDrill } from "../permalink.js";
+import { DISCLOSURE_CLAUSES, INVENTED_CROWD_DISCLOSURE } from "../csv.js";
 import { CARD_ORDER, DRILL_CARDS } from "../../../engine/job/cards.js";
 
 /**
@@ -71,6 +72,7 @@ function textChunks(root: Node): readonly string[] {
 
 interface Walked {
   readonly document: Document;
+  readonly window: Window;
   readonly verdict: string;
   readonly link: string;
 }
@@ -129,6 +131,7 @@ async function walkTheDrill(): Promise<Walked> {
   const anchor = verdictHost.querySelector("a");
   return {
     document,
+    window: dom.window as unknown as Window,
     verdict: verdictHost.textContent ?? "",
     link: anchor?.getAttribute("href") ?? "",
   };
@@ -164,6 +167,28 @@ describe("eight calls end in a verdict", () => {
     const tallyLine = walked.document.querySelector("#tally")?.textContent ?? "";
     expect(tallyLine).toContain("Called so far: 8 of eight");
     expect(tallyLine).toContain("on 2 you said the card could not be called");
+
+    // The count itself, which the title of this test claims and nothing here used to check: the
+    // capture group above was read and thrown away, so a verdict saying "you called nine of the
+    // eight cards wrong" passed. Right plus wrong plus declined is every call made, and the walk
+    // made eight.
+    const counted = /(\d+) matched what the room did, (\d+) did not, and on (\d+) you said/.exec(
+      tallyLine,
+    );
+    expect(counted, "the running score never says how the calls split").not.toBeNull();
+    const right = Number(counted?.[1]);
+    const missed = Number(counted?.[2]);
+    const declined = Number(counted?.[3]);
+    expect(right + missed + declined, "the three buckets do not add up to the calls made").toBe(
+      CARD_ORDER.length,
+    );
+    expect(declined, "the two scripted declines were not counted as declines").toBe(2);
+    // And the verdict's own wrong-count is the same number the running score reports, spelled as a
+    // word. Two renderings of one tally that could drift apart, and now cannot.
+    const WORDS: readonly string[] = ["none", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+    expect(wrong?.[1], "the verdict and the running score disagree on how many missed").toBe(
+      WORDS[missed],
+    );
   });
 
   it("says how often the corridor number pointed the other way", () => {
@@ -212,5 +237,110 @@ describe("eight calls end in a verdict", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * The two ways a finished drill leaves the page.
+ *
+ * Both were built, tested at unit level and reachable by nobody: `encodeDrill` and `toDrillCsv`
+ * had no caller in any shipped page, while the spec's verdict screen asks for both. A unit test of
+ * an encoder passes forever against a page with no button, which is why these assertions are made
+ * against the buttons a reader can actually press.
+ */
+describe("the verdict hands the drill back to the reader", () => {
+  let walked: Walked;
+
+  beforeAll(async () => {
+    walked = await walkTheDrill();
+  }, 60000);
+
+  it("offers both controls the verdict is supposed to offer", () => {
+    expect(
+      walked.document.querySelector("#drill-copy-link"),
+      "a finished drill cannot be shared",
+    ).not.toBeNull();
+    expect(
+      walked.document.querySelector("#drill-export-csv"),
+      "a finished drill cannot be exported",
+    ).not.toBeNull();
+  });
+
+  it("copies a link carrying the cards and never the calls, the score or a measurement", () => {
+    walked.document.querySelector<HTMLButtonElement>("#drill-copy-link")?.click();
+    const query = walked.window.location.search;
+
+    // The payload: every card, in the order it was called, and reachable again.
+    const decoded = decodeDrill(query);
+    expect(decoded.cards).toEqual(CARD_ORDER);
+    expect(decoded.notices).toEqual([]);
+
+    // What must never be in it. The state behind this link holds a call, an honest answer and a
+    // correct flag per card, and the scripted walk got some of them wrong — so a leak here would
+    // be a real leak and not a hypothetical one.
+    expect(query).not.toMatch(/wrong|right|score|correct|called|bigger|smaller|cannot/i);
+    // Guardrail 10 again: no measured value. A metre in a link quotes an old build's answer with
+    // the next build's authority.
+    expect(query).not.toMatch(/\d+\.\d/);
+    // One key, and it is the cards.
+    expect([...new URLSearchParams(query.slice(1)).keys()]).toEqual(["cards"]);
+  });
+
+  it("exports a file that says the crowd is invented before it says anything else", () => {
+    // The data URI branch of `downloadCsv`, taken deliberately: the object-URL branch hands back an
+    // opaque handle whose text cannot be read back in this environment, and the text is the whole
+    // of what is asserted here. Which branch a browser takes changes nothing about the bytes.
+    const url = (globalThis as unknown as { URL: { createObjectURL?: unknown } }).URL;
+    const saved = url.createObjectURL;
+    delete url.createObjectURL;
+
+    let href = "";
+    let filename = "";
+    const catchDownload = (event: Event): void => {
+      const target = event.target as HTMLAnchorElement;
+      href = target.getAttribute("href") ?? "";
+      filename = target.getAttribute("download") ?? "";
+      event.preventDefault();
+    };
+    walked.document.addEventListener("click", catchDownload, true);
+    try {
+      walked.document.querySelector<HTMLButtonElement>("#drill-export-csv")?.click();
+    } finally {
+      walked.document.removeEventListener("click", catchDownload, true);
+      if (saved !== undefined) {
+        url.createObjectURL = saved;
+      }
+    }
+
+    expect(filename, "the export produced no file").toMatch(/\.csv$/);
+    expect(href.startsWith("data:text/csv")).toBe(true);
+    const text = decodeURIComponent(href.slice(href.indexOf(",") + 1));
+    const lines = text.split("\n");
+
+    // Guardrail 1, in the form that matters most: a file outlives the page it came from.
+    expect(lines[0]).toBe(`# ${INVENTED_CROWD_DISCLOSURE}`);
+    for (const clause of DISCLOSURE_CLAUSES) {
+      expect(lines[0], `the export's first line drops "${clause}"`).toContain(clause);
+    }
+    // One row per card called. The header block is every `#` line plus the first line after it,
+    // which is the column row — found rather than spelled out, so a renamed column does not turn
+    // this into a count that is quietly one too many.
+    const body: string[] = [];
+    for (const line of lines) {
+      if (line.length === 0 || line.startsWith("#")) {
+        continue;
+      }
+      body.push(line);
+    }
+    expect(body[0], "the export has no column row").toContain("Card");
+    const rows = body.slice(1);
+    expect(rows.length, "the export carries a different number of rows from cards called").toBe(
+      CARD_ORDER.length,
+    );
+    // Every card by its reader-facing name, not its key.
+    for (const key of CARD_ORDER) {
+      expect(text, `${key} is missing from the export`).toContain(DRILL_CARDS[key].name);
+      expect(text, `${key} reached the export as a code identifier`).not.toContain(`"${key}"`);
+    }
   });
 });

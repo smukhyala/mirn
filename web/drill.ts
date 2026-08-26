@@ -4,7 +4,14 @@
 import "./app/console/boot.js";
 import { makeRunConfig, SIM_CONSTANTS } from "./engine/contracts/config.js";
 import { AXIS_ORDER, type AxisKey } from "./engine/job/axes.js";
-import { CARD_ORDER, DRILL_CARDS, cardConfig, cardRulerParams, type DrillCard } from "./engine/job/cards.js";
+import {
+  CARD_ORDER,
+  DRILL_CARDS,
+  cardConfig,
+  cardRulerParams,
+  type CardKey,
+  type DrillCard,
+} from "./engine/job/cards.js";
 import {
   COLUMNS,
   COLUMN_ORDER,
@@ -27,7 +34,14 @@ import {
   type DrillState,
   type HonestCall,
 } from "./app/console/drill.js";
-import { encodeSettings } from "./app/console/permalink.js";
+import { decodeDrill, encodeDrill, encodeSettings } from "./app/console/permalink.js";
+import {
+  makeDrillCsvEntry,
+  makeDrillCsvOptions,
+  toDrillCsv,
+  type DrillCsvEntry,
+} from "./app/console/csv.js";
+import { downloadCsv } from "./app/console/table.js";
 import { isRenderable, resolveZero, stampsFor } from "./app/console/preview.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings } from "./app/console/state.js";
 import {
@@ -558,6 +572,7 @@ export function bootDrill(doc: Document): void {
   const name = el<HTMLParagraphElement>(doc, "card-name");
   const status = el<HTMLParagraphElement>(doc, "call-status");
   const revealHost = el<HTMLDivElement>(doc, "reveal");
+  const noticeHost = el<HTMLDivElement>(doc, "link-notices");
   const tallyLine = el<HTMLParagraphElement>(doc, "tally");
   const verdictHost = el<HTMLElement>(doc, "verdict");
   const buttons: readonly { readonly node: HTMLButtonElement; readonly call: DrillCall }[] =
@@ -567,7 +582,21 @@ export function bootDrill(doc: Document): void {
       { node: el<HTMLButtonElement>(doc, "call-cannot-tell"), call: "cannot tell" as const },
     ]);
 
-  let state: DrillState = makeDrillState();
+  /**
+   * The reading half of this page's permalink, read before the first card is built.
+   *
+   * `encodeDrill` writes which cards a drill was and nothing else. This reads that back and runs
+   * exactly those, in that order. Wiring only the writing half would be the write-only link
+   * guardrail 10 names as worse than no link at all: it would look like it worked and lose its
+   * payload in silence. No list, or a list of nothing this catalogue holds, is the ordinary case
+   * and gets the catalogue's own order — and anything the catalogue does not have is said above
+   * the card in plain English rather than dropped quietly, the way the console prints what its own
+   * panel could not take.
+   */
+  const link = decodeDrill(window.location.search);
+  const order: readonly CardKey[] = link.cards.length > 0 ? link.cards : CARD_ORDER;
+
+  let state: DrillState = makeDrillState(order);
   let cardRun: CardRun = runCard(cardAt(state.index));
   let sample = 0;
   let base: PlaybackBase = { wallStartMs: 0, sampleAtStart: 0, dtMs: 50, rate: 1 };
@@ -579,11 +608,20 @@ export function bootDrill(doc: Document): void {
   // Whether the corridor-readable number pointed the other way from the truth, one entry per card
   // answered. The verdict counts them; nothing scores from them.
   const misleadingCards: boolean[] = [];
+  /**
+   * One row per card called, built at the reveal and exported from the verdict.
+   *
+   * Built here rather than at the export, because the four numbers in a row exist only while that
+   * card's reveal is in hand: the drill buys a band and a zero-effect run per card and keeps
+   * neither. Re-deriving them at the export would mean re-running eight rooms, and a second
+   * measurement of the same card is a second chance for the file and the page to disagree.
+   */
+  const csvRows: DrillCsvEntry[] = [];
 
   function cardAt(index: number): DrillCard {
-    const key = CARD_ORDER[index];
+    const key = state.order[index];
     if (key === undefined) {
-      throw new Error("the card catalogue has no card at that position");
+      throw new Error("this drill has no card at that position");
     }
     return DRILL_CARDS[key];
   }
@@ -637,7 +675,7 @@ export function bootDrill(doc: Document): void {
       return;
     }
     tallyLine.textContent =
-      `Called so far: ${String(counts.total)} of ${countWord(CARD_ORDER.length)}. ` +
+      `Called so far: ${String(counts.total)} of ${countWord(state.order.length)}. ` +
       `${String(counts.right)} matched what the room did, ${String(counts.wrong)} did not, and ` +
       `on ${String(counts.cannotTell)} you said the card could not be called.`;
   };
@@ -648,7 +686,7 @@ export function bootDrill(doc: Document): void {
     base = { wallStartMs: 0, sampleAtStart: 0, dtMs: 50, rate: 1 };
     frozen = false;
     revealed = false;
-    progress.textContent = `Card ${String(state.index + 1)} of ${String(CARD_ORDER.length)}`;
+    progress.textContent = `Card ${String(state.index + 1)} of ${String(state.order.length)}`;
     name.textContent = cardRun.card.name;
     status.textContent = "";
     clear(revealHost);
@@ -663,11 +701,11 @@ export function bootDrill(doc: Document): void {
   const showVerdict = (): void => {
     stage.hidden = true;
     verdictHost.hidden = false;
-    paintVerdict(doc, verdictHost, state, misleadingCards, cardRun);
+    paintVerdict(doc, verdictHost, state, misleadingCards, cardRun, csvRows);
   };
 
   const paintRevealBlock = (cardReveal: CardReveal, call: DrillCall): void => {
-    const last = state.index + 1 >= CARD_ORDER.length;
+    const last = state.index + 1 >= state.order.length;
     const next = doc.createElement("button");
     next.type = "button";
     next.id = "next-card";
@@ -702,8 +740,26 @@ export function bootDrill(doc: Document): void {
       status.textContent = `You called it: ${CALL_CLAUSE[button.call]}.`;
 
       const cardReveal = revealCard(cardRun);
+      const calledKey = state.order[state.index];
       state = answer(state, button.call, cardReveal.honest);
       misleadingCards.push(cardReveal.corridorMisleads);
+      // The forecaster's own zero, read out of the same report the tile above it is rendered from
+      // rather than measured a second time here. A row is only written when all four numbers are
+      // in hand: a column of blanks in a file that outlives the page is worse than a shorter file.
+      const forecastZero = cardReveal.readings["forecastZeroM"];
+      if (calledKey !== undefined && forecastZero !== undefined) {
+        csvRows.push(
+          makeDrillCsvEntry({
+            cardKey: calledKey,
+            call: button.call,
+            honest: cardReveal.honest,
+            truthM: cardReveal.truthM,
+            bandM: cardReveal.bandM,
+            corridorM: cardReveal.forecastM,
+            corridorZeroM: forecastZero.value,
+          }),
+        );
+      }
 
       frozen = true;
       revealed = true;
@@ -712,6 +768,15 @@ export function bootDrill(doc: Document): void {
       paintRevealBlock(cardReveal, button.call);
       paintTally();
     });
+  }
+
+  // Said once, at boot, above the card. There is nothing later that could make a link's own
+  // mistake go away, and nothing on the page rewrites it.
+  if (link.notices.length > 0) {
+    noticeHost.hidden = false;
+    for (const notice of link.notices) {
+      noticeHost.appendChild(element(doc, "p", "region-note", notice));
+    }
   }
 
   loadCard(cardRun);
@@ -836,7 +901,7 @@ export function verdictLines(
   misleadingCards: readonly boolean[],
 ): readonly VerdictLine[] {
   const counts = tally(state);
-  const total = countWord(CARD_ORDER.length);
+  const total = countWord(state.order.length);
   const lines: VerdictLine[] = [];
 
   lines.push(
@@ -908,13 +973,86 @@ export function verdictLines(
   return Object.freeze(lines);
 }
 
-/** The verdict, after the last card: the sentences above, and the way back into the console. */
+/**
+ * The two ways to take a finished drill away with you.
+ *
+ * The pattern is the console's ledger bar, deliberately: two buttons and one sentence underneath
+ * saying what each carries, so a reader who has used one page recognises the other. What differs is
+ * what there is to carry.
+ *
+ * **The link carries the cards and nothing else.** `encodeDrill` writes the card keys in the order
+ * they were called and cannot write a call, an honest answer or a score — `DrillCallRecord` holds
+ * all three and it reads none of them. That is guardrail 10's rule and not a preference: a link
+ * saying you got five of eight would quote an old page's answer with the new page's authority, on
+ * a page whose whole argument is that the score is not the interesting part. A key resolves through
+ * the closed catalogue to a room, which reproduces exactly, and to nothing about how it was called.
+ *
+ * **The file carries the disclosure on line one**, because a file outlives the page it came from
+ * and the crowd in it is still invented wherever it is opened. It also carries, in its own header,
+ * that no detection floor was measured for any card — the drill never buys one — rather than a
+ * column of blanks or, worse, a fabricated number.
+ */
+function paintVerdictBar(
+  doc: Document,
+  host: HTMLElement,
+  state: DrillState,
+  rows: readonly DrillCsvEntry[],
+): void {
+  const bar = doc.createElement("div");
+  bar.className = "verdict-bar";
+
+  const exportButton = doc.createElement("button");
+  exportButton.type = "button";
+  exportButton.id = "drill-export-csv";
+  exportButton.textContent = "Export CSV";
+  exportButton.addEventListener("click", () => {
+    const text = toDrillCsv(
+      rows,
+      makeDrillCsvOptions({ generatedAtIso: new Date(Date.now()).toISOString() }),
+    );
+    downloadCsv(doc, "mirn-drill.csv", text);
+  });
+  bar.appendChild(exportButton);
+
+  const copyButton = doc.createElement("button");
+  copyButton.type = "button";
+  copyButton.id = "drill-copy-link";
+  copyButton.textContent = "Copy link";
+  copyButton.addEventListener("click", () => {
+    // The "?" is added here, once, at the only place a whole address is assembled — `encodeDrill`
+    // returns the bare pairs, the same way `encodeSettings` does for the console.
+    const query = `?${encodeDrill(state)}`;
+    window.history.replaceState(null, "", query);
+    const clipboard = window.navigator.clipboard;
+    if (clipboard !== undefined) {
+      void clipboard.writeText(`${window.location.origin}${window.location.pathname}${query}`);
+    }
+  });
+  bar.appendChild(copyButton);
+
+  host.appendChild(bar);
+  host.appendChild(
+    element(
+      doc,
+      "p",
+      "region-note",
+      `The link carries the ${countWord(state.order.length)} cards this drill was, and never what ` +
+        `you called or how you did: open it and you get the same rooms in the same order, to call ` +
+        `for yourself. The file carries one row per card, and opens with the sentence saying the ` +
+        `crowd is invented before any number in it.`,
+    ),
+  );
+}
+
+/** The verdict, after the last card: the sentences above, the two ways to take it away, and the
+ *  way back into the console. */
 function paintVerdict(
   doc: Document,
   host: HTMLElement,
   state: DrillState,
   misleadingCards: readonly boolean[],
   lastCard: CardRun,
+  rows: readonly DrillCsvEntry[],
 ): void {
   const heading = doc.createElement("h2");
   heading.className = "region-title";
@@ -925,6 +1063,8 @@ function paintVerdict(
   for (const entry of verdictLines(state, misleadingCards)) {
     host.appendChild(element(doc, "p", entry.className, entry.text));
   }
+
+  paintVerdictBar(doc, host, state, rows);
 
   const invitation = doc.createElement("p");
   invitation.className = "verdict-line";
