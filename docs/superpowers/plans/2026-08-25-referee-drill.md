@@ -1021,6 +1021,19 @@ it("says the tally does not survive a reload", async () => {
 });
 ```
 
+**Correction to the snippet above:** `frozenSampleBefore` is not defined anywhere in this plan.
+Capture the sample index from the view *before* the click and compare against that value:
+
+```ts
+const before = viewAfter().sample;
+click(document.querySelector('[data-call="bigger"]'), window);
+expect(viewAfter().sample).toBe(before);
+```
+
+The property being defended is that the reveal redraws the *same instant* with the control arm
+switched on, so the reader compares like with like rather than watching the crowd move while they
+read.
+
 - [ ] **Step 2: Run it, implement, run it again**
 
 Same cycle. The reveal redraws the arena at the identical `sample`, fills the tiles through the
@@ -1123,6 +1136,35 @@ A fifth item in the existing `ways-in` list, linking to `./drill.html`. It is no
 different page — so check `presets.test.ts` still passes: it counts the links in that block and
 decodes each one. Update it honestly to expect four preset addresses plus one page link, and keep it
 decoding the four.
+
+**How `presets.test.ts` breaks, and the honest fix.** Its `waysInHrefs()` matches *every* `href`
+in the ways-in block and then puts each through `decodeSettings`. A fifth item pointing at
+`./drill.html` therefore does two things: `toHaveLength(4)` fails, and the decode loop tries to read
+a page path as a query string and reports notices.
+
+Do not fix this by excluding the new link from the block or by relaxing the length assertion.
+Split the two kinds of link explicitly, so both stay guarded:
+
+```ts
+function waysInHrefs(): readonly string[] {
+  // ... unchanged block match ...
+  return found;
+}
+
+/** The four that carry settings. These are the ones the decoder must accept without complaint. */
+function presetHrefs(): readonly string[] {
+  return waysInHrefs().filter((h) => h.startsWith("?"));
+}
+
+/** The links to other pages. A page link that carries a query string is a mistake. */
+function pageHrefs(): readonly string[] {
+  return waysInHrefs().filter((h) => !h.startsWith("?"));
+}
+```
+
+Then: assert `presetHrefs()` has length 4 and decode each as before; assert `pageHrefs()` contains
+`./drill.html`; and assert no page link contains a `?`, which is the mistake this split could
+otherwise hide.
 
 - [ ] **Step 2: Explain the drill on the explanations page**
 
