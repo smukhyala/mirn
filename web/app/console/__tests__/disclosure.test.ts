@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { DISCLOSURE_CLAUSES } from "../csv.js";
+import { DISCLOSURE_CLAUSES, INVENTED_CROWD_DISCLOSURE } from "../csv.js";
 
 /**
  * The ordering assertion runs against the FILE, not the booted DOM. A script can move a paragraph
@@ -86,7 +86,31 @@ describe("the console page is the page the build ships", () => {
 });
 
 describe("the invented-crowd disclosure comes first", () => {
+  /**
+   * The list itself, spelled out, and this is the assertion the other five are standing on.
+   *
+   * Five loops across four files iterate `DISCLOSURE_CLAUSES` and check the surface under test
+   * contains each entry. Empty the array and all five go green at once, having checked nothing —
+   * and the only other content check compares an export's first line against the very constant
+   * that produced it, so gutting that to "" stays green too. Guardrail 1 is the one rule on this
+   * project that a reader is harmed by, so the words it turns on are written here as literals
+   * rather than derived from the thing they are meant to constrain.
+   */
+  it("still names the four things a reader has to be told", () => {
+    expect(DISCLOSURE_CLAUSES).toEqual([
+      "simulated",
+      "social-force model",
+      "invented people obeying invented rules",
+      "no number here is a measurement of real pedestrians",
+    ]);
+    expect(INVENTED_CROWD_DISCLOSURE).toContain("no number here is a measurement of real pedestrians");
+    for (const clause of DISCLOSURE_CLAUSES) {
+      expect(clause.length, "a disclosure clause is empty").toBeGreaterThan(0);
+    }
+  });
+
   it("carries every clause the CSV carries", () => {
+    expect(DISCLOSURE_CLAUSES.length, "there are no clauses to check for").toBeGreaterThan(0);
     for (const clause of DISCLOSURE_CLAUSES) {
       expect(FLAT).toContain(clause);
     }

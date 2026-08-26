@@ -42,6 +42,15 @@ interface Booted {
   /** The view the canvas was LAST drawn from, read fresh. The reveal's own property is a
    *  statement about two readings of this, taken either side of a click. */
   readonly viewNow: () => ArenaView;
+  /**
+   * Runs the page's own animation frame at a wall-clock reading of this test's choosing.
+   *
+   * Without this there is no playback in jsdom at all: `requestAnimationFrame` never fires, the
+   * frame index never leaves zero, and every statement about "the frame the reader was looking at"
+   * is a statement about frame zero — which is the same before and after any click, under every
+   * possible implementation. The reveal's freeze was asserted that way once and could not fail.
+   */
+  readonly step: (nowMs: number) => void;
 }
 
 /** The card's own column set, read back off the module rather than restated here. */
@@ -57,8 +66,11 @@ let cardColumns: readonly ColumnKey[] = [];
 let verdictLines: (state: DrillState, misleadingCards: readonly boolean[]) => readonly VerdictLine[] =
   () => [];
 
-async function bootDrill(): Promise<Booted> {
-  const dom = new JSDOM(HTML, { pretendToBeVisual: true, url: "https://example.test/drill" });
+async function bootDrill(search = ""): Promise<Booted> {
+  const dom = new JSDOM(HTML, {
+    pretendToBeVisual: true,
+    url: `https://example.test/drill${search}`,
+  });
 
   // jsdom has no canvas, so `getContext` returns null and the page's own guard would throw before
   // anything mounted. A proxy that accepts every call and records none is enough: what is asserted
@@ -73,7 +85,14 @@ async function bootDrill(): Promise<Booted> {
   globals["document"] = dom.window.document;
   globals["HTMLElement"] = dom.window.HTMLElement;
   globals["getComputedStyle"] = dom.window.getComputedStyle.bind(dom.window);
-  globals["requestAnimationFrame"] = (): number => 0;
+  // Capturing rather than inert. The page re-registers itself at the end of every frame, so
+  // holding the latest callback is enough to drive playback forward one frame per `step`, and
+  // nothing runs unless a test asks for it.
+  let pending: ((nowMs: number) => void) | null = null;
+  globals["requestAnimationFrame"] = (callback: (nowMs: number) => void): number => {
+    pending = callback;
+    return 0;
+  };
 
   vi.resetModules();
   const module = (await import("../../../drill.js")) as {
@@ -91,7 +110,15 @@ async function bootDrill(): Promise<Booted> {
     return drawn;
   };
   const view = viewNow();
-  return { document: dom.window.document, view, viewNow };
+  const step = (nowMs: number): void => {
+    const callback = pending;
+    if (callback === null) {
+      throw new Error("the drill asked for no animation frame, so playback cannot be advanced");
+    }
+    pending = null;
+    callback(nowMs);
+  };
+  return { document: dom.window.document, view, viewNow, step };
 }
 
 /** Clicks a button by id and fails loudly if the page has no such button, rather than doing
@@ -238,6 +265,9 @@ describe("the card shows only what a corridor could give you", () => {
     // showing one with no word about its zero is not, so every shown tile carries the zero row and
     // the row carries a sentence.
     const tiles = document.querySelectorAll("#readouts .tile:not(.tile-withheld)");
+    // A card that showed no number at all would satisfy every assertion in this loop by having no
+    // iterations. Its sibling above carries the same guard for the same reason.
+    expect(tiles.length, "the card shows no numbers, so this checked nothing").toBeGreaterThan(0);
     for (const tile of tiles) {
       const key = tile.getAttribute("data-column") ?? "";
       const zero = tile.querySelector(".tile-zero");
@@ -252,6 +282,12 @@ describe("the card shows only what a corridor could give you", () => {
     // The forecaster's reading is the case that exists today: readable from one crossing, but the
     // number it would read if the robot had changed nothing is not. Derived, so a second such
     // column added later is covered without this test being edited.
+    //
+    // Counted, because "derived" and "vacuous" look identical from here: today exactly one column
+    // in the catalogue meets both conditions, and flipping either flag on that one column would
+    // leave this test green having examined nothing. The same hole was found and closed in
+    // unpaired.test.ts on this branch.
+    let examined = 0;
     for (const key of COLUMN_ORDER) {
       const descriptor = COLUMNS[key];
       if (!descriptor.corridorReadable || descriptor.zero.kind !== "companionColumn") {
@@ -260,6 +296,7 @@ describe("the card shows only what a corridor could give you", () => {
       if (COLUMNS[descriptor.zero.column].corridorReadable) {
         continue;
       }
+      examined = examined + 1;
       const tile = document.querySelector(`#readouts [data-column="${key}"]`);
       expect(tile, `${key} is missing from the card`).not.toBeNull();
       expect(
@@ -268,6 +305,10 @@ describe("the card shows only what a corridor could give you", () => {
       ).toBeNull();
       expect(tile?.querySelector(".tile-zero-how")?.textContent ?? "").toContain("withheld");
     }
+    expect(
+      examined,
+      "no column is corridor-readable with a companion zero that is not, so this proved nothing",
+    ).toBeGreaterThan(0);
   });
 
   it("says the ordinary difference between two runs is withheld, not unmeasured", () => {
@@ -285,7 +326,10 @@ describe("the card shows only what a corridor could give you", () => {
     const first = CARD_ORDER[0] as keyof typeof DRILL_CARDS;
     expect(document.querySelector("#card-name")?.textContent).toBe(DRILL_CARDS[first].name);
     const progress = document.querySelector("#card-progress")?.textContent ?? "";
-    expect(progress).toContain(String(CARD_ORDER.length));
+    // The whole line, not `toContain`. "Card 8 of 8" rendered on card one contains the catalogue's
+    // length and would have passed — and a reader who is told they are on the last card when they
+    // are on the first has been told something false about the only progress they can see.
+    expect(progress).toBe(`Card 1 of ${String(CARD_ORDER.length)}`);
   });
 
   it("puts no bare code identifier in front of a reader", () => {
@@ -393,14 +437,36 @@ describe("the reveal shows the second run, on the instant the reader was looking
   beforeAll(async () => {
     const booted = await bootDrill();
     document = booted.document;
+
+    // Playback is run forward off frame zero BEFORE the call, and forward again after it.
+    //
+    // Both halves are load-bearing, and the version of this test that had neither could not fail:
+    // `requestAnimationFrame` never fires in jsdom on its own, so `sample` never left 0 and the
+    // assertion below compared 0 to 0 under every possible implementation — including one that
+    // unfroze playback and reset the frame, which was mutation-tested green. The frame clock is
+    // absolute (web/app/clock.ts): at the drill's own base of 50 ms a frame and rate 1, a wall
+    // reading of `50 * n` is frame `n`, so both readings are chosen off the view's own sample
+    // count rather than written here as numbers.
+    const nSamples = booted.viewNow().nSamples;
+    const midFrame = Math.floor(nSamples / 2);
+    booted.step(midFrame * 50);
     before = booted.viewNow();
     click(document, "call-bigger");
+    // The wall clock does not stop because a reader clicked. A page that only stopped ADVANCING on
+    // the click, without freezing, would redraw a later frame here.
+    booted.step((midFrame + 20) * 50);
     after = booted.viewNow();
   });
 
   it("fades the control arm in on the same frozen frame", () => {
     expect(after.showControl).toBe(true);
     expect(after.showGaps).toBe(true);
+    // The canary. Without an advanced frame this comparison is 0 against 0, and every statement
+    // below it about "the instant the reader was looking at" is a statement about frame zero.
+    expect(
+      before.sample,
+      "playback never left the first frame, so comparing the two readings proves nothing",
+    ).toBeGreaterThan(0);
     // The same instant, so the reader compares like with like rather than watching it move. The
     // sample index is captured off the view BEFORE the click: there is no frozen index recorded
     // anywhere else, and a hardcoded 0 would pass against a page that redrew a different frame
@@ -665,5 +731,76 @@ describe("the verdict", () => {
         expect(identifier.exec(entry.text), entry.text).toBeNull();
       }
     }
+  });
+});
+
+
+/**
+ * The reading half of the drill's permalink.
+ *
+ * The writing half is next door in drill-verdict.slow.test.ts, where a finished drill actually has
+ * a link to write. This is the half guardrail 10 calls the difference between a permalink and a
+ * link that looks like one: a page that wrote a payload and then ignored it on the way back in
+ * would lose it in silence, and the reader would never know the difference.
+ */
+describe("a link naming its cards is read back, and what it gets wrong is said out loud", () => {
+  it("runs the cards the link names, in the order it names them", async () => {
+    const second = CARD_ORDER[1];
+    const first = CARD_ORDER[0];
+    if (second === undefined || first === undefined) {
+      throw new Error("the catalogue has fewer than two cards");
+    }
+    // Reversed, so passing cannot mean "it ignored the link and ran the catalogue".
+    const { document } = await bootDrill(`?cards=${second},${first}`);
+    expect(document.querySelector("#card-name")?.textContent).toBe(DRILL_CARDS[second].name);
+    // And the drill is now two cards long, from the link rather than from the catalogue.
+    expect(document.querySelector("#card-progress")?.textContent).toBe("Card 1 of 2");
+  });
+
+  it("falls back to the whole catalogue when the link names no cards", async () => {
+    const first = CARD_ORDER[0];
+    if (first === undefined) {
+      throw new Error("the catalogue has no cards");
+    }
+    const { document } = await bootDrill();
+    expect(document.querySelector("#card-name")?.textContent).toBe(DRILL_CARDS[first].name);
+    expect(document.querySelector("#card-progress")?.textContent).toBe(
+      `Card 1 of ${String(CARD_ORDER.length)}`,
+    );
+  });
+
+  it("says nothing about the link when the link asked for nothing it could not have", async () => {
+    const { document } = await bootDrill();
+    const host = document.querySelector<HTMLElement>("#link-notices");
+    expect(host, "the page has nowhere to say what a link got wrong").not.toBeNull();
+    expect(host?.hidden).toBe(true);
+    expect(host?.textContent ?? "").toBe("");
+  });
+
+  it("names what a hand-edited link asked for and could not have, above the card", async () => {
+    const first = CARD_ORDER[0];
+    if (first === undefined) {
+      throw new Error("the catalogue has no cards");
+    }
+    const { document } = await bootDrill(`?cards=${first},a-card-that-was-never-written`);
+    const host = document.querySelector<HTMLElement>("#link-notices");
+    expect(host?.hidden).toBe(false);
+    const said = host?.textContent ?? "";
+    expect(said).toContain("a-card-that-was-never-written");
+    // Said above the card, not below it: a reader who has already called a card cannot un-call it.
+    const stage = document.querySelector("#stage");
+    const notices = document.querySelector("#link-notices");
+    const readouts = document.querySelector("#readouts");
+    if (notices === null || readouts === null || stage === null) {
+      throw new Error("the card is missing the notice host, the readouts or the stage");
+    }
+    expect(stage.contains(notices)).toBe(true);
+    // DOCUMENT_POSITION_FOLLOWING is 4: the readouts come after the correction, in document order.
+    expect(
+      notices.compareDocumentPosition(readouts) & 4,
+      "the correction arrives after the numbers it is about",
+    ).toBeGreaterThan(0);
+    // The one card it could have still runs, rather than the whole thing failing over a typo.
+    expect(document.querySelector("#card-name")?.textContent).toBe(DRILL_CARDS[first].name);
   });
 });

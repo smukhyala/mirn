@@ -89,11 +89,24 @@ function readingsWith(controlFrom: typeof CONFIG): ReadonlyMap<ColumnKey, Readin
 }
 
 describe("which readouts a real corridor could produce", () => {
-  it("every column declares whether it can be read without a control run", () => {
+  it("the catalogue splits both ways, so neither answer is the default", () => {
+    // This used to assert `typeof column.corridorReadable === "boolean"`, which the type system
+    // guarantees on a frozen object literal with a non-optional field: no single-line change to
+    // columns.ts could make it red without a deliberate cast. What is worth checking is that the
+    // flag is a decision rather than a constant — a catalogue where every column answered the same
+    // way would make the two tests below it vacuous in one direction and nobody would notice.
+    let readable = 0;
+    let needsControl = 0;
     for (const key of COLUMN_ORDER) {
-      const column = COLUMNS[key];
-      expect(typeof column.corridorReadable, `${key} must declare it`).toBe("boolean");
+      if (COLUMNS[key].corridorReadable) {
+        readable = readable + 1;
+      } else {
+        needsControl = needsControl + 1;
+      }
     }
+    expect(readable, "no column claims to be readable from one crossing").toBeGreaterThan(0);
+    expect(needsControl, "no column admits to needing the run without the robot").toBeGreaterThan(0);
+    expect(readable + needsControl).toBe(COLUMN_ORDER.length);
   });
 
   it("a column that claims to need no control run reads identically under the swap", () => {

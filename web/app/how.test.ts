@@ -132,6 +132,13 @@ describe("the invented-crowd disclosure comes first here too", () => {
     // the simulator without anything failing.
     const decimal = /\d+\.\d+/.exec(TEXT);
     expect(decimal, `web/how.html quotes '${decimal?.[0] ?? ""}'`).toBeNull();
+
+    // And a WHOLE number with a unit after it, which the decimal scan above cannot see: "moved the
+    // crowd by 1 m" is exactly as stale-able as "by 1.04 m" and would have passed. Bare integers
+    // are left alone deliberately — they are method constants inside formulas (two runs, ninety-five
+    // out of a hundred), not readings.
+    const withUnit = /\b\d+(?:\.\d+)?\s*(?:m|s|metres|metre|seconds|second)\b/.exec(TEXT);
+    expect(withUnit, `web/how.html quotes '${withUnit?.[0] ?? ""}'`).toBeNull();
   });
 });
 

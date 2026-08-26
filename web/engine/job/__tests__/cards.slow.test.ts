@@ -189,19 +189,47 @@ function shapeOf(result: CardMeasurement): CardShape {
 describe("what the eight cards actually do", () => {
   const measured = new Map<CardKey, CardMeasurement>();
 
+  /**
+   * Every card, with what the first test measured for it — and a guard that it measured them.
+   *
+   * The map is filled by the first `it` in this file and read by the three below it, which is
+   * cheap (one simulation set for four tests) and quietly fragile: under `-t`, under `.only`, on a
+   * bail in the first test, or after a reordering, the map is empty and a `for` loop over it runs
+   * zero times. Two of the tests below used to do exactly that and pass — one comparing
+   * `Infinity > 0.03`, the other making no assertion at all, both in 3 ms, which is not one
+   * simulation let alone eight. The count is asserted here so an empty loop is a red test rather
+   * than a fast green one.
+   */
+  function measuredCards(): readonly (readonly [CardKey, CardMeasurement])[] {
+    const rows: (readonly [CardKey, CardMeasurement])[] = [];
+    for (const key of CARD_ORDER) {
+      const result = measured.get(key);
+      expect(result, `${key} was never measured`).toBeDefined();
+      if (result === undefined) {
+        continue;
+      }
+      rows.push([key, result]);
+    }
+    expect(
+      rows.length,
+      "no card was measured, so everything below this examined nothing",
+    ).toBe(CARD_ORDER.length);
+    return rows;
+  }
+
   it(
     "still reads the way the table in this file says it does",
     () => {
       for (const key of CARD_ORDER) {
         const result = measure(key);
         measured.set(key, result);
-        expect(EXPECTED[key].honest, `${key}: the truth moved to the other side of the band`).toBe(
-          result.honest,
+        expect(result.honest, `${key}: the truth moved to the other side of the band`).toBe(
+          EXPECTED[key].honest,
         );
         expect(
-          EXPECTED[key].corridor,
+          result.corridor,
           `${key}: the forecaster moved to the other side of the band`,
-        ).toBe(result.corridor);
+        ).toBe(EXPECTED[key].corridor);
         // Every one is a strict comparison in the page, so an exact tie would make the honest call
         // an arbitrary choice rather than a reading.
         expect(result.pairedM, `${key}: the truth sits exactly on the band`).not.toBe(result.bandM);
@@ -217,12 +245,7 @@ describe("what the eight cards actually do", () => {
     // The check the catalogue cannot make for itself. `shape` is a claim about what a room does to
     // a reader, and a claim about a room is only worth what the room says. Flip any one value in
     // cards.ts and this goes red naming the card, what it says and what it does.
-    for (const key of CARD_ORDER) {
-      const result = measured.get(key);
-      expect(result, `${key} was never measured`).toBeDefined();
-      if (result === undefined) {
-        continue;
-      }
+    for (const [key, result] of measuredCards()) {
       const actual = shapeOf(result);
       expect(
         DRILL_CARDS[key].shape,
@@ -241,11 +264,7 @@ describe("what the eight cards actually do", () => {
     let readsHigh = 0;
     let readsLow = 0;
     let agrees = 0;
-    for (const key of CARD_ORDER) {
-      const result = measured.get(key);
-      if (result === undefined) {
-        continue;
-      }
+    for (const [, result] of measuredCards()) {
       const shape = shapeOf(result);
       if (shape === "reads high") {
         readsHigh = readsHigh + 1;
@@ -268,11 +287,7 @@ describe("what the eight cards actually do", () => {
     let closestBand = Number.POSITIVE_INFINITY;
     let closestForecast = Number.POSITIVE_INFINITY;
     let closestFloor = Number.POSITIVE_INFINITY;
-    for (const key of CARD_ORDER) {
-      const result = measured.get(key);
-      if (result === undefined) {
-        continue;
-      }
+    for (const [, result] of measuredCards()) {
       const fromBand = Math.abs(result.pairedM - result.bandM) / result.bandM;
       const forecastFromBand = Math.abs(result.forecastM - result.bandM) / result.bandM;
       const fromFloor = Math.abs(result.pairedM - result.floorM) / result.floorM;
@@ -295,11 +310,7 @@ describe("what the eight cards actually do", () => {
     // Not the catalogue's field any more — see `CENSUS_FLOOR_SHAPE`. This is the provenance of
     // every setting in cards.ts, and it is checked so that "the census measured this" stays a fact
     // rather than a sentence in a document nobody re-ran.
-    for (const key of CARD_ORDER) {
-      const result = measured.get(key);
-      if (result === undefined) {
-        continue;
-      }
+    for (const [key, result] of measuredCards()) {
       if (CENSUS_FLOOR_SHAPE[key] === "false positive") {
         expect(
           result.pairedM,
