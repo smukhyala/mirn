@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeRunConfig } from "../../contracts/config.js";
 import { runPair, type RunResult } from "../../sim/run.js";
-import { COLUMNS, COLUMN_ORDER, type ColumnKey } from "../columns.js";
+import { COLUMNS, COLUMN_ORDER, type ColumnKey, type Reading } from "../columns.js";
 import { buildContext, runReport, type MeasurementParams } from "../report.js";
 
 /**
@@ -15,7 +15,11 @@ import { buildContext, runReport, type MeasurementParams } from "../report.js";
  *
  * So this proves it rather than trusting a list. Each column is computed twice — once against the
  * real pair, once against a pair whose control arm has been swapped for a decoy from a different
- * seed. A column that returns the same value both times never looked at the control arm.
+ * seed. A column that returns the same reading both times — same availability, and the same value
+ * whenever that availability is "measured" — never looked at the control arm. Availability
+ * changing counts as noticing every bit as much as a value changing does: a column that goes from
+ * measured to censored the moment the control arm is swapped read the control arm to decide that,
+ * and showing it on a withheld card would leak exactly that decision.
  */
 
 const PARAMS: MeasurementParams = Object.freeze({
@@ -50,7 +54,17 @@ function swapControl(real: RunResult, decoy: RunResult): RunResult {
   };
 }
 
-function readingsWith(controlFrom: typeof CONFIG): ReadonlyMap<ColumnKey, number> {
+/**
+ * Every column's full `Reading` — availability and value both — against a run whose control arm
+ * came from `controlFrom`.
+ *
+ * `runReport` is called with the full `COLUMN_ORDER`, and it sets `report[key]` unconditionally
+ * for every key it is asked for (see `report.ts`), so every entry here is populated whether or not
+ * the column measured anything. Keeping the whole `Reading`, not just a filtered-to-measured
+ * number, is what lets the corridor-readable check below see a column go from measured to censored
+ * under the swap rather than silently vanishing from the comparison.
+ */
+function readingsWith(controlFrom: typeof CONFIG): ReadonlyMap<ColumnKey, Reading> {
   const real = runPair(CONFIG, () => 0);
   const decoy = runPair(controlFrom, () => 0);
   const swapped = swapControl(real, decoy);
@@ -64,11 +78,11 @@ function readingsWith(controlFrom: typeof CONFIG): ReadonlyMap<ColumnKey, number
     frechetMeanM: null,
   });
   const report = runReport(ctx, COLUMN_ORDER);
-  const out = new Map<ColumnKey, number>();
+  const out = new Map<ColumnKey, Reading>();
   for (const key of COLUMN_ORDER) {
     const reading = report[key];
-    if (reading !== undefined && reading.availability.kind === "measured") {
-      out.set(key, reading.value);
+    if (reading !== undefined) {
+      out.set(key, reading);
     }
   }
   return out;
@@ -82,7 +96,7 @@ describe("which readouts a real corridor could produce", () => {
     }
   });
 
-  it("a column that claims to need no control run does not notice the control arm changing", () => {
+  it("a column that claims to need no control run reads identically under the swap", () => {
     const withReal = readingsWith(CONFIG);
     const withDecoy = readingsWith(DECOY);
 
@@ -93,13 +107,33 @@ describe("which readouts a real corridor could produce", () => {
       }
       const a = withReal.get(key);
       const b = withDecoy.get(key);
+      // A corridor-readable column must produce a comparable reading in this fixture. Skipping
+      // silently here is exactly the hole that let a paired column (`recoveryS`, computed from
+      // the paired deviation series) hide behind a swap that censors it rather than moving its
+      // value: it would drop out of both maps and never be checked at all. So this fails loudly
+      // instead of continuing past a missing reading.
+      expect(a, `${key} claims to need no control run but produced no reading against the real pair`).toBeDefined();
+      expect(
+        b,
+        `${key} claims to need no control run but produced no reading against the decoy pair`,
+      ).toBeDefined();
       if (a === undefined || b === undefined) {
         continue;
       }
+      // Availability changing IS the column noticing the swap, every bit as much as a value
+      // changing — a column that goes from measured to censored decided that by looking at the
+      // control arm. Compare availability kinds before ever looking at values.
       expect(
-        a,
-        `${key} claims to need no control run but its value moved when the control arm was swapped`,
-      ).toBe(b);
+        b.availability.kind,
+        `${key} claims to need no control run but its availability changed when the control arm ` +
+          `was swapped: real=${a.availability.kind}, decoy=${b.availability.kind}`,
+      ).toBe(a.availability.kind);
+      if (a.availability.kind === "measured") {
+        expect(
+          b.value,
+          `${key} claims to need no control run but its value moved when the control arm was swapped`,
+        ).toBe(a.value);
+      }
     }
   });
 
@@ -114,7 +148,13 @@ describe("which readouts a real corridor could produce", () => {
       }
       const a = withReal.get(key);
       const b = withDecoy.get(key);
-      if (a !== undefined && b !== undefined && a !== b) {
+      if (a === undefined || b === undefined) {
+        continue;
+      }
+      if (a.availability.kind !== "measured" || b.availability.kind !== "measured") {
+        continue;
+      }
+      if (a.value !== b.value) {
         noticed += 1;
       }
     }
