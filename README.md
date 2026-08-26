@@ -52,8 +52,10 @@ robots, or which published method is wrong. Nothing here is a research result.
 
 ## What is on the page
 
-One page. A settings panel, an arena you can scrub, seven headline readouts with a column picker
-for the rest, a sweep curve, and a ledger of every result you kept.
+Three pages, and the console is the one you land on. A settings panel, an arena you can scrub,
+seven headline readouts with a column picker for the rest, a sweep curve, and a ledger of every
+result you kept. The other two are the referee drill and the working, both described below; neither
+is a step in a sequence, and either is reachable from the console at any time.
 
 One press of Run executes N axis values × M seeds; a single run is the degenerate 1×1 case of the
 same mechanism. Editing a setting re-simulates a live preview in about 38 ms. A 72-run sweep takes
@@ -64,6 +66,36 @@ were zero. The zero reference is never collapsible and never optional — it is 
 value, measured at the same settings. A value with nothing to judge it against is the exact error
 this thing exists to show. Two of the seven readouts are withheld from the live preview, with the
 reason stated, because they need a run-to-run band a preview does not buy.
+
+---
+
+## The referee drill
+
+**[Try the drill →](https://smukhyala.github.io/mirn/drill.html)**
+
+A second page, built from the same formulas and computing nothing new: one room, run once, with
+the second run withheld, and a question — did the robot disturb this crowd by more than the
+ordinary difference between two runs of it, or by less? Call it, and the second run is shown.
+
+Eight rooms, each answered with the same room run twice under the paired construction above, so
+the honest answer is known rather than guessed at. Five of the eight are built so that the one
+number a real corridor could hand you — a forecaster's report, computed from the run with the
+robot and nothing else — points the wrong way. Three are built so it happens to point the right
+way, and that is not a softening of the point: a drill where the number always misled would let a
+reader score perfectly by inverting it, and would teach that it is systematically backwards rather
+than what it actually is, which is unrelated to the answer. Which readings are even eligible to
+appear on a withheld card is not decided by a name sounding safe — it is proved, per reading, by
+swapping the withheld run for a decoy from an unrelated crowd and checking whether anything
+changes.
+
+At the end it says how many you called wrong and whether the misses went the same way, then hands
+the drill back two ways: a link, which carries the eight rooms and never your calls or your score,
+and a file, which carries one row per card and opens with the sentence saying the crowd is invented.
+
+**The transferable claim is not about this crowd.** It is that a paired comparison — the same
+situation, run twice, differing in one thing — settles a question a single observation cannot,
+and settles it by construction rather than by a cleverer estimate. The crowd is invented and the
+robot is a toy; the shape of the argument is not specific to either.
 
 ---
 
@@ -118,11 +150,12 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 515 browser tests across 47 files in 18 s. 298 Python tests, about 6 minutes, of
-which 275 run in 22 s without the heavy nulls. CI checks the two languages independently, then runs
-a third job for the check no human remembers: that the committed fixtures are current and the
-browser still reproduces them. The built site is one HTML file, one stylesheet, a 112 kB script and
-a 48 kB worker.
+**The numbers.** 652 browser tests across 56 files in 22 s, of which 633 run in 13 s without the
+three that re-run the simulator. 298 Python tests, about 6 minutes, of which 275 run in 22 s without
+the heavy nulls. CI checks the two languages independently, then runs a third job for the check no
+human remembers: that the committed fixtures are current and the browser still reproduces them. The
+built site is three HTML files (8.6 kB, 6.9 kB and 56 kB), one 15 kB stylesheet, about 134 kB of
+script across four chunks, and a 49 kB worker.
 
 ---
 
@@ -141,7 +174,7 @@ differs is what the paired run is used for. Theirs is a benchmark: it scores nav
 against each other. MIRN uses the same construction as a known ground truth for scoring the
 **rulers** — the paired difference is the answer, and the question on screen is what a method that
 cannot see the second run reports against it, including on a run where the answer is known to be
-exactly zero. Every effect is printed beside its own run-to-run noise floor. And it is interactive:
+exactly zero. Every effect is printed beside its own run-to-run band. And it is interactive:
 you turn the dial and watch the number move rather than reading a table of someone else's.
 
 ---
@@ -183,7 +216,7 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 515 tests, production build — 28 s
+npm run check        # typecheck, 652 tests, production build — 30 s
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in

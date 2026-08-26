@@ -73,7 +73,7 @@ describe("the live preview", () => {
   });
 
   it("stamps every readout with the settings it was measured at", () => {
-    const stamps = stampsFor(runPreview(settings));
+    const stamps = stampsFor(runPreview(settings).context);
     const labels = stamps.map((stamp) => stamp.label);
     expect(labels).toContain("crowd");
     expect(labels).toContain("forecast horizon");
@@ -82,7 +82,7 @@ describe("the live preview", () => {
 
   it("never labels a stamp with its own unit, which would print the word twice", () => {
     // "people 18 people": the label sits before the value and the unit suffix after it.
-    for (const stamp of stampsFor(runPreview(settings))) {
+    for (const stamp of stampsFor(runPreview(settings).context)) {
       expect(stamp.label, `the ${stamp.label} stamp repeats its unit`).not.toBe(
         unitSuffix(stamp.unit),
       );

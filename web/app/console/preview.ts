@@ -140,27 +140,37 @@ export function runPreview(settings: ConsoleSettings): Preview {
   return Object.freeze({ kind: "preview" as const, config, run, zeroRun, context, readings });
 }
 
-export function stampsFor(preview: Preview): readonly SettingStamp[] {
-  const dt = preview.config.dt;
+/**
+ * What a tile was measured at, printed under every reading.
+ *
+ * Takes the report context rather than a whole `Preview`, because the context is all it ever read
+ * — the room and the ruler — and because the drill's card has no `Preview` to hand it. A card
+ * builds its context straight from the catalogue in `web/engine/job/cards.ts` and never runs the
+ * zero-effect reference arm, so a second copy of these three stamps is the only alternative, and
+ * three reader-facing labels living in two files is exactly the drift this project spends its
+ * comments arguing against.
+ */
+export function stampsFor(ctx: ReportContext): readonly SettingStamp[] {
+  const dt = ctx.config.dt;
   return Object.freeze([
     Object.freeze({
       // Not "people". The label and the unit are printed either side of the value, so a stamp
       // labelled with its own unit reads "people 18 people".
       kind: "settingStamp" as const,
       label: "crowd",
-      value: preview.config.crowd.nPedestrians,
+      value: ctx.config.crowd.nPedestrians,
       unit: "people" as const,
     }),
     Object.freeze({
       kind: "settingStamp" as const,
       label: "forecast horizon",
-      value: preview.context.params.forecastHorizonSteps * dt,
+      value: ctx.params.forecastHorizonSteps * dt,
       unit: "seconds" as const,
     }),
     Object.freeze({
       kind: "settingStamp" as const,
       label: "measured at",
-      value: preview.context.params.forecastEndStep * dt,
+      value: ctx.params.forecastEndStep * dt,
       unit: "seconds" as const,
     }),
   ]);

@@ -1,8 +1,14 @@
 # CLAUDE.md — working agreement for MIRN
 
 MIRN is a **simulator console** for perturbation in robotics. This file is the operational
-contract, and it is the only one — `docs/teaching/authoring.md` governed page copy and there are
-no pages.
+contract, and it is the only one — `docs/teaching/authoring.md` governed the notebook's ordered
+pages, and there is no ordering left to govern.
+
+Where this file says "there are no pages", it means the seventeen-page fixed reading order, which
+is gone. Three HTML documents ship: `web/index.html` (the console), `web/how.html` (the arithmetic,
+in sentences) and `web/drill.html` (the referee drill). None of them is a step in a sequence — each
+is reachable at any time from either of the others, and none has to be read before the console
+shows a number.
 
 If you are looking for the research measurement instrument this project used to be, it is in
 `docs/archive/`. It governs nothing here.
@@ -20,9 +26,10 @@ read carefully for twenty minutes. What changed is that they act instead of read
 The notebook carried its explanation in seventeen pages, in a fixed order, before any number
 appeared. The console has no order at all: every number is reachable in any state. So the
 explanation stops *preceding* the number and starts *hanging off* it. The
-`intuition → visualization → measurement → mathematics → interpretation` shape was a page ordering
-and there are no pages. It is replaced by the one sentence that survives its loss, because that is
-what guardrails 1, 6 and 7 now rest on:
+`intuition → visualization → measurement → mathematics → interpretation` shape was a page ordering,
+and the ordering is gone — the two documents beside the console are places a reader chooses to go,
+not steps they are marched through. It is replaced by the one sentence that survives its loss,
+because that is what guardrails 1, 6 and 7 now rest on:
 
 > **Every number on screen is one interaction from what it assumes and from what it would read if
 > the answer were zero.**
@@ -92,6 +99,21 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    a closed `<details>` is not shown. The zero is measured per axis value, never quoted from another
    cell.
 
+   **One case has a phrase and no value, and it is the drill's card.** There, the zero of a shown
+   number is itself the answer the reader is about to be asked for — the forecaster's report has a
+   `companionColumn` zero, and that companion needs the run without the robot. Computing it and
+   hiding it would be a value on the page one edit from a leak; quoting the value would hand over
+   the answer. So the tile renders the zero slot as a sentence naming which run is missing and
+   saying that this is the position a real corridor leaves you in, with no figure in it. Three
+   conditions, all mechanical, and the exception exists only where all three hold: it is
+   **derived**, from `corridorReadable` on the companion column via `zeroIsWithheld` in
+   `web/drill.ts` and never from a named column; it goes through a **separately named** function,
+   `withheldZeroRendering`, so `zeroRenderingFor`'s throw-on-unresolved guard is untouched and a
+   caller has to ask for the withheld form on purpose; and the number it sits under still carries a
+   **body-scale anchor** and a gauge, so guardrail 7 is discharged by something other than the zero.
+   The sentence is not inside a `<details>`, like every other zero. Outside those three conditions
+   this clause does not apply, and a tile with a bare number is still a build error.
+
 7. **Raw metres may appear, but never alone.** A beginner needs to see metres against something, or
    a ratio means nothing to them. On a 72-row table a body-scale phrase per cell is absurd, so the
    anchor appears on the tiles and in the column header, once. Every metre is shown next to
@@ -129,7 +151,8 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
 
 11. **The line is not "do not be a simulator"; it is between this toy, measured well, and robots,
     characterised.** The operative half of the old rule — "which page does this make clearer?" —
-    stops working when there are no pages, and it was the half that did the refusing. No ROS, no
+    stops working when there is no reading order to be clearer within, and it was the half that did
+    the refusing. No ROS, no
     planner benchmark, no dataset loader, no trained model, no physics-engine dependency, no second
     simulator backend, no leaderboard, no bring-your-own-method import path. The CSV is an export,
     never an input format — the moment something else can be read in and scored, this is a benchmark
@@ -142,19 +165,36 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
 
 12. **No bare code identifier on any surface a reader sees, and every term defined in plain English
     at first use.** Half of this guardrail genuinely died: `web/vocab.ts`, the `introduces`/`uses`
-    front matter, `checkVocabulary` and `lintForwardTerms` all go, because with one page there is no
-    order to fix. What survives is the whole rule. Its mechanical enforcement is the identifier
-    regex, re-homed from the deleted render suite onto `COLUMNS` and `AXES` in
+    front matter, `checkVocabulary` and `lintForwardTerms` all go, because with no reading order
+    there is no first use to police — a term's first use is wherever the reader happened to start.
+    What survives is the whole rule. Its mechanical enforcement is the identifier regex, re-homed
+    from the deleted render suite onto `COLUMNS` and `AXES` in
     `web/engine/job/__tests__/columns.test.ts` and `axes.slow.test.ts`. Pointed at the catalogue
-    rather than a rendered DOM, it also covers a column nobody ticked. Two more suites run variants
-    of the same regex over strings the catalogue does not own: `panel.test.ts` over the whole
-    booted panel's text, and `permalink.test.ts` over every sentence a hand-edited link can
-    produce.
+    rather than a rendered DOM, it also covers a column nobody ticked. Four more suites run variants
+    of the same regex over strings the catalogue does not own: `panel.test.ts` over the whole booted
+    panel's text, `permalink.test.ts` over every sentence a hand-edited link can produce,
+    `how.test.ts` over the working page's prose, and `drill-dom.test.ts` over the booted drill and
+    every branch of its verdict. Because a term can now be met on any of three documents, each one
+    that uses a defined term glosses it where it uses it, rather than relying on the reader having
+    been somewhere else first.
 
 13. **`docs/archive/` is read-only.** Never delete or soften an `UNVERIFIED` marker in it, never
     cite it as current, and never quietly update a claim in it to match something we now believe.
     Any claim the lesson takes from the archive cites the primary source directly; if the archive
     marks it UNVERIFIED, the copy either verifies it independently or does not make it.
+
+**A note on the referee drill**, since it is the first feature built after these guardrails and is
+worth checking against them rather than assumed to comply. `web/engine/job/cards.ts`'s eight cards
+are a closed table, like `COLUMNS` and `AXES` — no `register`, nothing added at runtime, and
+`cards.slow.test.ts` measures every one of them against the real engine rather than trusting a
+hand-written label. The safety property the drill depends on — that no number needing the run
+without the robot reaches a card before the call — is not a list of allowed columns checked by eye;
+it is `corridorReadable` on each column descriptor, and that flag is proved rather than asserted:
+`web/engine/job/__tests__/unpaired.test.ts` swaps the control arm for a decoy from an unrelated
+crowd and fails any column claiming to need no control run that notices the swap. And guardrail 11
+was not amended for the drill, because it does not need to be: the drill scores a reader's call
+against what the room did, never a robot's performance and never a rival method's, so it never
+enters the run-list-with-pinning-and-export shape guardrail 11 already refuses.
 
 ---
 
@@ -286,9 +326,9 @@ Nothing from the virtualenv is on PATH — not `python`, not `pytest`, not `ruff
 command below is written so it runs as spelled from the repository root, with no activation step.
 
 ```bash
-npm run check                            # typecheck, vitest, vite build — 28 s
-npm run test                             # 511 tests in 22 s
-npx vitest run --exclude '**/*.slow.test.ts'   # 506 of them in 14 s
+npm run check                            # typecheck, vitest, vite build — 30 s
+npm run test                             # 652 tests across 56 files in 22 s
+npx vitest run --exclude '**/*.slow.test.ts'   # 633 of them in 13 s
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them in 22 s, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -300,27 +340,45 @@ of them used to be wrong by a plausible-looking margin, which is the failure mod
 exists to name: a timing nobody re-ran is a claim, and the whole point of a documented fast loop is
 that its cost is small enough to be worth it.
 
-**There is no `--project engine` fast loop, and naming one was the mistake.** It runs in 17 s
-against 22 s for everything, because `axes.slow.test.ts` is 14 s of the suite and lives inside the
-engine project. Excluding that one file is the only cut worth making, and it is what the third line
-above does — 14 s, at the cost of the guardrail-3 check, so it is a working loop and not the gate.
+**There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
+project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
+project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
+is what the third line above does — 13 s against 22 s. The three it drops are `axes.slow.test.ts`
+(guardrail 3's every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's
+eight cards actually does, measured) and `drill-verdict.slow.test.ts` (the whole drill driven card
+by card). All three re-run the simulator many times over, which is why they cost what they cost and
+why none of them can be made fast. So it is a working loop and not the gate.
 
 The fast pytest loop is real: the tests that dominate the runtime carry `@pytest.mark.slow`, and
 `pyproject.toml` records the measurement the cut-off came from. It skips the divergence property
 tests and the calibration suite, so it is also a loop and not a gate. `tests/test_placebo.py` is
 deliberately not marked and runs in both.
 
-Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — 27
-seconds measured. Full `npm run check` plus `.venv/bin/python -m pytest -q` before any push.
+Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — 38
+seconds measured, of which `npm run test` is 24 on a cold machine. Every timing in this section is
+a cold-machine figure and they do not survive being run back to back: three consecutive repeats of
+this pre-commit line measured 38, 44 and 63 seconds on the same commit with nothing else running,
+so treat any single number here as the floor and not the expectation. Full `npm run check` plus
+`.venv/bin/python -m pytest -q` before any push.
 **Never claim work is complete without running it and showing the output.**
 
 ---
 
 ## Content
 
-There is no prose file. Every word a reader sees is a `label`, a `zero`, an `assumption` or a
-`note` on an entry in `web/engine/job/columns.ts` or `web/engine/job/axes.ts`, and those two
-catalogues are closed.
+**Three reader-facing surfaces, and what governs each.** This section used to open "there is no
+prose file", which was true of the console alone and stopped being true the moment a second page
+shipped. The rule it was protecting survives whole; what changed is that it now has to be said
+three times.
+
+| Surface | Who writes the words | What holds them honest |
+|---|---|---|
+| The console's tiles, columns and controls | The catalogues alone — a `label`, a `zero`, an `assumption` or a `note` on an entry in `web/engine/job/columns.ts` or `web/engine/job/axes.ts`. Both are closed | `columns.test.ts` and `axes.slow.test.ts` run the identifier regex over the catalogue itself, so a column nobody ticked is covered too. `tile.test.ts` renders every column and fails on a numeric literal |
+| `web/how.html` | Hand-written prose, ~1,000 lines of it, the one place the arithmetic is set out in sentences | `web/app/how.test.ts`: the identifier regex over its visible text, and a scan that fails on any measured value in the file. It states formulas and never results, so nothing in it can go stale against a physics change |
+| The drill's own strings in `web/drill.ts` — `CALL_CLAUSE`, `HONEST_CLAUSE`, `WITHHELD_ZERO_HOW`, the reveal's sentences and `verdictLines` | Hand-written, because they describe a reader's call rather than a measurement, and no catalogue entry has anywhere to put them | `drill-dom.test.ts` runs the identifier regex over the booted page and over every branch of `verdictLines`; the reveal quotes no number the tiles above it are not also showing; `COUNT_WORDS` means no sentence carries a digit for something the catalogue decides |
+
+Everything below applies to all three. A hand-written surface is not a licence to write a number
+into a sentence, to name a variable at a reader, or to say something that has not been measured.
 
 **No numeric literal appears in console copy.** Every zero line, band figure and caption renders
 from the cell actually on screen, because a hardcoded number is a claim that outlives the settings

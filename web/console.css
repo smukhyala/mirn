@@ -47,10 +47,9 @@ body {
 /*
  * The page's one <main> carries class="console-main", and every property this used to set is set
  * again by .console-main below — at (0,1,0) against this selector's (0,0,1), so the class wins
- * whatever the source order and whatever the viewport. The layout, its narrow-viewport collapse
- * and the one property nothing else declared (align-items) all live there now. A `main` rule and
- * a `.console-main` rule for the same element is a trap: an editor changing the former sees the
- * page not move.
+ * whatever the source order and whatever the viewport. The layout lives there now. A `main` rule
+ * and a `.console-main` rule for the same element is a trap: an editor changing the former sees
+ * the page not move.
  */
 
 #arena {
@@ -87,6 +86,7 @@ button {
 button:hover { background: var(--mirn-surface); }
 
 .panel-title {
+  grid-column: 1 / -1;
   margin: 0;
   font-family: var(--mirn-font-mono);
   text-transform: uppercase;
@@ -113,12 +113,30 @@ button:hover { background: var(--mirn-surface); }
 .control-note { font-family: var(--mirn-font-sans); font-size: 0.74rem; line-height: 1.45; }
 .control-moves { color: var(--mirn-ink-faint); letter-spacing: 0.03em; }
 
-/* Three sections in one narrow column with nothing between them read as one long list. */
-.panel { display: flex; flex-direction: column; gap: 1.6rem; }
-.panel-group { display: flex; flex-direction: column; gap: 0.9rem; }
+/* Three categories, stacked top to bottom, each with its own heading. Within a category, the
+   controls themselves wrap into as many columns as the width allows: each .panel-group is its own
+   grid rather than one grid spanning all three, so "the room and the robot" (eleven controls),
+   "the ruler" (three) and "one press of Run" (seven, and not sliders) each size their own rows
+   from their own item count, and one category's heights can never leave a gap in another's row.
+   The alternative — one grid for the whole panel, with panel-title spanning every column to force
+   a row break between categories — reads almost identically once rendered, because auto-fit still
+   only ever fills a row with the items actually between two headings. It was not worth the price:
+   .panel-group is a <section>, and making it a transparent pass-through (display: contents) so its
+   children could join a single outer grid is the only way to get there, which is exactly the kind
+   of landmark-stripping trick guardrail-quality CSS in this file has otherwise avoided. Three
+   independent grids read the same and stay simple. */
+.panel { display: flex; flex-direction: column; gap: 2rem; }
+.panel-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1.3rem 1.6rem;
+  align-items: start;
+}
 
-/* Set as prose, not as another control: it is a sentence about the preview, not a knob. */
-.panel-note { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--mirn-ink-muted); }
+/* Set as prose, not as another control: it is a sentence about the preview, not a knob. Spans
+   every column a group's row is currently using, the same as the heading above it, so a sentence
+   never gets squeezed into one 16rem slot next to the sliders it is about. */
+.panel-note { grid-column: 1 / -1; margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--mirn-ink-muted); }
 .panel-note:empty { display: none; }
 
 /* What a link could not carry, printed above the controls it is about. Empty on an ordinary
@@ -159,16 +177,24 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 
 /* ---------------------------------------------------------------- the console's own rules */
 
+/*
+ * The stage used to share this row with a 20rem settings rail (grid-template-columns:
+ * minmax(0, 1fr) 20rem). Fourteen controls in that rail, each carrying a label, a value, a
+ * slider and a two-to-four sentence note, made it run far past the bottom of the arena and pull
+ * the eye to the densest text on the page rather than to what mattered. The stage now has the row
+ * to itself; the settings live below it, in .settings-region, as their own full-width section.
+ */
 .console-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 20rem;
-  gap: 2rem;
   max-width: 76rem;
   margin: 0 auto;
   padding: 0 2rem;
-  align-items: start;
 }
 .console-masthead { max-width: 52rem; margin: 0 auto; padding: 3rem 2rem 1.5rem; }
+
+/* Same box as .ledger-region below it: same max-width, same side padding, same rhythm of a
+   region-title before its content. The settings sit between the stage and the ledger, and now
+   read as a third full-width section rather than a rail squeezed beside the first one. */
+.settings-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
 
 .region-title {
   margin: 0 0 0.35rem;
@@ -272,6 +298,15 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 .tile-zero { margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
 .tile-zero-value { color: var(--mirn-ink); }
 .tile-zero-unit { margin: 0 0.3rem 0 0.15rem; }
+/*
+ * The gap the unit usually provides, for the units that have no suffix to print.
+ *
+ * An adjacent-sibling selector rather than a margin on the phrase itself: it fires only when the
+ * phrase follows the value directly, which is exactly the case where no unit span sits between
+ * them. A count reads "0 occasions" with no space at all otherwise, and the console never caught
+ * it because the console shows no counted column — the drill's card is the first surface that does.
+ */
+.tile-zero-value + .tile-zero-how { margin-left: 0.3rem; }
 .tile-stamps { margin: 0.3rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.66rem; color: var(--mirn-ink-faint); }
 .stamp { margin-right: 0.9rem; }
 .stamp-value { margin-left: 0.3rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
@@ -328,28 +363,6 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 .kept-empty { color: var(--mirn-ink-muted); font-size: 0.82rem; }
 
 /*
- * Last in the file on purpose. Media queries add no specificity, so a narrowing rule only wins if
- * it comes after every wider rule for the same selector — the single-column .readouts rule this
- * replaces sat above two later three- and two-column ones and could not fire at any width at all.
- * Narrowest last, so each one overrides the one above it.
- */
-@media (max-width: 60rem) {
-  .console-main { grid-template-columns: minmax(0, 1fr); }
-  .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-/* A tile carries a 1.6rem value, an anchor sentence, a gauge, a zero row and a stamp row. Two of
-   them across a phone is about 150px each, which is not enough for any of it. */
-@media (max-width: 45rem) {
-  .console-main { padding: 0 1.2rem; }
-  .console-masthead { padding: 2rem 1.2rem 1.2rem; }
-  .ledger-region { padding: 0 1.2rem; }
-  .readouts { grid-template-columns: minmax(0, 1fr); }
-  .ways-in { padding: 0 1.2rem 1.2rem; }
-  .ways-in ul { grid-template-columns: minmax(0, 1fr); }
-}
-
-/*
  * The ways in.
  *
  * A reader who has just arrived has met none of the fourteen controls, and the most interesting
@@ -391,5 +404,448 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   font-size: 0.82rem;
   line-height: 1.5;
   color: var(--mirn-ink-muted);
+}
+
+/* ---------------------------------------------------------------- the working page */
+
+/*
+ * web/how.html: what every readout on the console actually computes. It shares this stylesheet
+ * because it shares the voice, the palette and the typographic scale, and a second stylesheet
+ * would be a second place for a colour literal to appear.
+ *
+ * These rules sit ABOVE the breakpoint block that closes the file, and their narrow-viewport
+ * overrides sit inside it, for the reason that block's own comment gives: a media query adds no
+ * specificity, so a narrowing rule written above a base rule for the same selector can never fire.
+ * Do not append a new @media block after that one either — every breakpoint in this file is
+ * written widest first, and the narrow rules for this page belong in the existing 45rem block.
+ *
+ * The accent appears once, in .perturbation-term, and it is spent on exactly one thing: the symbol
+ * standing for the gap between a person's two paths, wherever a formula uses it. That gap IS the
+ * perturbation, which is the only thing web/ui/theme.ts allows this token to mark. Nothing else on
+ * this page — not a heading, not a link, not the warning below the two nulls — may reach for it.
+ */
+
+.how-main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Used on both pages, so it is not scoped to .how. Set as a mono line with an underline that
+   darkens, matching .ways-in's links rather than inventing a second link style. */
+.how-backlink {
+  margin: 1.1rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.how-backlink a {
+  color: var(--mirn-ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--mirn-rule);
+  padding-bottom: 0.1rem;
+}
+.how-backlink a:hover { border-bottom-color: var(--mirn-ink); }
+
+.how-main p { max-width: 40rem; }
+.how-main a { color: var(--mirn-ink); }
+
+.how-intro, .how-vocab, .how-contents, .how-drill, .how-close { margin: 2.6rem 0; }
+
+/* The vocabulary list. The term hangs in mono above its definition rather than beside it: five
+   terms with two-to-four sentence definitions do not fit a two-column list at any width worth
+   supporting, and a term that wraps to two lines beside its own definition reads as a mistake. */
+.how-terms { margin: 1rem 0 0; }
+.how-terms dt {
+  margin-top: 1.5rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+.how-terms dd {
+  margin: 0.4rem 0 0;
+  max-width: 40rem;
+  border-left: 1px solid var(--mirn-grid);
+  padding-left: 1rem;
+}
+
+/* Fifteen measurements is too many to hunt through. Numbered, because the page has an order. */
+.how-contents ol {
+  margin: 0.8rem 0 0;
+  padding-left: 1.4rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem 1.6rem;
+  font-size: 0.86rem;
+}
+.how-contents li { color: var(--mirn-ink-faint); }
+.how-contents a { color: var(--mirn-ink-muted); text-decoration: none; border-bottom: 1px solid var(--mirn-grid); }
+.how-contents a:hover { color: var(--mirn-ink); border-bottom-color: var(--mirn-ink); }
+
+/* A group heading is a heavier rule than a measurement's, so the seven groups read as the page's
+   spine and the fifteen measurements as entries hung off it. */
+.how-group { margin: 3.5rem 0 0; }
+.how-group-title {
+  margin: 0;
+  padding-top: 0.7rem;
+  border-top: 2px solid var(--mirn-ink);
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.how-group-note { margin: 0.7rem 0 0; color: var(--mirn-ink-muted); font-size: 0.9rem; }
+
+.how-measure { margin: 2.4rem 0 0; border-top: 1px solid var(--mirn-rule); padding-top: 0.9rem; }
+.how-measure h3 { margin: 0; font-size: 1.25rem; line-height: 1.25; font-weight: 600; }
+
+/* The four parts. The first is the lead and is set as such; the other three are announced by a
+   mono kicker that hangs above its paragraph. */
+.how-measure h4 {
+  margin: 1.5rem 0 0.35rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+.how-measure p { margin: 0.6rem 0 0; }
+
+/* The lead paragraph: what the measurement reads when the true effect is nothing. Given the only
+   filled ground on the page, because it is the thing a reader should take away if they take away
+   one sentence. */
+.how-zero {
+  margin: 0.9rem 0 0;
+  background: var(--mirn-surface);
+  border-left: 2px solid var(--mirn-ink);
+  padding: 0.8rem 1.1rem;
+  max-width: 42rem;
+}
+.how-kicker {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mirn-ink-faint);
+}
+
+/* A formula is the one thing on this page that cannot be reflowed, so it scrolls inside its own
+   box rather than making the document slide sideways under the prose.
+   The max-width override is not cosmetic: .how-main p holds prose to a readable 40rem measure, and
+   a formula inheriting that measure was silently clipping its right-hand half behind a scrollbar
+   nobody would think to drag. Formulas get the whole column, and the long ones are broken by hand
+   rather than left to overflow. */
+.how-formula {
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 0 0.7rem 1rem;
+  border-left: 1px solid var(--mirn-rule);
+  overflow-x: auto;
+  max-width: none;
+}
+.how-symbol {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.84rem;
+  line-height: 1.9;
+  color: var(--mirn-ink);
+  white-space: nowrap;
+}
+.how-terms dd.how-formula { border-left-color: var(--mirn-rule); }
+
+/* The one place the accent is spent on this page. See the header comment above. */
+.perturbation-term { color: var(--mirn-perturbation); }
+
+.how-note {
+  margin: 0.8rem 0 0;
+  font-size: 0.86rem;
+  color: var(--mirn-ink-muted);
+  border-left: 1px solid var(--mirn-grid);
+  padding-left: 1rem;
+}
+
+/* The two nulls' warning. Rules top and bottom rather than a box: it is the loudest thing on the
+   page and a full border would make it look like a callout in a manual. */
+.how-warning {
+  margin: 2.6rem 0 0;
+  padding: 1.2rem 0;
+  border-top: 2px solid var(--mirn-ink);
+  border-bottom: 2px solid var(--mirn-ink);
+}
+.how-warning h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.how-warning p { margin: 0.7rem 0 0; }
+
+.how-close { margin-top: 3.5rem; border-top: 1px solid var(--mirn-rule); padding-top: 0.9rem; }
+
+/*
+ * Last in the file on purpose. Media queries add no specificity, so a narrowing rule only wins if
+ * it comes after every wider rule for the same selector — the single-column .readouts rule this
+ * replaces sat above two later three- and two-column ones and could not fire at any width at all.
+ * Narrowest last, so each one overrides the one above it.
+ *
+ * This block used to sit above .ways-in instead of below it, which is the same trap: .ways-in's
+ * own base rules were written after this block, so — by the identical source-order argument —
+ * they always beat this block's narrow-viewport overrides for .ways-in and .ways-in ul, at every
+ * width, and the four link cards never actually collapsed to one column on a phone. Moving the
+ * whole block below .ways-in is the fix; nothing inside it changed.
+ */
+/*
+ * The key to the canvas.
+ *
+ * Every colour here is the token the canvas itself draws with, so the picture and its key have one
+ * definition between them: a person is `--mirn-ink-muted` in both places, the run without the robot
+ * is that same ink hollowed out against `--mirn-paper`, and the distance between a person's two
+ * positions is the one accented thing on the page.
+ *
+ * The two dots differ by fill and the two paths by dash, not by hue. That is deliberate and it is
+ * the same reason the sweep curve's lines do: the distinction has to survive greyscale, print and
+ * every form of colour blindness, and the single accent has to stay spent on the perturbation.
+ */
+.arena-key {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.3rem 1.4rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--mirn-ink-muted);
+}
+.arena-key li {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr;
+  align-items: baseline;
+}
+.key-mark {
+  display: inline-block;
+  position: relative;
+  top: 0.05rem;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.key-treated {
+  border-radius: 50%;
+  background: var(--mirn-ink-muted);
+}
+.key-control {
+  border-radius: 50%;
+  background: var(--mirn-paper);
+  border: 1.5px solid var(--mirn-ink-muted);
+}
+.key-robot {
+  width: 0.72rem;
+  height: 0.72rem;
+  background: var(--mirn-ink);
+}
+.key-gap {
+  height: 0;
+  border-top: 2px solid var(--mirn-perturbation);
+  top: -0.2rem;
+}
+.key-path-treated {
+  height: 0;
+  border-top: 2px solid var(--mirn-ink);
+  top: -0.2rem;
+}
+.key-path-control {
+  height: 0;
+  border-top: 1.5px dashed var(--mirn-ink-muted);
+  top: -0.2rem;
+}
+.key-note { margin-top: 0.5rem; }
+
+/*
+ * A withheld tile keeps the shape of a readout so the strip does not jump when the answer arrives,
+ * but carries no number and no gauge. Muted, because it is not the thing to look at yet.
+ */
+.tile-withheld { opacity: 0.72; }
+.tile-withheld-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--mirn-ink-faint);
+}
+
+/*
+ * The drill's card.
+ *
+ * Everything else it needs — the stage, the arena, the key, the readouts grid, the tiles — is the
+ * console's, unchanged. What is new is the card's own two heading lines and the block of three
+ * buttons under them, and that is all this section is. The buttons are pills rather than the
+ * console's filled Run block on purpose: Run commits a measurement, these three commit an opinion,
+ * and they should not look like the same act.
+ *
+ * No colour literal, as everywhere in this file. The accent belongs to the perturbation and a
+ * button is not one, so none of these rules names it.
+ */
+.card-progress {
+  margin: 0.2rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--mirn-ink-faint);
+}
+.card-name {
+  margin: 0.15rem 0 0.9rem;
+  max-width: 38rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: var(--mirn-ink);
+}
+.call {
+  margin: 2.4rem 0 0;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 0.9rem;
+}
+.call-question { margin: 0.5rem 0 0; max-width: 38rem; color: var(--mirn-ink-muted); }
+.call-buttons { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 1.1rem; }
+/* Type, colour and hover come from the stylesheet's own `button` rule. Only the shape and the
+   size are the drill's: a pill, larger than the console's, because these three commit an opinion
+   rather than a measurement and should not look like Run. */
+.call-buttons button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 2rem;
+}
+.call-buttons button[disabled] {
+  border-color: var(--mirn-rule);
+  color: var(--mirn-ink-faint);
+  cursor: default;
+}
+.call-buttons button[disabled]:hover { background: var(--mirn-paper); }
+.call-status { margin: 1rem 0 0; max-width: 38rem; color: var(--mirn-ink); }
+.call-status:empty { display: none; }
+
+/*
+ * The drill's reveal, running score and verdict.
+ *
+ * The reveal is the one block on either page that is allowed to sit on the accent, and it does not:
+ * the accent belongs to the perturbation and nothing else, so the reveal is marked by a rule down
+ * its left edge in the same ink as everything else. What separates it is position and weight, not
+ * hue. No colour literal here either.
+ *
+ * `.reveal-host:empty` collapses so the card carries no gap under the buttons before a call is
+ * made — the block appears where the reader's eye already is rather than pushing the page around
+ * when it arrives.
+ */
+.reveal-host:empty { display: none; }
+.drill-reveal {
+  margin: 1.8rem 0 0;
+  border-left: 2px solid var(--mirn-ink);
+  padding: 0.2rem 0 0.2rem 1.1rem;
+  max-width: 40rem;
+}
+.reveal-call {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.45;
+  color: var(--mirn-ink);
+}
+.reveal-line {
+  margin: 0.75rem 0 0;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--mirn-ink-muted);
+}
+.reveal-mark {
+  margin: 0.9rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  line-height: 1.55;
+  color: var(--mirn-ink);
+}
+/* Type, colour and hover come from the stylesheet's own `button` rule; only the shape is the
+   drill's. A pill, like the three it follows, because moving on is the same kind of act as
+   calling it and should not look like Run. */
+.reveal-next {
+  margin-top: 1.2rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 2rem;
+}
+
+.drill-tally {
+  margin: 2.4rem 0 0;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 0.9rem;
+}
+.tally-line {
+  margin: 0.5rem 0 0.9rem;
+  max-width: 38rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--mirn-ink);
+}
+
+/*
+ * The verdict replaces the card rather than sitting under it, so it is the only thing on the page
+ * when it appears and can afford the width and the quiet ground.
+ */
+.drill-verdict {
+  margin: 1.6rem 0 0;
+  background: var(--mirn-surface);
+  border: 1px solid var(--mirn-rule);
+  padding: 1.6rem 1.6rem 1.8rem;
+}
+.verdict-line {
+  margin: 0.8rem 0 0;
+  max-width: 42rem;
+  line-height: 1.65;
+  color: var(--mirn-ink-muted);
+}
+/* The one sentence the drill exists to deliver. Larger, in full ink, with air around it. */
+.verdict-claim {
+  margin: 1.6rem 0 0.4rem;
+  max-width: 42rem;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 1.2rem;
+  font-size: 1.12rem;
+  line-height: 1.5;
+  color: var(--mirn-ink);
+}
+.verdict-link { color: var(--mirn-ink); }
+/* The console's ledger bar, on the verdict. Same row of plain buttons, same sentence underneath
+   saying what each one carries, because a reader who has used one page should recognise the other.
+   Not the call buttons' pill: these two take a finished drill away, they do not commit an opinion. */
+.verdict-bar { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: baseline; margin-top: 1.6rem; }
+.verdict-bar + .region-note { max-width: 42rem; margin-top: 0.7rem; }
+/* Empty on every ordinary visit, and shown only when a hand-edited link asked for a card this
+   drill does not have. Set apart by a rule rather than by colour: it is a correction, not a
+   warning, and nothing on this page spends the accent on chrome. */
+.link-notices {
+  margin: 0.8rem 0 0;
+  border-left: 2px solid var(--mirn-rule);
+  padding-left: 0.9rem;
+}
+.link-notices .region-note { margin: 0.2rem 0; max-width: 42rem; }
+
+@media (max-width: 60rem) {
+  .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* A tile carries a 1.6rem value, an anchor sentence, a gauge, a zero row and a stamp row. Two of
+   them across a phone is about 150px each, which is not enough for any of it. */
+@media (max-width: 45rem) {
+  .console-main { padding: 0 1.2rem; }
+  .console-masthead { padding: 2rem 1.2rem 1.2rem; }
+  .settings-region { padding: 0 1.2rem; }
+  .ledger-region { padding: 0 1.2rem; }
+  .readouts { grid-template-columns: minmax(0, 1fr); }
+  .ways-in { padding: 0 1.2rem 1.2rem; }
+  .ways-in ul { grid-template-columns: minmax(0, 1fr); }
+  /* The working page rides in the existing block rather than opening a new one, because every
+     breakpoint in this file is written widest first and a new @media below this would have to be
+     narrower than 45rem to keep that order. Its two-column contents list and its formulas are the
+     only things on it that do not reflow on their own. */
+  .how-main { padding: 0 1.2rem; }
+  .how-contents ol { grid-template-columns: minmax(0, 1fr); }
+  .how-zero { padding: 0.7rem 0.9rem; }
 }
 
