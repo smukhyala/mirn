@@ -21,17 +21,22 @@
 </header>
 
 <!--
-  Four ways in, for a reader who has not met the controls yet.
+  Five ways in, for a reader who has not met the controls yet.
 
-  Plain links, not buttons: the page reads the settings out of the address on load, so these work
-  with scripting switched off and carry no state of their own. Every one of them is checked by
-  web/app/console/__tests__/presets.test.ts, which decodes each address here exactly as the page
-  does and fails if a single setting would be ignored — a link that greets a stranger with a
-  complaint is worse than no link at all.
+  The first four are plain query-string links: the page reads the settings out of the address on
+  load, so these work with scripting switched off and carry no state of their own. Every one of
+  them is checked by web/app/console/__tests__/presets.test.ts, which decodes each address here
+  exactly as the page does and fails if a single setting would be ignored — a link that greets a
+  stranger with a complaint is worse than no link at all.
 
   No sentence below quotes a number. The numbers move when a formula moves, and a caption that
   has gone stale is the failure this project exists to argue against. Each one says what to watch
   instead, and names the one control that is changing.
+
+  The fifth is different in kind, not degree: a link to another page rather than a query string
+  this one decodes, so presets.test.ts checks it separately from the first four — it asserts the
+  page link names ./drill.html and carries no query string of its own, rather than running it
+  through the settings decoder a page address was never meant to satisfy.
 -->
 <nav class="ways-in" aria-label="Ways in">
   <h2 class="region-title">Start here</h2>
@@ -55,6 +60,11 @@
       <a href="?people=18&amp;hold_line=0.5&amp;pace=1.34&amp;fidget=0&amp;space=1&amp;robot_speed=1.1&amp;reaction=0.15&amp;berth=0&amp;mis_sees=0&amp;offset=0&amp;episode=40&amp;horizon=3&amp;window_end=10&amp;notice=0&amp;near_miss=0.5&amp;recovery_tol=0.1&amp;recovery_dwell=20&amp;vary=fidget&amp;values=0,0.75,1.5,2.25,3&amp;seeds=1&amp;band=8&amp;floor=0&amp;frechet=0&amp;zero=1">A crowd that fidgets</a>
       <span>Press Run. Only the crowd's aimless wobble is changing, and nobody here reacts to the
       robot, so its real effect stays flat at nothing. The forecaster keeps reporting one.</span>
+    </li>
+    <li>
+      <a href="./drill.html">The referee drill</a>
+      <span>A different way in: call whether the robot disturbed an invented crowd before the
+      second run is shown, then see what the room actually did.</span>
     </li>
   </ul>
 </nav>

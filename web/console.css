@@ -451,7 +451,7 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 .how-main p { max-width: 40rem; }
 .how-main a { color: var(--mirn-ink); }
 
-.how-intro, .how-vocab, .how-contents, .how-close { margin: 2.6rem 0; }
+.how-intro, .how-vocab, .how-contents, .how-drill, .how-close { margin: 2.6rem 0; }
 
 /* The vocabulary list. The term hangs in mono above its definition rather than beside it: five
    terms with two-to-four sentence definitions do not fit a two-column list at any width worth

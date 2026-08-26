@@ -67,6 +67,32 @@ reason stated, because they need a run-to-run band a preview does not buy.
 
 ---
 
+## The referee drill
+
+**[Try the drill →](https://smukhyala.github.io/mirn/drill.html)**
+
+A second page, built from the same formulas and computing nothing new: one room, run once, with
+the second run withheld, and a question — did the robot disturb this crowd by more than the
+ordinary difference between two runs of it, or by less? Call it, and the second run is shown.
+
+Eight rooms, each answered with the same room run twice under the paired construction above, so
+the honest answer is known rather than guessed at. Five of the eight are built so that the one
+number a real corridor could hand you — a forecaster's report, computed from the run with the
+robot and nothing else — points the wrong way. Three are built so it happens to point the right
+way, and that is not a softening of the point: a drill where the number always misled would let a
+reader score perfectly by inverting it, and would teach that it is systematically backwards rather
+than what it actually is, which is unrelated to the answer. Which readings are even eligible to
+appear on a withheld card is not decided by a name sounding safe — it is proved, per reading, by
+swapping the withheld run for a decoy from an unrelated crowd and checking whether anything
+changes.
+
+**The transferable claim is not about this crowd.** It is that a paired comparison — the same
+situation, run twice, differing in one thing — settles a question a single observation cannot,
+and settles it by construction rather than by a cleverer estimate. The crowd is invented and the
+robot is a toy; the shape of the argument is not specific to either.
+
+---
+
 ## How it is kept honest
 
 **Two implementations, one oracle.** Python in `src/mirn/` is the reference for every formula the

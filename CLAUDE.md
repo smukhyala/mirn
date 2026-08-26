@@ -156,6 +156,19 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     Any claim the lesson takes from the archive cites the primary source directly; if the archive
     marks it UNVERIFIED, the copy either verifies it independently or does not make it.
 
+**A note on the referee drill**, since it is the first feature built after these guardrails and is
+worth checking against them rather than assumed to comply. `web/engine/job/cards.ts`'s eight cards
+are a closed table, like `COLUMNS` and `AXES` — no `register`, nothing added at runtime, and
+`cards.slow.test.ts` measures every one of them against the real engine rather than trusting a
+hand-written label. The safety property the drill depends on — that no number needing the run
+without the robot reaches a card before the call — is not a list of allowed columns checked by eye;
+it is `corridorReadable` on each column descriptor, and that flag is proved rather than asserted:
+`web/engine/job/__tests__/unpaired.test.ts` swaps the control arm for a decoy from an unrelated
+crowd and fails any column claiming to need no control run that notices the swap. And guardrail 11
+was not amended for the drill, because it does not need to be: the drill scores a reader's call
+against what the room did, never a robot's performance and never a rival method's, so it never
+enters the run-list-with-pinning-and-export shape guardrail 11 already refuses.
+
 ---
 
 ## The two-implementation rule
@@ -287,8 +300,8 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build — 28 s
-npm run test                             # 618 tests in 22 s
-npx vitest run --exclude '**/*.slow.test.ts'   # 602 of them in 15 s
+npm run test                             # 642 tests in 21 s
+npx vitest run --exclude '**/*.slow.test.ts'   # 626 of them in 15 s
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them in 22 s, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -303,7 +316,7 @@ that its cost is small enough to be worth it.
 **There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
 project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
 project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
-is what the third line above does — 15 s against 22 s. The three it drops are `axes.slow.test.ts`
+is what the third line above does — 15 s against 21 s. The three it drops are `axes.slow.test.ts`
 (guardrail 3's every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's
 eight cards actually does, measured) and `drill-verdict.slow.test.ts` (the whole drill driven card
 by card). All three re-run the simulator many times over, which is why they cost what they cost and
