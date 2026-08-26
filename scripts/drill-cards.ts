@@ -9,13 +9,32 @@ import { splitHalfNull, seededPermutations } from "../web/engine/measure/null/sp
  *
  * A card only teaches if the reader can be wrong on it. Two shapes qualify:
  *   FALSE POSITIVE — the robot's true effect is below what this room could resolve, and the
- *     forecaster still reports more than two runs of the room differ by. A reader trusting the
- *     forecaster calls "bigger" and is wrong.
+ *     forecaster still reports more than two runs of the room differ by.
  *   FALSE NEGATIVE — the true effect is comfortably above the floor, and the forecaster reports
- *     less than the band. A reader trusting the forecaster calls "smaller" and is wrong.
+ *     less than the band.
  *
  * Everything else is a card where the confounded number happens to agree with the truth, which
  * teaches nothing and must not be shipped as though it did.
+ *
+ * ## This screen judges the two numbers against two different nulls, and that is not the score
+ *
+ * Read this before quoting a shape out of this file. The two labels above compare the TRUTH to the
+ * split-half detection floor and the FORECASTER to the run-to-run band — each estimator against its
+ * own null, which is a defensible screen and is how the census that picked the eight cards was run.
+ *
+ * It is not what the drill's card asks the reader, and it does not license the phrase "a reader
+ * trusting the forecaster calls this and is wrong". The card asks one question — did the robot
+ * move this crowd by more than two runs of the same room differ by on their own? — and that is the
+ * truth against the RUN-TO-RUN BAND alone. On three of the eight cards this script found, the two
+ * nulls put the truth on opposite sides, so on those three the reader who trusted the forecaster
+ * was right and the label said otherwise. That was caught while the reveal was being built and
+ * fixed in commit `a6c6c06`.
+ *
+ * So: this file is a SCREEN for finding rooms worth looking at, and nothing more. The shipped
+ * classification is `CardShape` in `web/engine/job/cards.ts`, re-derived against the band and
+ * asserted in `web/engine/job/__tests__/cards.slow.test.ts`, which also keeps this screen's own
+ * floor classification alive as `CENSUS_FLOOR_SHAPE` so the provenance stays checked. Nothing
+ * imports this script.
  *
  * RESTRUCTURED from the brief's literal script (which is an 8x5x4x3x4x4x4 = 30,720-cell nested
  * loop that reruns the world for every ruler setting). The true effect, the run-to-run band and
@@ -107,6 +126,8 @@ function classify(
   let shape: Cell["shape"];
   if (!Number.isFinite(world.trueEffect) || !Number.isFinite(forecast)) {
     shape = "unusable";
+    // Truth against the floor, forecaster against the band — see this file's header. A screen,
+    // never a score.
   } else if (world.trueEffect < world.floor && forecast > world.band) {
     shape = "false positive";
   } else if (world.trueEffect > world.floor && forecast < world.band) {

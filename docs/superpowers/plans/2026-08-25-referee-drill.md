@@ -854,6 +854,12 @@ the truth is above the floor while the number is under the band, so the right ca
 `"cannot tell"` is never counted right — it is an honest answer and the verdict should say so
 separately rather than scoring it.
 
+> **Corrected in Task 7 — do not implement the paragraph above.** It classifies the truth against
+> the *split-half detection floor* while the card asks the reader about the *run-to-run band*, and
+> on three of the eight cards those two nulls put the truth on opposite sides. The scored rule is
+> the truth against the band, measured at the reveal, and nothing is scored from a card's label at
+> all. See **Addendum, Task 7** at the foot of this plan.
+
 - [ ] **Step 4: Run the tests until they pass**
 
 Run: `npx vitest run web/app/console/__tests__/drill.test.ts`
@@ -1210,3 +1216,56 @@ start until Task 1 reports — that is a sequencing fact, not a placeholder.
 **Type consistency:** `DrillCard`, `DRILL_CARDS`, `CARD_ORDER`, `cardConfig`, `cardRulerParams`
 (Task 3) are consumed by Tasks 5–8 under those names. `renderWithheldTile(doc, label)` (Task 4) is
 consumed by Task 6. `corridorReadable` (Task 2) is consumed by Tasks 3 and 6.
+
+---
+
+## Addendum, Task 7: the scoring rule above is against the wrong null
+
+Nothing above is retracted as a *plan*; what follows is a correction to one rule inside it, made
+while Task 7 was building the reveal and landed in commit `a6c6c06`. This plan is corrected in
+place rather than left standing, because the next agent to add a ninth card reads it as the
+instruction and would reimplement the defect.
+
+**What the plan says.** Task 5's Step 3 (and the census script sketched at Task 1, and the test
+sketch at Task 6) classify a card by the **true effect against the split-half detection floor**,
+with the forecaster against the **run-to-run band** — each estimator judged against its own null.
+
+**What the card asks.** One question, and a different one:
+
+> Did the robot move this crowd by more than that ordinary difference, or by less?
+
+That is the true effect against the **run-to-run band**. On three of the eight cards Task 3 picked
+(`fastModestRoom`, `amblingPackedRoom`, `unhurriedFullerRoom`) the two nulls disagree, so the plan's
+rule marks a reader wrong for the call that the two numbers printed on the same screen say is right.
+The measured table is in `docs/superpowers/notes/2026-08-25-drill-card-census.md` (Addendum, Task 7)
+and, as running assertions, in the header of `web/engine/job/__tests__/cards.slow.test.ts`.
+
+**What shipped instead.**
+
+- `CardShape` is `"reads high" | "reads low" | "agrees"`, re-derived against the band. It is a
+  statement about what a card does to a reader who trusts the corridor number, and it is never read
+  by the scorer.
+- `answer(state, call, honest)` takes the honest call as an argument. It is measured at the reveal,
+  from the paired reading and the band that reveal actually bought, so nothing can be scored from a
+  label written before the room was run.
+- The census's own floor classification is kept as `CENSUS_FLOOR_SHAPE` in
+  `cards.slow.test.ts` and still asserted, so the provenance of every setting in `cards.ts` stays
+  checked rather than merely recorded.
+
+**The general rule this leaves behind:** a card may be *selected* by whatever screen finds
+interesting rooms, but it must be *scored* against the null the question on screen names. The two
+nulls are never divided by one another and never compared for size — `web/how.html`'s `#never-divide`
+aside exists for that.
+
+## Addendum: the frozen-frame snippet at "Correction to the snippet above" is still not a test
+
+The corrected snippet earlier in this plan — capture `sample` before the click, compare after —
+was implemented as written and **could not fail**. In jsdom `requestAnimationFrame` is stubbed and
+never invokes its callback, so `sample` never leaves `0`, and the comparison is `0` against `0`
+under every possible implementation. Mutation-tested: a page that unfroze playback and reset the
+frame on the call left all 41 tests in the file green.
+
+Advancing playback is the missing half. `web/app/console/__tests__/drill-dom.test.ts` now installs a
+*capturing* `requestAnimationFrame` and runs a frame at a wall-clock reading of its own choosing,
+before the click and again after it, with a canary asserting the first reading is not frame zero.
+Any test in this project that compares two readings of a clock has to move the clock first.

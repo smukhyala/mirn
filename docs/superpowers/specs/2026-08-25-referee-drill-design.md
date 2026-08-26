@@ -48,6 +48,11 @@ confounded number is obviously noise teaches nothing; one where it is obviously 
 nothing. The drill needs roughly four cards where the true effect is below the floor while the
 forecaster clears the band, and roughly four the other way.
 
+> **Corrected during the build — see the addendum at the foot of this document.** That sentence
+> selects cards against the *split-half detection floor* while the card screen below asks the
+> reader about the *run-to-run band*. It is a fine screen for finding raw material and it is not
+> the rule a call is scored by.
+
 Task 1 measures this against the real engine, before any UI exists.
 
 **Kill criterion: fewer than four of each and the drill has no cards.** Stop, report, and do not
@@ -126,3 +131,35 @@ read the site's existing explanation first still get at least a quarter of them 
 The second clause is load-bearing. If reading the confound in prose already inoculates people, the
 drill is redundant and the site should just write the sentence better. Task 1 cannot test this —
 only humans can — but Task 1 determines whether there are cards to test it with.
+
+---
+
+## Addendum: the gate screens against one null and the card asks about another
+
+Written after the drill shipped, correcting this document in place rather than leaving it standing.
+
+**The gate** (above) selects a card by the true effect against the **split-half detection floor**,
+with the forecaster against the **run-to-run band**. **The card screen** asks:
+
+> Did the robot move this crowd by more than that ordinary difference, or by less?
+
+which is the true effect against the **run-to-run band**. On three of the eight cards the census
+found, the two nulls put the true effect on opposite sides — so a drill that screened with the gate
+and then scored with the gate's answer would have told a reader their call was wrong while showing
+them the two numbers that said it was right. That is what happened, and it was fixed in commit
+`a6c6c06` before release.
+
+**Selection and scoring are separate, and only scoring is constrained.** The gate stands as written:
+it is a screen for finding rooms where a confounded number and the truth are worth comparing, and it
+did its job. What must match the question on screen is the *score*. What shipped measures the honest
+call at the reveal, from the paired reading and the band that reveal bought, and never from a card's
+stored label.
+
+**The mix that resulted is five fooling and three agreeing**, not eight fooling. That is deliberate:
+if every card fooled, a reader could score eight out of eight by inverting whatever the corridor
+number says and would leave believing that number is systematically wrong. It is uninformative, not
+inverted, and this toy cannot support the stronger claim (guardrail 2). The gate's "roughly four of
+each" was a criterion for raw material and was met.
+
+The measured table is in `docs/superpowers/notes/2026-08-25-drill-card-census.md` and is asserted,
+card by card, in `web/engine/job/__tests__/cards.slow.test.ts`.

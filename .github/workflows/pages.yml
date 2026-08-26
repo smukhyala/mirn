@@ -27,10 +27,16 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      # `npm run check`, not `npm run build`. This is the only automated path to the public site,
+      # and ci.yml runs the suite on a PARALLEL trigger — so with a bare build here a merge to main
+      # publishes whether or not the placebo gate, the corridor-readable guard, the storage scan
+      # and the numeric-literal ban are red. `check` is typecheck, the whole vitest suite and the
+      # production build, in that order, and it emits the same dist/ the build alone would.
+      #
       # Vite's root is web/ and its outDir is ../dist, so this writes the repo-root dist/.
       # `base` stays "./": the emitted asset paths resolve against the document URL, which is
       # what makes the same build work at a project subpath, at a domain root and from a file.
-      - run: npm run build
+      - run: npm run check
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
