@@ -298,6 +298,15 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 .tile-zero { margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
 .tile-zero-value { color: var(--mirn-ink); }
 .tile-zero-unit { margin: 0 0.3rem 0 0.15rem; }
+/*
+ * The gap the unit usually provides, for the units that have no suffix to print.
+ *
+ * An adjacent-sibling selector rather than a margin on the phrase itself: it fires only when the
+ * phrase follows the value directly, which is exactly the case where no unit span sits between
+ * them. A count reads "0 occasions" with no space at all otherwise, and the console never caught
+ * it because the console shows no counted column — the drill's card is the first surface that does.
+ */
+.tile-zero-value + .tile-zero-how { margin-left: 0.3rem; }
 .tile-stamps { margin: 0.3rem 0 0; font-family: var(--mirn-font-mono); font-size: 0.66rem; color: var(--mirn-ink-faint); }
 .stamp { margin-right: 0.9rem; }
 .stamp-value { margin-left: 0.3rem; color: var(--mirn-ink-muted); font-variant-numeric: tabular-nums; }
@@ -662,6 +671,56 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   line-height: 1.45;
   color: var(--mirn-ink-faint);
 }
+
+/*
+ * The drill's card.
+ *
+ * Everything else it needs — the stage, the arena, the key, the readouts grid, the tiles — is the
+ * console's, unchanged. What is new is the card's own two heading lines and the block of three
+ * buttons under them, and that is all this section is. The buttons are pills rather than the
+ * console's filled Run block on purpose: Run commits a measurement, these three commit an opinion,
+ * and they should not look like the same act.
+ *
+ * No colour literal, as everywhere in this file. The accent belongs to the perturbation and a
+ * button is not one, so none of these rules names it.
+ */
+.card-progress {
+  margin: 0.2rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--mirn-ink-faint);
+}
+.card-name {
+  margin: 0.15rem 0 0.9rem;
+  max-width: 38rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: var(--mirn-ink);
+}
+.call {
+  margin: 2.4rem 0 0;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 0.9rem;
+}
+.call-question { margin: 0.5rem 0 0; max-width: 38rem; color: var(--mirn-ink-muted); }
+.call-buttons { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 1.1rem; }
+/* Type, colour and hover come from the stylesheet's own `button` rule. Only the shape and the
+   size are the drill's: a pill, larger than the console's, because these three commit an opinion
+   rather than a measurement and should not look like Run. */
+.call-buttons button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 2rem;
+}
+.call-buttons button[disabled] {
+  border-color: var(--mirn-rule);
+  color: var(--mirn-ink-faint);
+  cursor: default;
+}
+.call-buttons button[disabled]:hover { background: var(--mirn-paper); }
+.call-status { margin: 1rem 0 0; max-width: 38rem; color: var(--mirn-ink); }
+.call-status:empty { display: none; }
 
 @media (max-width: 60rem) {
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

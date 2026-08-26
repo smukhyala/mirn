@@ -29,22 +29,28 @@ describe("the console page is the page the build ships", () => {
     expect(run().trim()).toBe("web/index.html");
   });
 
-  it("is an entry point, alongside the working page and nothing else", () => {
+  it("is an entry point, alongside the working page, the drill and nothing else", () => {
     const config = readFileSync("vite.config.ts", "utf8");
     expect(config).toContain('index: resolve(__dirname, "web/index.html")');
     expect(config).toContain('how: resolve(__dirname, "web/how.html")');
+    expect(config).toContain('drill: resolve(__dirname, "web/drill.html")');
     // Asserting the ABSENCE is still the point, and it is what this test is actually for. A
     // surviving `instrument` entry would mean the build is still emitting a page whose source an
-    // earlier task deleted.
+    // earlier task deleted. Both of these outlive the count below on purpose: a count alone goes
+    // green the moment somebody adds a page and forgets to delete a dead one.
     expect(config).not.toContain("instrument");
     expect(config).not.toContain("generatedPages");
-    // The entry map used to be guarded by being a single named page. It is two now, so the guard
+    // The entry map used to be guarded by being a single named page. It is three now, so the guard
     // is stated directly instead of implied: every entry names a file that exists, and there are
     // exactly as many entries as there are hand-written pages. An entry whose HTML has been
     // deleted fails here rather than at deploy, which is the same defect the `instrument`
     // assertion above catches for one particular name.
+    //
+    // Raised from two to three by the drill (web/drill.html). The three named `toContain`s above
+    // and this exact length together mean the map is these three pages and nothing else — which is
+    // what a `toContain` on its own would not say.
     const entries = [...config.matchAll(/(\w+): resolve\(__dirname, "([^"]+)"\)/g)];
-    expect(entries).toHaveLength(2);
+    expect(entries).toHaveLength(3);
     for (const entry of entries) {
       const page = entry[2] as string;
       expect(existsSync(page), `${page} is an entry point with no source file`).toBe(true);

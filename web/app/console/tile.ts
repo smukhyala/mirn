@@ -36,6 +36,17 @@ const SUFFIX: Readonly<Record<UnitKey, string>> = Object.freeze({
 
 export const BAND_NOT_MEASURED = "not yet measured — press Run";
 
+/**
+ * Deliberately not a softer wording of the line above it.
+ *
+ * "Not yet measured" names a control that would measure it. The drill's card has no such control
+ * and is not going to grow one: the ordinary difference between two runs of a room is made of runs
+ * with no robot in them, and a card that handed the reader those runs would have handed them the
+ * answer. Collapsing the two states would print "press Run" on a page with no Run button.
+ */
+export const BAND_WITHHELD =
+  "withheld on this card: it is measured from runs of this room with no robot in it";
+
 export function formatValue(value: number, unit: UnitKey): string {
   const places = DECIMALS[unit];
   return value.toFixed(places);
@@ -53,7 +64,10 @@ export interface ZeroRendering {
    * 0.000 m, and `tile.test.ts` now renders every real column to keep that from coming back.
    */
   readonly how: string;
-  /** NaN only when the reference is `notAPerturbation`. */
+  /**
+   * NaN when the reference is `notAPerturbation`, and when the zero itself is being withheld —
+   * see `withheldZeroRendering`. Both print the phrase alone, with no value slot.
+   */
   readonly value: number;
   readonly unit: UnitKey;
   /**
@@ -90,9 +104,40 @@ export function zeroRenderingFor(
   return Object.freeze({ kind: "zeroRendering" as const, how: reference.how, value, unit, bound });
 }
 
+/**
+ * The zero for a number whose zero-reference is itself being withheld from the reader.
+ *
+ * It carries a phrase and no value, which `renderZero` already renders correctly: the value slot
+ * is skipped for a non-finite number and the phrase prints on its own. That is not a hole in
+ * guardrail 6 but the sharpest statement of it. Guardrail 6 forbids a number with nothing to judge
+ * it against and no word about what is missing; this prints the word. The drill's whole subject is
+ * a reading whose zero comes from a second run of the room, and the second run is the one thing a
+ * corridor cannot give you — so the tile says so, in the slot where the zero would otherwise sit.
+ *
+ * Separate from `zeroRenderingFor` rather than a flag on it, and it must stay separate.
+ * `zeroRenderingFor` throws on a non-finite value for every reference kind but `notAPerturbation`,
+ * and that guard is what stops an unresolved companion column reaching a reader as a blank. A
+ * caller has to ask for this by name.
+ */
+export function withheldZeroRendering(how: string, unit: UnitKey): ZeroRendering {
+  if (how.length === 0) {
+    throw new ContractError(
+      "a withheld zero must still carry a phrase saying what is missing and why",
+    );
+  }
+  return Object.freeze({
+    kind: "zeroRendering" as const,
+    how,
+    value: Number.NaN,
+    unit,
+    bound: false,
+  });
+}
+
 export type BandGauge =
   | { readonly kind: "bandMeasured"; readonly bandM: number; readonly nReplicates: number }
-  | { readonly kind: "bandNotMeasured" };
+  | { readonly kind: "bandNotMeasured" }
+  | { readonly kind: "bandWithheld" };
 
 export interface SettingStamp {
   readonly kind: "settingStamp";
@@ -218,9 +263,7 @@ function renderGauge(doc: Document, props: TileProps): HTMLElement {
 
   const caption = doc.createElement("p");
   caption.className = "gauge-caption";
-  if (props.gauge.kind === "bandNotMeasured") {
-    caption.textContent = BAND_NOT_MEASURED;
-  } else {
+  if (props.gauge.kind === "bandMeasured") {
     caption.appendChild(element(doc, "span", "gauge-number", String(props.gauge.nReplicates)));
     caption.appendChild(
       element(
@@ -230,6 +273,10 @@ function renderGauge(doc: Document, props: TileProps): HTMLElement {
         " replicate runs of this room with no robot in it, 95th percentile",
       ),
     );
+  } else if (props.gauge.kind === "bandWithheld") {
+    caption.textContent = BAND_WITHHELD;
+  } else {
+    caption.textContent = BAND_NOT_MEASURED;
   }
   wrap.appendChild(caption);
   return wrap;

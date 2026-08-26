@@ -197,7 +197,7 @@ function buildRunBlock(doc: Document): {
 }
 
 function paintTiles(doc: Document, host: HTMLElement, preview: Preview): void {
-  const stamps = stampsFor(preview);
+  const stamps = stampsFor(preview.context);
   // The gauge is empty during a preview, always: a floor measured at other settings beside this
   // cell's number is the same error the band was already caught making.
   const gauge: BandGauge = { kind: "bandNotMeasured" };

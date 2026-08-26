@@ -530,7 +530,11 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: false,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "A robot that never came closer than the near-miss line reads exactly 0 occasions.",
+      // Not "reads exactly 0 occasions": the value slot prints that 0 immediately to the left of
+      // this phrase, so spelling it out again is the "0.000 m ... and this reads 0.000 m" defect
+      // six other entries were corrected for. This column has no tile on the console — the drill's
+      // card is the first surface that shows it — which is why it survived that pass.
+      how: "occasions, which is what a robot that never came closer than the near-miss line reads.",
     }),
     assumption: (): string =>
       "Occasions, not instants. Counting instants below the line would make the number grow " +
