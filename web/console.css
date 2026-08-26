@@ -722,6 +722,96 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 .call-status { margin: 1rem 0 0; max-width: 38rem; color: var(--mirn-ink); }
 .call-status:empty { display: none; }
 
+/*
+ * The drill's reveal, running score and verdict.
+ *
+ * The reveal is the one block on either page that is allowed to sit on the accent, and it does not:
+ * the accent belongs to the perturbation and nothing else, so the reveal is marked by a rule down
+ * its left edge in the same ink as everything else. What separates it is position and weight, not
+ * hue. No colour literal here either.
+ *
+ * `.reveal-host:empty` collapses so the card carries no gap under the buttons before a call is
+ * made — the block appears where the reader's eye already is rather than pushing the page around
+ * when it arrives.
+ */
+.reveal-host:empty { display: none; }
+.drill-reveal {
+  margin: 1.8rem 0 0;
+  border-left: 2px solid var(--mirn-ink);
+  padding: 0.2rem 0 0.2rem 1.1rem;
+  max-width: 40rem;
+}
+.reveal-call {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.45;
+  color: var(--mirn-ink);
+}
+.reveal-line {
+  margin: 0.75rem 0 0;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--mirn-ink-muted);
+}
+.reveal-mark {
+  margin: 0.9rem 0 0;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  line-height: 1.55;
+  color: var(--mirn-ink);
+}
+/* Type, colour and hover come from the stylesheet's own `button` rule; only the shape is the
+   drill's. A pill, like the three it follows, because moving on is the same kind of act as
+   calling it and should not look like Run. */
+.reveal-next {
+  margin-top: 1.2rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 2rem;
+}
+
+.drill-tally {
+  margin: 2.4rem 0 0;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 0.9rem;
+}
+.tally-line {
+  margin: 0.5rem 0 0.9rem;
+  max-width: 38rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--mirn-ink);
+}
+
+/*
+ * The verdict replaces the card rather than sitting under it, so it is the only thing on the page
+ * when it appears and can afford the width and the quiet ground.
+ */
+.drill-verdict {
+  margin: 1.6rem 0 0;
+  background: var(--mirn-surface);
+  border: 1px solid var(--mirn-rule);
+  padding: 1.6rem 1.6rem 1.8rem;
+}
+.verdict-line {
+  margin: 0.8rem 0 0;
+  max-width: 42rem;
+  line-height: 1.65;
+  color: var(--mirn-ink-muted);
+}
+/* The one sentence the drill exists to deliver. Larger, in full ink, with air around it. */
+.verdict-claim {
+  margin: 1.6rem 0 0.4rem;
+  max-width: 42rem;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 1.2rem;
+  font-size: 1.12rem;
+  line-height: 1.5;
+  color: var(--mirn-ink);
+}
+.verdict-link { color: var(--mirn-ink); }
+
 @media (max-width: 60rem) {
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -32,7 +32,7 @@
 </header>
 
 <main class="console-main">
-  <section class="stage" aria-labelledby="card-title">
+  <section class="stage" id="stage" aria-labelledby="card-title">
     <h2 class="region-title" id="card-title">The card</h2>
     <!--
       Both of these are filled by web/drill.ts and are empty here on purpose. The count is rendered
@@ -82,7 +82,39 @@
       </div>
       <p class="call-status" id="call-status"></p>
     </section>
+
+    <!--
+      Empty until a call is made. web/drill.ts builds the whole reveal into it: the sentence saying
+      what was called, the sentence saying what the room actually did, and the button on to the
+      next card. Nothing claims to be a reveal before there is one, so a test looking for
+      `.drill-reveal` before the click finds nothing rather than an empty shell.
+    -->
+    <div class="reveal-host" id="reveal"></div>
   </section>
+
+  <!--
+    The running score, and the sentence saying it does not survive a reload.
+
+    That sentence is static rather than written by the script on purpose. Guardrail 10 says the
+    tally is held in memory and the page says so; a reader who has JavaScript switched off, or who
+    arrives before the module has run, still gets told. It is also the only honest thing to say —
+    there is no server, no account and no saved session behind this page, and there is not going to
+    be one.
+  -->
+  <section class="drill-tally" aria-labelledby="tally-title">
+    <h2 class="region-title" id="tally-title">Your running score</h2>
+    <p class="tally-line" id="tally"></p>
+    <p class="region-note">
+      This score is held in memory only. Reload the page and the drill starts again at the first
+      card: nothing here is written down, on this machine or anywhere else.
+    </p>
+  </section>
+
+  <!--
+    Hidden until the last card has been called, and filled by web/drill.ts. Its heading carries the
+    id this section names, so the id exists by the time a reader can see either.
+  -->
+  <section class="drill-verdict" id="verdict" aria-labelledby="verdict-title" hidden></section>
 </main>
 
 <script type="module" src="./drill.ts"></script>

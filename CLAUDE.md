@@ -286,9 +286,9 @@ Nothing from the virtualenv is on PATH — not `python`, not `pytest`, not `ruff
 command below is written so it runs as spelled from the repository root, with no activation step.
 
 ```bash
-npm run check                            # typecheck, vitest, vite build — 28 s
-npm run test                             # 511 tests in 22 s
-npx vitest run --exclude '**/*.slow.test.ts'   # 506 of them in 14 s
+npm run check                            # typecheck, vitest, vite build — 30 s
+npm run test                             # 617 tests in 22 s
+npx vitest run --exclude '**/*.slow.test.ts'   # 602 of them in 15 s
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them in 22 s, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -300,17 +300,21 @@ of them used to be wrong by a plausible-looking margin, which is the failure mod
 exists to name: a timing nobody re-ran is a claim, and the whole point of a documented fast loop is
 that its cost is small enough to be worth it.
 
-**There is no `--project engine` fast loop, and naming one was the mistake.** It runs in 17 s
-against 22 s for everything, because `axes.slow.test.ts` is 14 s of the suite and lives inside the
-engine project. Excluding that one file is the only cut worth making, and it is what the third line
-above does — 14 s, at the cost of the guardrail-3 check, so it is a working loop and not the gate.
+**There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
+project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
+project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
+is what the third line above does — 15 s against 22 s. The three it drops are `axes.slow.test.ts`
+(guardrail 3's every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's
+eight cards actually does, measured) and `drill-verdict.slow.test.ts` (the whole drill driven card
+by card). All three re-run the simulator many times over, which is why they cost what they cost and
+why none of them can be made fast. So it is a working loop and not the gate.
 
 The fast pytest loop is real: the tests that dominate the runtime carry `@pytest.mark.slow`, and
 `pyproject.toml` records the measurement the cut-off came from. It skips the divergence property
 tests and the calibration suite, so it is also a loop and not a gate. `tests/test_placebo.py` is
 deliberately not marked and runs in both.
 
-Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — 27
+Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — 26
 seconds measured. Full `npm run check` plus `.venv/bin/python -m pytest -q` before any push.
 **Never claim work is complete without running it and showing the output.**
 

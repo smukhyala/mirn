@@ -7,6 +7,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { CARD_ORDER, DRILL_CARDS } from "../../../engine/job/cards.js";
 import { COLUMNS, COLUMN_ORDER, type ColumnKey } from "../../../engine/job/columns.js";
 import type { ArenaView } from "../../../ui/arena.js";
+import { answer, makeDrillState, reveal, type DrillCall, type DrillState } from "../drill.js";
+import type { VerdictLine } from "../../../drill.js";
 import { DISCLOSURE_CLAUSES } from "../csv.js";
 import { BAND_NOT_MEASURED, BAND_WITHHELD } from "../tile.js";
 
@@ -37,10 +39,23 @@ const FLAT = HTML.replace(/\s+/g, " ");
 interface Booted {
   readonly document: Document;
   readonly view: ArenaView;
+  /** The view the canvas was LAST drawn from, read fresh. The reveal's own property is a
+   *  statement about two readings of this, taken either side of a click. */
+  readonly viewNow: () => ArenaView;
 }
 
 /** The card's own column set, read back off the module rather than restated here. */
 let cardColumns: readonly ColumnKey[] = [];
+
+/**
+ * The verdict's wording, read back off the module the same way.
+ *
+ * The page's own module is a top-level script — importing it boots a card — so there is no way to
+ * reach this without a DOM. Reading it off the booted module rather than importing it separately
+ * keeps that honest and costs one boot, not eight simulations per branch.
+ */
+let verdictLines: (state: DrillState, misleadingCards: readonly boolean[]) => readonly VerdictLine[] =
+  () => [];
 
 async function bootDrill(): Promise<Booted> {
   const dom = new JSDOM(HTML, { pretendToBeVisual: true, url: "https://example.test/drill" });
@@ -64,13 +79,29 @@ async function bootDrill(): Promise<Booted> {
   const module = (await import("../../../drill.js")) as {
     arenaViewNow: () => ArenaView | null;
     CARD_COLUMNS: readonly ColumnKey[];
+    verdictLines: (state: DrillState, misleadingCards: readonly boolean[]) => readonly VerdictLine[];
   };
   cardColumns = module.CARD_COLUMNS;
-  const view = module.arenaViewNow();
-  if (view === null) {
-    throw new Error("the drill booted without drawing the arena once");
+  verdictLines = module.verdictLines;
+  const viewNow = (): ArenaView => {
+    const drawn = module.arenaViewNow();
+    if (drawn === null) {
+      throw new Error("the drill has not drawn the arena");
+    }
+    return drawn;
+  };
+  const view = viewNow();
+  return { document: dom.window.document, view, viewNow };
+}
+
+/** Clicks a button by id and fails loudly if the page has no such button, rather than doing
+ *  nothing and letting every assertion below describe the card that never moved. */
+function click(document: Document, id: string): void {
+  const button = document.querySelector<HTMLButtonElement>(`#${id}`);
+  if (button === null) {
+    throw new Error(`the drill has no #${id} to click`);
   }
-  return { document: dom.window.document, view };
+  button.click();
 }
 
 /**
@@ -344,5 +375,295 @@ describe("the three buttons take one call and no more", () => {
     // The truth lives behind the reveal, which is a later screen. A status line quoting a number
     // here would be the answer, printed by the one element that is meant to be the reader's own.
     expect(status).not.toMatch(/\d/);
+  });
+});
+
+/**
+ * The reveal.
+ *
+ * One boot, one call, and every assertion about what arrived. Booting once matters for more than
+ * speed: the properties below are about ONE card before and after ONE click, and a fresh boot per
+ * assertion would compare two different rooms and prove nothing about either.
+ */
+describe("the reveal shows the second run, on the instant the reader was looking at", () => {
+  let document: Document;
+  let before: ArenaView;
+  let after: ArenaView;
+
+  beforeAll(async () => {
+    const booted = await bootDrill();
+    document = booted.document;
+    before = booted.viewNow();
+    click(document, "call-bigger");
+    after = booted.viewNow();
+  });
+
+  it("fades the control arm in on the same frozen frame", () => {
+    expect(after.showControl).toBe(true);
+    expect(after.showGaps).toBe(true);
+    // The same instant, so the reader compares like with like rather than watching it move. The
+    // sample index is captured off the view BEFORE the click: there is no frozen index recorded
+    // anywhere else, and a hardcoded 0 would pass against a page that redrew a different frame
+    // whenever playback happened to be at the start.
+    expect(after.sample).toBe(before.sample);
+  });
+
+  it("still draws the run it was already drawing", () => {
+    expect(after.treated).toBe(before.treated);
+    expect(after.control).toBe(before.control);
+    expect(after.robot).not.toBeNull();
+  });
+
+  it("fills every withheld tile on reveal", () => {
+    expect(document.querySelectorAll(".tile-withheld")).toHaveLength(0);
+  });
+
+  it("puts a number and a zero in every tile it just filled", () => {
+    // Guardrail 6 at the tile, after the reveal as much as before it: a revealed number goes
+    // through the ordinary tile path or it does not go up at all.
+    const tiles = document.querySelectorAll("#readouts .tile");
+    expect(tiles.length).toBe(cardColumns.length);
+    for (const tile of tiles) {
+      const key = tile.getAttribute("data-column") ?? "";
+      expect(tile.querySelector(".tile-number")?.textContent ?? "", `${key} shows no value`).toMatch(
+        /\d/,
+      );
+      const zero = tile.querySelector(".tile-zero");
+      expect(zero, `${key} shows a number with no zero row`).not.toBeNull();
+      expect(zero?.closest("details"), `${key} hides its zero behind a disclosure`).toBeNull();
+      const how = tile.querySelector(".tile-zero-how")?.textContent ?? "";
+      expect(how.length, `${key} says nothing about what zero would read`).toBeGreaterThan(0);
+      expect(how, `${key} still calls its zero withheld after the reveal`).not.toContain("withheld");
+    }
+  });
+
+  it("measures the ordinary difference between two runs instead of withholding it", () => {
+    const captions = document.querySelectorAll("#readouts .gauge-caption");
+    expect(captions.length).toBeGreaterThan(0);
+    for (const caption of captions) {
+      expect(caption.textContent).not.toBe(BAND_WITHHELD);
+      expect(caption.textContent).not.toBe(BAND_NOT_MEASURED);
+    }
+  });
+
+  it("grows the key back to every mark the arena now draws", () => {
+    const marks: string[] = [];
+    for (const node of document.querySelectorAll(".arena-key .key-mark")) {
+      marks.push(node.getAttribute("class") ?? "");
+    }
+    const has = (name: string): boolean => marks.some((mark) => mark.includes(name));
+    // Checked against the view rather than against the number six, which would pass just as well
+    // for a key that grew the wrong two entries.
+    expect(has("key-control")).toBe(after.showControl);
+    expect(has("key-path-control")).toBe(after.showControl);
+    expect(has("key-gap")).toBe(after.showGaps);
+    expect(has("key-robot")).toBe(after.robot !== null);
+    expect(marks).toHaveLength(6);
+  });
+
+  it("states the call, the truth, the ordinary difference and what the corridor number said", () => {
+    const line = document.querySelector(".drill-reveal")?.textContent ?? "";
+    expect(line).toMatch(/you said/i);
+    expect(line).toMatch(/\d/);
+    expect(line).toContain("The robot moved this crowd by");
+    expect(line).toContain("Two runs of this room with nothing done to either of them differ by");
+    expect(line).toContain("A forecaster watching only the run with the robot in it");
+  });
+
+  it("quotes no number the tiles above it are not also showing", () => {
+    // Every figure in the reveal's own sentences is a value read back out of the run, so each one
+    // has a tile a few lines up carrying its zero. A number here with no tile would be guardrail 6
+    // broken by prose.
+    const line = document.querySelector(".drill-reveal")?.textContent ?? "";
+    const quoted = line.match(/\d+\.\d+/g) ?? [];
+    expect(quoted.length).toBeGreaterThan(0);
+    const onTiles: string[] = [];
+    for (const node of document.querySelectorAll("#readouts .tile-number")) {
+      onTiles.push(node.textContent ?? "");
+    }
+    for (const value of quoted) {
+      expect(onTiles, `the reveal quotes ${value}, which is on no tile`).toContain(value);
+    }
+  });
+
+  it("offers a way on, and takes no second call on the card just answered", () => {
+    expect(document.querySelector("#next-card")).not.toBeNull();
+    for (const id of ["call-bigger", "call-smaller", "call-cannot-tell"]) {
+      expect(document.querySelector<HTMLButtonElement>(`#${id}`)?.disabled).toBe(true);
+    }
+  });
+
+  it("puts no bare code identifier into the reveal either", () => {
+    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
+    const offenders: string[] = [];
+    const reveal = document.querySelector(".drill-reveal");
+    expect(reveal).not.toBeNull();
+    if (reveal !== null) {
+      for (const chunk of textChunks(reveal)) {
+        const found = identifier.exec(chunk);
+        if (found !== null) {
+          offenders.push(found[0]);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("the running score", () => {
+  it("says it does not survive a reload, before anything has been called", async () => {
+    const { document } = await bootDrill();
+    // Guardrail 10: the tally is in memory and the page says so. Static markup, so a reader who
+    // never runs the script is told as well.
+    expect(document.body.textContent).toMatch(/reload|refresh/i);
+    expect(document.querySelector("#tally")?.textContent ?? "").toContain("No cards called yet");
+  });
+
+  it("counts the call once it is made", async () => {
+    const { document } = await bootDrill();
+    click(document, "call-cannot-tell");
+    const line = document.querySelector("#tally")?.textContent ?? "";
+    expect(line).toContain("Called so far: 1 of eight");
+    expect(line).toContain("on 1 you said the card could not be called");
+  });
+});
+
+/**
+ * The verdict's wording, on every branch a reader can land on.
+ *
+ * Driven from state objects rather than from eight clicks, because reaching "every one you got
+ * wrong went the same way" through the page means eight simulations per branch and there are four
+ * branches. The eight-click walk lives in drill-verdict.slow.test.ts and checks that this wording
+ * actually reaches the page; what is checked here is that the wording is right.
+ */
+describe("the verdict", () => {
+  let lines: (state: DrillState, misleadingCards: readonly boolean[]) => readonly VerdictLine[];
+
+  beforeAll(async () => {
+    await bootDrill();
+    lines = verdictLines;
+  });
+
+  function walk(script: readonly (readonly [DrillCall, "bigger" | "smaller"])[]): DrillState {
+    let state = makeDrillState();
+    for (const step of script) {
+      state = answer(state, step[0], step[1]);
+      state = reveal(state);
+    }
+    return state;
+  }
+
+  function textOf(state: DrillState, misleading: readonly boolean[]): string {
+    const parts: string[] = [];
+    for (const entry of lines(state, misleading)) {
+      parts.push(entry.text);
+    }
+    return parts.join(" ");
+  }
+
+  function everyCard(call: DrillCall, honest: "bigger" | "smaller"): readonly (readonly [DrillCall, "bigger" | "smaller"])[] {
+    const script: (readonly [DrillCall, "bigger" | "smaller"])[] = [];
+    for (let i = 0; i < CARD_ORDER.length; i++) {
+      script.push([call, honest] as const);
+    }
+    return script;
+  }
+
+  it("carries the sentence the whole drill exists to deliver", () => {
+    const text = textOf(walk(everyCard("bigger", "bigger")), []);
+    expect(text).toContain(
+      "On all eight the paired reading was right — not because it is a better estimator, but " +
+        "because both runs shared a seed and differed only in the robot.",
+    );
+  });
+
+  it("sets that sentence apart from the counting above it", () => {
+    const entries = lines(walk(everyCard("bigger", "bigger")), []);
+    const last = entries[entries.length - 1];
+    expect(last?.className).toBe("verdict-claim");
+    for (let i = 0; i < entries.length - 1; i++) {
+      expect(entries[i]?.className).toBe("verdict-line");
+    }
+  });
+
+  it("says how many were called wrong", () => {
+    const script: (readonly [DrillCall, "bigger" | "smaller"])[] = [];
+    for (let i = 0; i < CARD_ORDER.length; i++) {
+      if (i < 3) {
+        script.push(["bigger", "smaller"] as const);
+      } else {
+        script.push(["bigger", "bigger"] as const);
+      }
+    }
+    expect(textOf(walk(script), [])).toContain("You called three of the eight cards wrong.");
+  });
+
+  it("says when every miss went the same way", () => {
+    const overCalled = textOf(walk(everyCard("bigger", "smaller")), []);
+    expect(overCalled).toContain("Every one you got wrong went the same way");
+    expect(overCalled).toContain("by more than the ordinary difference between two runs when it had not");
+
+    const underCalled = textOf(walk(everyCard("smaller", "bigger")), []);
+    expect(underCalled).toContain("Every one you got wrong went the same way");
+    expect(underCalled).toContain("when it had moved it by more");
+  });
+
+  it("says when the misses went both ways, and how many each way", () => {
+    const script: (readonly [DrillCall, "bigger" | "smaller"])[] = [];
+    for (let i = 0; i < CARD_ORDER.length; i++) {
+      if (i < 5) {
+        script.push(["bigger", "smaller"] as const);
+      } else {
+        script.push(["smaller", "bigger"] as const);
+      }
+    }
+    const text = textOf(walk(script), []);
+    expect(text).toContain("went both ways");
+    expect(text).toContain("on 5 you said by more");
+    expect(text).toContain("on 3 you said by less");
+  });
+
+  it("reports a decline on its own, neither right nor wrong", () => {
+    const declined = textOf(walk(everyCard("cannot tell", "bigger")), []);
+    expect(declined).toContain("On eight of them you said the card could not be called");
+    expect(declined).toContain("neither right nor wrong");
+    // It must never be folded into the wrong count: it is the honest answer to a card built to be
+    // unanswerable from what it shows.
+    expect(declined).toContain("You called none of the eight cards wrong.");
+
+    const noneDeclined = textOf(walk(everyCard("bigger", "bigger")), []);
+    expect(noneDeclined).toContain("You called every card rather than declining any of them.");
+  });
+
+  it("says there is no direction when nothing missed", () => {
+    expect(textOf(walk(everyCard("bigger", "bigger")), [])).toContain(
+      "There is no direction to report, because none of your calls missed.",
+    );
+  });
+
+  it("counts how often the corridor number pointed the other way, and claims nothing more", () => {
+    const state = walk(everyCard("bigger", "bigger"));
+    const misled = [true, true, false, true, false, false, true, false];
+    const text = textOf(state, misled);
+    expect(text).toContain("pointed the other way from the truth on four of the eight");
+    // Never "it is always wrong": guardrail 2. On this catalogue it is not, and the drill would be
+    // teaching a conclusion the toy does not support if it said so.
+    expect(text).toContain("It is not that it is always wrong.");
+    expect(textOf(state, [])).toContain("pointed the other way from the truth on none of the eight");
+  });
+
+  it("puts no bare code identifier in any of it", () => {
+    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
+    const scripts = [
+      everyCard("bigger", "bigger"),
+      everyCard("bigger", "smaller"),
+      everyCard("smaller", "bigger"),
+      everyCard("cannot tell", "bigger"),
+    ];
+    for (const script of scripts) {
+      for (const entry of lines(walk(script), [true, false])) {
+        expect(identifier.exec(entry.text), entry.text).toBeNull();
+      }
+    }
   });
 });
