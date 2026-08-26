@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../../engine/job/axes.js";
+import { CARD_ORDER } from "../../../engine/job/cards.js";
+import { answer, makeDrillState, reveal, type DrillState } from "../drill.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "../state.js";
 import {
   AXIS_QUERY_KEY,
   SETTING_QUERY_KEYS,
+  decodeDrill,
   decodeSettings,
+  encodeDrill,
   encodeSettings,
   settingsNotHonoured,
 } from "../permalink.js";
@@ -361,6 +365,89 @@ describe("what the panel could not carry is said out loud", () => {
     expect(lines.length).toBeGreaterThan(5);
     for (const line of lines) {
       expect(identifier.test(line), `"${line}" carries a code identifier`).toBe(false);
+    }
+  });
+});
+
+/**
+ * The drill has no axes and no settings, so its own permalink has exactly one thing to carry: which
+ * cards were called, in order. Everything else `DrillCallRecord` holds — the call, the honest
+ * answer, whether the two agreed — is a result, and guardrail 10 says a link carries the recipe and
+ * never the results, for the same reason the console's own link does: a link asserting a score
+ * would quote an old answer with the new page's authority.
+ */
+describe("the drill's own link", () => {
+  function stateAfterAnswers(n: number): DrillState {
+    let state = makeDrillState();
+    for (let i = 0; i < n; i++) {
+      state = answer(state, "bigger", "smaller");
+      state = reveal(state);
+    }
+    return state;
+  }
+
+  it("carries the cards and never the calls or the answers", () => {
+    const link = encodeDrill(stateAfterAnswers(CARD_ORDER.length));
+    expect(link).toContain("cards=");
+    expect(link).not.toMatch(/wrong|right|score|calls?=/);
+    for (const n of ["0.", "1.", "2."]) {
+      expect(link, "a permalink may not carry a measured value").not.toContain(n);
+    }
+  });
+
+  it("refuses a card key that is not in the catalogue", () => {
+    const decoded = decodeDrill("?cards=not-a-real-card");
+    expect(decoded.notices.length).toBeGreaterThan(0);
+    expect(decoded.cards).toHaveLength(0);
+  });
+
+  it("round-trips the cards actually called, in order", () => {
+    const state = stateAfterAnswers(3);
+    const decoded = decodeDrill(encodeDrill(state));
+    expect(decoded.notices).toEqual([]);
+    expect(decoded.cards).toEqual(CARD_ORDER.slice(0, 3));
+  });
+
+  it("carries every one of the eight once the drill is complete", () => {
+    const decoded = decodeDrill(encodeDrill(stateAfterAnswers(CARD_ORDER.length)));
+    expect(decoded.notices).toEqual([]);
+    expect(decoded.cards).toEqual(CARD_ORDER);
+  });
+
+  it("carries nothing before any card has been called", () => {
+    const link = encodeDrill(makeDrillState());
+    expect(decodeDrill(link).cards).toEqual([]);
+  });
+
+  it("drops an unknown card but keeps the ones it does recognise", () => {
+    const decoded = decodeDrill(`cards=${CARD_ORDER[0]},not-a-real-card,${CARD_ORDER[1]}`);
+    expect(decoded.cards).toEqual([CARD_ORDER[0], CARD_ORDER[1]]);
+    expect(decoded.notices.length).toBe(1);
+  });
+
+  it("reports a repeated unknown key only once", () => {
+    const decoded = decodeDrill("cards=unicorn,unicorn,unicorn");
+    expect(decoded.notices.length).toBe(1);
+  });
+
+  it("tolerates a leading question mark", () => {
+    const decoded = decodeDrill(`?cards=${CARD_ORDER[0]}`);
+    expect(decoded.cards).toEqual([CARD_ORDER[0]]);
+  });
+
+  it("never throws, whatever is in it", () => {
+    const hostile: readonly string[] = ["", "?", "cards", "cards=", "cards=,,,", "cards=%00", "unrelated=1"];
+    for (const query of hostile) {
+      const result = decodeDrill(query);
+      expect(result.kind).toBe("drillLinkResult");
+    }
+  });
+
+  it("writes its notices in plain English", () => {
+    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
+    const decoded = decodeDrill("cards=not-a-real-card");
+    for (const notice of decoded.notices) {
+      expect(identifier.test(notice), `"${notice}" carries a code identifier`).toBe(false);
     }
   });
 });

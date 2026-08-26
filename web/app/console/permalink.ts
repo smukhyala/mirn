@@ -1,6 +1,8 @@
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
+import { CARD_ORDER, type CardKey } from "../../engine/job/cards.js";
 import type { UnitKey } from "../../engine/job/columns.js";
 import { unitLabel } from "../../ui/labels.js";
+import type { DrillState } from "./drill.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "./state.js";
 
 /**
@@ -711,4 +713,73 @@ export function settingsNotHonoured(
   }
 
   return Object.freeze(lines);
+}
+
+/**
+ * The drill's own permalink, and a narrower recipe than the console's.
+ *
+ * The console's link carries thirteen axes and eleven settings because a room has that many knobs.
+ * The drill has none: every card is a fixed entry in `DRILL_CARDS`, so the only thing worth naming
+ * in a link is *which* cards this drill was — the eight keys, in the order they were called. That
+ * is still a recipe rather than a result: a key resolves to a card's settings and seed through
+ * `DRILL_CARDS`, which reproduces the room exactly, and reproduces nothing about how it was called.
+ *
+ * `DrillCallRecord` also carries `call`, `honest` and `correct`, and none of the three is read here.
+ * A link that carried `correct=false` would be exactly the failure guardrail 10 exists to name: a
+ * score quoted with the new page's authority, on a page whose whole point is that the score is not
+ * the thing worth carrying. `web/drill.ts` does not yet write this link anywhere a reader can copy
+ * — building the encoder and decoder first, and proving neither can leak a result, is what this file
+ * does; wiring a button to it is later work.
+ *
+ * `decodeDrill` follows `decodeSettings`'s own convention: an unknown card key is ignored, with a
+ * notice a reader can read, never silently and never by throwing.
+ */
+
+const DRILL_CARDS_KEY = "cards";
+
+export interface DrillLinkResult {
+  readonly kind: "drillLinkResult";
+  readonly cards: readonly CardKey[];
+  readonly notices: readonly string[];
+}
+
+/** The cards called so far, in the order they were called — never the call, the honest answer, or
+ *  whether the two agreed. */
+export function encodeDrill(state: DrillState): string {
+  const keys: string[] = [];
+  for (const record of state.calls) {
+    keys.push(record.cardKey);
+  }
+  return `${DRILL_CARDS_KEY}=${keys.join(",")}`;
+}
+
+export function decodeDrill(query: string): DrillLinkResult {
+  const trimmed = query.startsWith("?") ? query.slice(1) : query;
+  const params = new URLSearchParams(trimmed);
+  const notices: string[] = [];
+  const cards: CardKey[] = [];
+
+  const raw = params.get(DRILL_CARDS_KEY);
+  if (raw !== null && raw.length > 0) {
+    const known = new Set<string>(CARD_ORDER);
+    const alreadyReported = new Set<string>();
+    for (const piece of raw.split(",")) {
+      if (known.has(piece)) {
+        cards.push(piece as CardKey);
+        continue;
+      }
+      if (!alreadyReported.has(piece)) {
+        alreadyReported.add(piece);
+        notices.push(
+          `The link named a card this drill does not have, written as "${piece}". It was ignored.`,
+        );
+      }
+    }
+  }
+
+  return Object.freeze({
+    kind: "drillLinkResult" as const,
+    cards: Object.freeze(cards),
+    notices: Object.freeze(notices),
+  });
 }

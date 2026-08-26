@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { CARD_ORDER, DRILL_CARDS, type CardKey } from "../../../engine/job/cards.js";
 import { makeFloorParams, makeSweepJob } from "../../../engine/job/spec.js";
 import type { SweepJob } from "../../../engine/job/spec.js";
 import type { RunRow } from "../../../engine/job/stats.js";
 import type { Reading } from "../../../engine/job/columns.js";
-import { DISCLOSURE_CLAUSES, INVENTED_CROWD_DISCLOSURE, makeCsvOptions, toCsv } from "../csv.js";
+import type { DrillCall, HonestCall } from "../drill.js";
+import {
+  DISCLOSURE_CLAUSES,
+  INVENTED_CROWD_DISCLOSURE,
+  makeCsvOptions,
+  makeDrillCsvEntry,
+  makeDrillCsvOptions,
+  toCsv,
+  toDrillCsv,
+} from "../csv.js";
 
 /**
  * The CSV is the one surface that outlives the page it came from. A spreadsheet has no standing
@@ -281,5 +291,169 @@ describe("the CSV discloses before it reports", () => {
     const text = toCsv(jobWithFloor, floorRows, makeCsvOptions({ generatedAtIso: AT }));
     const header = text.split("\n").filter((line) => line.startsWith("#")).join("\n");
     expect(header).toContain("detection floor: 20 splits at the 95th percentile, every 4 steps, permutation seed 7");
+  });
+});
+
+/**
+ * The drill's own export.
+ *
+ * Unlike the sweep's CSV above, a "floor" per row was asked for in this task's own brief and is not
+ * written here: `web/drill.ts` never buys a detection floor for any card (`runCard` and
+ * `revealCard` both pass `floor: null`), so there is no measured value to put in one. That is
+ * checked directly below, alongside the disclosure and the plain-English header the sweep's export
+ * is already held to.
+ */
+describe("the drill's own CSV discloses before it reports", () => {
+  const GENERATED_AT = "2026-08-25T12:00:00.000Z";
+
+  function entry(
+    cardKey: CardKey,
+    call: DrillCall,
+    honest: HonestCall,
+    truthM: number,
+    bandM: number,
+    corridorM: number,
+    corridorZeroM: number,
+  ) {
+    return makeDrillCsvEntry({ cardKey, call, honest, truthM, bandM, corridorM, corridorZeroM });
+  }
+
+  it("puts the invented-crowd line on line 1, before any header or number", () => {
+    const rows = [entry(CARD_ORDER[0] as CardKey, "bigger", "bigger", 0.4, 0.2, 0.3, 0.25)];
+    const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
+    const lines = text.split("\n");
+    expect(lines[0]).toBe(`# ${INVENTED_CROWD_DISCLOSURE}`);
+    for (const clause of DISCLOSURE_CLAUSES) {
+      expect(lines[0]).toContain(clause);
+    }
+  });
+
+  it("says plainly that no detection floor was measured, rather than inventing one", () => {
+    const rows = [entry(CARD_ORDER[0] as CardKey, "bigger", "bigger", 0.4, 0.2, 0.3, 0.25)];
+    const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
+    const header = text.split("\n").filter((line) => line.startsWith("#")).join("\n");
+    expect(header).toContain("detection floor: not measured");
+    // And no row carries a bare number claiming to be one either: every field on a data row is
+    // either the card's name, a plain-English word, or one of the four metres readings this file
+    // actually computed.
+    const dataLines = text.split("\n").filter((line) => line.length > 0 && !line.startsWith("#"));
+    expect(dataLines[0]?.split(",")).toHaveLength(8);
+  });
+
+  it("names every column in plain English, never by its key", () => {
+    const rows = [entry(CARD_ORDER[0] as CardKey, "bigger", "bigger", 0.4, 0.2, 0.3, 0.25)];
+    const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
+    const headerRow = text.split("\n").filter((l) => l.length > 0 && !l.startsWith("#"))[0] as string;
+    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
+    expect(identifier.exec(headerRow)).toBeNull();
+  });
+
+  it("writes one row per card, in the order given, with the card's plain-English name", () => {
+    const rows = [
+      entry(CARD_ORDER[0] as CardKey, "bigger", "smaller", 0.1, 0.2, 0.3, 0.25),
+      entry(CARD_ORDER[1] as CardKey, "smaller", "smaller", 0.11, 0.22, 0.33, 0.26),
+      entry(CARD_ORDER[2] as CardKey, "cannot tell", "bigger", 0.4, 0.1, 0.2, 0.05),
+    ];
+    const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
+    const dataLines = text.split("\n").filter((line) => line.length > 0 && !line.startsWith("#"));
+    expect(dataLines).toHaveLength(4); // header + three cards
+    expect(dataLines[1]).toContain(DRILL_CARDS[CARD_ORDER[0] as CardKey].name);
+    expect(dataLines[2]).toContain(DRILL_CARDS[CARD_ORDER[1] as CardKey].name);
+    expect(dataLines[3]).toContain(DRILL_CARDS[CARD_ORDER[2] as CardKey].name);
+  });
+
+  it("marks a right call yes, a wrong call no, and a declined card its own word", () => {
+    // Every one of the eight card names contains a comma ("a modest room walking briskly, a
+    // moderately pushy robot" and its siblings), so `csvField` quotes it — a naive split on ","
+    // would cut the name apart rather than the row. The call, the honest answer and the match
+    // word are never quoted (none of the six words contains a comma), so the three run together
+    // untouched regardless of how the quoted name ahead of them is written, and that is what is
+    // checked here instead of splitting the row.
+    const rows = [
+      entry(CARD_ORDER[0] as CardKey, "bigger", "bigger", 0.4, 0.2, 0.3, 0.25),
+      entry(CARD_ORDER[1] as CardKey, "bigger", "smaller", 0.1, 0.2, 0.3, 0.25),
+      entry(CARD_ORDER[2] as CardKey, "cannot tell", "bigger", 0.4, 0.1, 0.2, 0.05),
+    ];
+    const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
+    const dataLines = text.split("\n").filter((line) => line.length > 0 && !line.startsWith("#"));
+    expect(dataLines[1]).toContain("bigger,bigger,yes");
+    expect(dataLines[2]).toContain("bigger,smaller,no");
+    expect(dataLines[3]).toContain("cannot tell,bigger,declined");
+  });
+
+  it("writes the exact row, name quoted for its own comma, readings to three decimal places", () => {
+    const rows = [entry(CARD_ORDER[0] as CardKey, "bigger", "bigger", 0.4, 0.2, 0.3, 0.25)];
+    const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
+    const dataLines = text.split("\n").filter((line) => line.length > 0 && !line.startsWith("#"));
+    const cardName = DRILL_CARDS[CARD_ORDER[0] as CardKey].name;
+    expect(cardName).toContain(","); // the premise of the quoting note above
+    expect(dataLines[1]).toBe(`"${cardName}",bigger,bigger,yes,0.400,0.200,0.300,0.250`);
+  });
+
+  it("counts how many of the eight were called", () => {
+    const rows = [entry(CARD_ORDER[0] as CardKey, "bigger", "bigger", 0.4, 0.2, 0.3, 0.25)];
+    const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
+    const header = text.split("\n").filter((line) => line.startsWith("#")).join("\n");
+    expect(header).toContain(`completeness: 1 of ${String(CARD_ORDER.length)} cards called`);
+  });
+
+  it("throws rather than accept a card key the catalogue does not have", () => {
+    expect(() =>
+      makeDrillCsvEntry({
+        cardKey: "notACard" as unknown as CardKey,
+        call: "bigger",
+        honest: "bigger",
+        truthM: 0.4,
+        bandM: 0.2,
+        corridorM: 0.3,
+        corridorZeroM: 0.25,
+      }),
+    ).toThrow();
+  });
+
+  it("throws rather than accept a call the drill cannot record", () => {
+    expect(() =>
+      makeDrillCsvEntry({
+        cardKey: CARD_ORDER[0] as CardKey,
+        call: "maybe" as unknown as DrillCall,
+        honest: "bigger",
+        truthM: 0.4,
+        bandM: 0.2,
+        corridorM: 0.3,
+        corridorZeroM: 0.25,
+      }),
+    ).toThrow();
+  });
+
+  it("throws rather than accept an honest answer that is not bigger or smaller", () => {
+    expect(() =>
+      makeDrillCsvEntry({
+        cardKey: CARD_ORDER[0] as CardKey,
+        call: "bigger",
+        honest: "cannot tell" as unknown as HonestCall,
+        truthM: 0.4,
+        bandM: 0.2,
+        corridorM: 0.3,
+        corridorZeroM: 0.25,
+      }),
+    ).toThrow();
+  });
+
+  it("throws rather than accept a non-finite reading", () => {
+    expect(() =>
+      makeDrillCsvEntry({
+        cardKey: CARD_ORDER[0] as CardKey,
+        call: "bigger",
+        honest: "bigger",
+        truthM: Number.NaN,
+        bandM: 0.2,
+        corridorM: 0.3,
+        corridorZeroM: 0.25,
+      }),
+    ).toThrow();
+  });
+
+  it("rejects an empty timestamp the same way the sweep's export does", () => {
+    expect(() => makeDrillCsvOptions({ generatedAtIso: "" })).toThrow();
   });
 });
