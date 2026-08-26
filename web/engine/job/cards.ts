@@ -3,23 +3,48 @@ import { makeRunConfig, type RunConfig } from "../contracts/config.js";
 /**
  * The eight cards, closed.
  *
- * Each is a world where a reader who trusts the number a corridor could give them calls the
- * direction wrong. Both shapes are present, because a drill where the confounded number is always
- * too big teaches "that number is too big" rather than "that number is not telling you".
+ * Five are worlds where a reader who trusts the number a corridor could give them calls the
+ * direction wrong, in both directions. Three are worlds where that number happens to land on the
+ * right side, and those three are not a weakness of the set — they are what stops the drill being
+ * gameable. If all eight fooled, a reader could score eight out of eight by inverting whatever the
+ * corridor number says, and would leave believing it is SYSTEMATICALLY wrong. It is not: measured
+ * over sixty seeds it correlates 0.167 with the true effect and 0.605 with its own zero-effect
+ * reading. It is uninformative, not inverted, and a set where it is sometimes right is the only
+ * honest way to show that.
  *
  * The settings come from the census in docs/superpowers/notes/2026-08-25-drill-card-census.md,
  * which measured them against the real engine, and from an extended sweep run for this task that
- * re-pointed the false-negative side at the console's own default ruler (forecast horizon 3 s,
- * checked at 10 s) rather than the census's minimum-horizon candidate. No card may be added
- * without re-running it: a card whose confounded number happens to agree with the truth looks
- * identical on screen and teaches the opposite of the lesson.
+ * re-pointed the second four at the console's own default ruler (forecast horizon 3 s, checked at
+ * 10 s) rather than the census's minimum-horizon candidate. No card may be added without re-running
+ * it: `shape` below is a measurement, not a label, and a card carrying the wrong one looks
+ * identical on screen.
  *
  * All eight sit at the SAME ruler setting — the one the console opens on. That is not a
  * coincidence of what was easiest to find; it is the strongest form of the lesson available: at
- * the settings a reader arrives on with no dial touched, this number is already wrong, in both
+ * the settings a reader arrives on with no dial touched, this number already misses, in both
  * directions, across three different crowd sizes.
  */
-export type CardShape = "false positive" | "false negative";
+
+/**
+ * What this card does to a reader who trusts the number a corridor could give them.
+ *
+ * Measured against the RUN-TO-RUN BAND, because that is what the card asks about — "bigger than
+ * two runs of this room differ by". An earlier version of this field was classified against the
+ * split-half detection floor instead, which is a different null, and three cards were labelled as
+ * fooling that do not. The two nulls are not interchangeable and cross as the room fills; see
+ * web/engine/measure/null/splitHalf.ts.
+ *
+ *   "reads high" — the corridor number clears the band while the true effect does not. A reader
+ *                  who trusts it says bigger and is wrong.
+ *   "reads low"  — the true effect clears the band while the corridor number does not. A reader
+ *                  who trusts it says smaller and is wrong.
+ *   "agrees"     — both fall the same side. The reader is right for the wrong reason, and these
+ *                  are the cards that stop the drill being gameable.
+ *
+ * `web/engine/job/__tests__/cards.slow.test.ts` runs every card and fails on a mislabelled one, so
+ * this field cannot drift from what the rooms do.
+ */
+export type CardShape = "reads high" | "reads low" | "agrees";
 
 export interface DrillCard {
   readonly kind: "drillCard";
@@ -69,70 +94,73 @@ function makeCard(
  * `Object.freeze`; building the same object by iterating a list would have widened them to
  * `string` and reintroduced exactly the problem this comment is about.
  *
- * The first four are the false positives (ruling 1: drawn only from the census's non-degenerate
- * combinations, where wobble and robot pushiness are both nonzero). The second four are the false
- * negatives, re-pointed at the default ruler per ruling 2 — see the note above `unhurriedFullerRoom`
- * and its neighbours below.
+ * The first four were drawn from the census's non-degenerate combinations, where wobble and robot
+ * pushiness are both nonzero (ruling 1); the second four were re-pointed at the default ruler
+ * (ruling 2) — see the note above `unhurriedFullerRoom` and its neighbours below. Their `shape`
+ * values are NOT that split: the census classified against the split-half floor and the card asks
+ * about the run-to-run band, and on three of the eight those two nulls disagree. Every value below
+ * is re-derived against the band and measured by `cards.slow.test.ts`.
  */
 export const DRILL_CARDS = Object.freeze({
   fastModestRoom: makeCard(
     "fastModestRoom",
     "A modest room walking briskly, a moderately pushy robot",
-    "false positive",
+    "agrees",
     20260816,
     { crowdSize: 24, walkingPace: 1.8, crowdFidget: 1.1, pushStrength: 2 },
   ),
   fastPackedInsistentRobot: makeCard(
     "fastPackedInsistentRobot",
     "A packed, jittery room walking briskly, an insistent robot",
-    "false positive",
+    "reads high",
     20260816,
     { crowdSize: 44, walkingPace: 1.8, crowdFidget: 3, pushStrength: 3 },
   ),
   fastPackedGentleRobot: makeCard(
     "fastPackedGentleRobot",
     "The same packed, jittery room, but a barely pushy robot",
-    "false positive",
+    "reads high",
     424242,
     { crowdSize: 44, walkingPace: 1.8, crowdFidget: 3, pushStrength: 1 },
   ),
   fastFullerRoom: makeCard(
     "fastFullerRoom",
     "A fuller room walking briskly, a moderately pushy robot",
-    "false positive",
+    "reads high",
     20260816,
     { crowdSize: 34, walkingPace: 1.8, crowdFidget: 1.1, pushStrength: 2 },
   ),
-  // Every false-negative card below holds at the console's own default ruler — none of them needs
-  // an extreme slider position to fool. The census's own shortest-horizon candidate (this same
-  // crowd/robot setting as `amblingFullerRoom`, minimum forecast horizon) turned out to be false
-  // negative at the default ruler too, so it appears here at the default instead of the extreme it
-  // was originally found at (ruling 2 of this task).
+  // Every card below holds at the console's own default ruler — none of them needs an extreme
+  // slider position. The census's own shortest-horizon candidate (this same crowd/robot setting as
+  // `amblingFullerRoom`, minimum forecast horizon) turned out to sit on the same side at the
+  // default ruler too, so it appears here at the default instead of the extreme it was originally
+  // found at (ruling 2 of this task). Two of these four read low and two agree: against the band,
+  // this is not a block of four cards that all fool.
   unhurriedModestRoom: makeCard(
     "unhurriedModestRoom",
     "A modest, jittery room in no hurry, an insistent robot",
-    "false negative",
+    "reads low",
     20260816,
     { crowdSize: 24, walkingPace: 0.9, crowdFidget: 3, pushStrength: 3 },
   ),
   amblingFullerRoom: makeCard(
     "amblingFullerRoom",
     "A fuller room ambling along, an insistent robot",
-    "false negative",
+    "reads low",
     20260816,
     { crowdSize: 34, walkingPace: 0.4, crowdFidget: 1.1, pushStrength: 3 },
   ),
   amblingPackedRoom: makeCard(
     "amblingPackedRoom",
     "A packed, jittery room ambling along, an insistent robot",
-    "false negative",
+    "agrees",
     20260816,
     { crowdSize: 44, walkingPace: 0.4, crowdFidget: 3, pushStrength: 3 },
   ),
   unhurriedFullerRoom: makeCard(
     "unhurriedFullerRoom",
     "A fuller, jittery room in no hurry, an insistent robot",
-    "false negative",
+    "agrees",
     20260816,
     { crowdSize: 34, walkingPace: 0.9, crowdFidget: 3, pushStrength: 3 },
   ),

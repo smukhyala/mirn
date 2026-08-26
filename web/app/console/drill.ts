@@ -37,12 +37,16 @@ export type HonestCall = "bigger" | "smaller";
  * Both of those exist only once the second run has been run, which is to say at the reveal, which
  * is to say in the page rather than here.
  *
- * `cards.ts`'s own `shape` field is a DIFFERENT comparison and must not be used for this. It was
- * measured for card selection, against the split-half detection floor rather than against the
- * band, and on three of the eight cards the two disagree — `fastModestRoom`, `amblingPackedRoom`
- * and `unhurriedFullerRoom`. Scoring from `shape` printed "your call did not match" underneath
+ * `cards.ts`'s `shape` field is now measured against the same band, so it no longer disagrees —
+ * but it still must not be used for this, and the reason is worth keeping. `shape` says what a
+ * card does to a reader who trusts the corridor number; it does not say what THIS reader called or
+ * what the room in front of them did. Deriving a score from it would be scoring a call against a
+ * label rather than against a room, which is how it went wrong before: `shape` used to be
+ * classified against the split-half detection floor, a different null, and on three of the eight
+ * cards that disagreed with the band. Scoring from it printed "your call did not match" underneath
  * two numbers on the same screen that said it did. The measured table is in the header of
- * `web/engine/job/__tests__/cards.slow.test.ts`, which pins every one of these comparisons.
+ * `web/engine/job/__tests__/cards.slow.test.ts`, which pins every one of these comparisons and
+ * fails on a card whose declared shape is not what its room does.
  *
  * `"cannot tell"` can never equal an `HonestCall`, so it is never correct by construction rather
  * than by a special case in a scoring function. It is an honest answer to a card built to be

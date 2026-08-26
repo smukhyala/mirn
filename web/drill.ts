@@ -342,10 +342,12 @@ function revealCard(cardRun: CardRun): CardReveal {
     throw new Error("the reveal was built without the three numbers its own sentences quote");
   }
 
-  // The question the card asked, answered by the two numbers the card asked it about. Not read off
-  // the catalogue's `shape` field: that was measured against the split-half detection floor rather
-  // than against this band, and the two disagree on three of the eight cards — see the header of
-  // web/engine/job/__tests__/cards.slow.test.ts.
+  // The question the card asked, answered by the two numbers the card asked it about. Never read
+  // off the catalogue's `shape` field, even now that `shape` is measured against this same band:
+  // that field says what a card does to a reader who trusts the corridor number, which is not the
+  // same question as what this room did. It used to be classified against the split-half detection
+  // floor, a different null, and disagreed with the band on three of the eight cards — see the
+  // header of web/engine/job/__tests__/cards.slow.test.ts.
   let honest: HonestCall = "smaller";
   if (truth.value > bandReading.value) {
     honest = "bigger";

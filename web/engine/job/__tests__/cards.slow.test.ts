@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CARD_ORDER, DRILL_CARDS, cardConfig, cardRulerParams, type CardKey } from "../cards.js";
+import {
+  CARD_ORDER,
+  DRILL_CARDS,
+  cardConfig,
+  cardRulerParams,
+  type CardKey,
+  type CardShape,
+} from "../cards.js";
 import { cvmResidual, paired } from "../../measure/estimator/index.js";
 import { replicateBand } from "../../measure/null/band.js";
 import { seededPermutations, splitHalfNull } from "../../measure/null/splitHalf.js";
@@ -13,38 +20,42 @@ import { runPair } from "../../sim/run.js";
  * checks that they are still the eight rooms they were chosen for. A physics change that quietly
  * turned a trap into an agreement would otherwise be invisible until somebody read the page.
  *
- * ## Two different comparisons, and they disagree on three cards
+ * ## Two different nulls, and they disagree on three cards
  *
  * This is the thing to read before changing anything here.
  *
  * The card screen asks one question: did the robot move this crowd by more than two runs of the
  * same room differ by on their own? That is the paired reading against the RUN-TO-RUN BAND, and it
- * is what `web/drill.ts` measures at the reveal and hands to `answer` as the honest call.
+ * is what `web/drill.ts` measures at the reveal and hands to `answer` as the honest call. It is
+ * also what `cards.ts`'s `shape` field now records.
  *
- * `cards.ts`'s own `shape` field is a different comparison. The census that picked these eight
+ * It was not always. The census that picked these eight
  * (docs/superpowers/notes/2026-08-25-drill-card-census.md) classified a card by the paired reading
  * against the SPLIT-HALF DETECTION FLOOR, with the forecaster against the band — each estimator
- * judged against its own null, which is defensible and is not what the card asks about.
+ * judged against its own null, which is defensible and is not what the card asks about. On three of
+ * the eight the two nulls disagree, and both the scoring and the catalogue's own labels came from
+ * the floor: `fastModestRoom`, `amblingPackedRoom` and `unhurriedFullerRoom` were each called
+ * fooling, and marked the reader wrong, for the call that the two numbers printed on the same
+ * screen said was right. Measured on this machine, on the commit that wrote this table:
  *
- * On three of the eight the two disagree, and the drill scored from `shape` until this file was
- * written: `fastModestRoom`, `amblingPackedRoom` and `unhurriedFullerRoom` were each marked wrong
- * for the call that the two numbers printed on the same screen said was right. Measured on this
- * machine, on the commit that wrote this table:
- *
- * | card | paired | band | floor | forecaster | honest (vs band) | corridor (vs band) | fools |
+ * | card | paired | band | floor | forecaster | honest (vs band) | corridor (vs band) | shape |
  * |---|---|---|---|---|---|---|---|
- * | fastModestRoom           | 0.3869 | 0.3505 | 0.6961 | 0.4132 | bigger  | bigger  | no  |
- * | fastPackedInsistentRobot | 0.3238 | 0.4678 | 0.4701 | 0.5530 | smaller | bigger  | yes |
- * | fastPackedGentleRobot    | 0.3458 | 0.4408 | 0.4804 | 0.5523 | smaller | bigger  | yes |
- * | fastFullerRoom           | 0.3130 | 0.3555 | 0.5837 | 0.4059 | smaller | bigger  | yes |
- * | unhurriedModestRoom      | 0.7284 | 0.6278 | 0.5902 | 0.2308 | bigger  | smaller | yes |
- * | amblingFullerRoom        | 0.6234 | 0.4387 | 0.5306 | 0.0686 | bigger  | smaller | yes |
- * | amblingPackedRoom        | 0.6351 | 0.9238 | 0.4579 | 0.1667 | smaller | smaller | no  |
- * | unhurriedFullerRoom      | 0.6494 | 0.6725 | 0.5105 | 0.2238 | smaller | smaller | no  |
+ * | fastModestRoom           | 0.3869 | 0.3505 | 0.6961 | 0.4132 | bigger  | bigger  | agrees     |
+ * | fastPackedInsistentRobot | 0.3238 | 0.4678 | 0.4701 | 0.5530 | smaller | bigger  | reads high |
+ * | fastPackedGentleRobot    | 0.3458 | 0.4408 | 0.4804 | 0.5523 | smaller | bigger  | reads high |
+ * | fastFullerRoom           | 0.3130 | 0.3555 | 0.5837 | 0.4059 | smaller | bigger  | reads high |
+ * | unhurriedModestRoom      | 0.7284 | 0.6278 | 0.5902 | 0.2308 | bigger  | smaller | reads low  |
+ * | amblingFullerRoom        | 0.6234 | 0.4387 | 0.5306 | 0.0686 | bigger  | smaller | reads low  |
+ * | amblingPackedRoom        | 0.6351 | 0.9238 | 0.4579 | 0.1667 | smaller | smaller | agrees     |
+ * | unhurriedFullerRoom      | 0.6494 | 0.6725 | 0.5105 | 0.2238 | smaller | smaller | agrees     |
  *
- * Every `shape` in the catalogue still holds against the floor — all four false positives sit under
- * it and all four false negatives clear it — so nothing about the census was wrong. What was wrong
- * was scoring the band question with the floor's answer.
+ * Nothing about the census was wrong: its own classification still holds against the floor it
+ * measured, and `CENSUS_FLOOR_SHAPE` below keeps that checked so the provenance cannot rot. What
+ * was wrong was answering the band's question with the floor's answer.
+ *
+ * Five fooling and three agreeing is the intended mix, not a shortfall. If all eight fooled, a
+ * reader could score eight out of eight by inverting whatever the corridor number says, and would
+ * leave believing it is systematically wrong. It is uninformative, not inverted.
  *
  * ## Margins, closest first
  *
@@ -65,7 +76,8 @@ import { runPair } from "../../sim/run.js";
  *                       44.4% fastModestRoom, 46.4% fastFullerRoom
  *
  * The closest of all is `unhurriedFullerRoom` against the band, at 3.4%, and it is one the page
- * actually reads. The three floors above 17% belong to `shape`, which nothing on the page reads.
+ * actually reads. The floor margins belong to the census's own classification, which nothing on the
+ * page reads any more.
  * The three lists are recomputed and re-checked against these figures by the last test below, so
  * none of them is a claim nobody re-ran.
  *
@@ -127,7 +139,11 @@ function measure(key: CardKey): CardMeasurement {
 }
 
 /** The table above, as data. A card whose row here stops matching the room is the failure this
- *  file exists for, and the row says which way it moved. */
+ *  file exists for, and the row says which way it moved.
+ *
+ *  Finer than `shape`: two cards can both be "agrees" and agree on opposite sides, which this
+ *  pins and the catalogue's own field does not. `shape` is checked separately, against the
+ *  measurement rather than against this table, so the two cannot be made to agree by editing one. */
 const EXPECTED: Readonly<Record<CardKey, { readonly honest: string; readonly corridor: string }>> =
   Object.freeze({
     fastModestRoom: { honest: "bigger", corridor: "bigger" },
@@ -139,6 +155,36 @@ const EXPECTED: Readonly<Record<CardKey, { readonly honest: string; readonly cor
     amblingPackedRoom: { honest: "smaller", corridor: "smaller" },
     unhurriedFullerRoom: { honest: "smaller", corridor: "smaller" },
   });
+
+/**
+ * What the census called each card, against the split-half floor it measured.
+ *
+ * Kept here rather than in the catalogue, because the catalogue's field answers the card's own
+ * question and this one does not. It is the provenance of every setting in `cards.ts`, and
+ * provenance nobody checks rots — so it is asserted below rather than only written down.
+ */
+const CENSUS_FLOOR_SHAPE: Readonly<Record<CardKey, "false positive" | "false negative">> =
+  Object.freeze({
+    fastModestRoom: "false positive",
+    fastPackedInsistentRobot: "false positive",
+    fastPackedGentleRobot: "false positive",
+    fastFullerRoom: "false positive",
+    unhurriedModestRoom: "false negative",
+    amblingFullerRoom: "false negative",
+    amblingPackedRoom: "false negative",
+    unhurriedFullerRoom: "false negative",
+  });
+
+/** What a card does to a reader who trusts the corridor number, from the measurement alone. */
+function shapeOf(result: CardMeasurement): CardShape {
+  if (result.corridor === result.honest) {
+    return "agrees";
+  }
+  if (result.corridor === "bigger") {
+    return "reads high";
+  }
+  return "reads low";
+}
 
 describe("what the eight cards actually do", () => {
   const measured = new Map<CardKey, CardMeasurement>();
@@ -167,28 +213,52 @@ describe("what the eight cards actually do", () => {
     120000,
   );
 
-  it("still fools a reader who trusts the corridor number, in both directions", () => {
-    // The drill's whole content. Not "all eight fool" — three of them agree, and the verdict says
-    // so from a live count rather than claiming otherwise. What must hold is that both traps are
-    // still present, or the drill teaches "that number is always wrong", which is the opposite of
-    // the lesson and is not something this toy could support anyway.
-    let overCalls = 0;
-    let underCalls = 0;
+  it("carries the shape each card actually has, measured, not the one it was labelled with", () => {
+    // The check the catalogue cannot make for itself. `shape` is a claim about what a room does to
+    // a reader, and a claim about a room is only worth what the room says. Flip any one value in
+    // cards.ts and this goes red naming the card, what it says and what it does.
     for (const key of CARD_ORDER) {
       const result = measured.get(key);
       expect(result, `${key} was never measured`).toBeDefined();
       if (result === undefined) {
         continue;
       }
-      if (result.corridor === "bigger" && result.honest === "smaller") {
-        overCalls = overCalls + 1;
+      const actual = shapeOf(result);
+      expect(
+        DRILL_CARDS[key].shape,
+        `${key} is declared '${DRILL_CARDS[key].shape}' and the room does '${actual}'`,
+      ).toBe(actual);
+    }
+  });
+
+  it("still fools a reader who trusts the corridor number, in both directions, and still cannot be gamed", () => {
+    // The drill's whole content, measured rather than declared. Both halves matter. Too few fooling
+    // cards and it teaches nothing; NO agreeing cards and a reader can score eight out of eight by
+    // inverting whatever the corridor number says, and leaves believing that number is
+    // systematically wrong. It is uninformative, not inverted — 0.167 correlation with the true
+    // effect over sixty seeds — and this toy could not support the stronger claim anyway
+    // (guardrail 2).
+    let readsHigh = 0;
+    let readsLow = 0;
+    let agrees = 0;
+    for (const key of CARD_ORDER) {
+      const result = measured.get(key);
+      if (result === undefined) {
+        continue;
       }
-      if (result.corridor === "smaller" && result.honest === "bigger") {
-        underCalls = underCalls + 1;
+      const shape = shapeOf(result);
+      if (shape === "reads high") {
+        readsHigh = readsHigh + 1;
+      } else if (shape === "reads low") {
+        readsLow = readsLow + 1;
+      } else {
+        agrees = agrees + 1;
       }
     }
-    expect(overCalls, "no card is left where the corridor number reads too big").toBeGreaterThanOrEqual(2);
-    expect(underCalls, "no card is left where the corridor number reads too small").toBeGreaterThanOrEqual(2);
+    expect(readsHigh, "no card is left where the corridor number reads too big").toBeGreaterThanOrEqual(2);
+    expect(readsLow, "no card is left where the corridor number reads too small").toBeGreaterThanOrEqual(2);
+    expect(readsHigh + readsLow, "too few cards fool for the drill to teach anything").toBeGreaterThanOrEqual(4);
+    expect(agrees, "every card fools, so the drill can be gamed by inverting the number").toBeGreaterThanOrEqual(2);
   });
 
   it("keeps the margins this file records, so a physics change is a number and not a surprise", () => {
@@ -221,25 +291,26 @@ describe("what the eight cards actually do", () => {
     expect(closestFloor, "the truth has moved closer to the floor").toBeGreaterThan(0.15);
   });
 
-  it("still carries the shapes the census measured, against the floor the census used", () => {
-    // `shape` scores nothing any more — see the header — but it is the provenance of every card in
-    // the catalogue, and provenance nobody checks rots. A false positive is a truth under the
-    // floor; a false negative is one above it.
+  it("still matches what the census measured, against the floor the census used", () => {
+    // Not the catalogue's field any more — see `CENSUS_FLOOR_SHAPE`. This is the provenance of
+    // every setting in cards.ts, and it is checked so that "the census measured this" stays a fact
+    // rather than a sentence in a document nobody re-ran.
     for (const key of CARD_ORDER) {
       const result = measured.get(key);
       if (result === undefined) {
         continue;
       }
-      const shape = DRILL_CARDS[key].shape;
-      if (shape === "false positive") {
-        expect(result.pairedM, `${key} is called a false positive and clears the floor`).toBeLessThan(
-          result.floorM,
-        );
+      if (CENSUS_FLOOR_SHAPE[key] === "false positive") {
+        expect(
+          result.pairedM,
+          `${key} was censused as a false positive and now clears the floor`,
+        ).toBeLessThan(result.floorM);
         continue;
       }
-      expect(result.pairedM, `${key} is called a false negative and sits under the floor`).toBeGreaterThan(
-        result.floorM,
-      );
+      expect(
+        result.pairedM,
+        `${key} was censused as a false negative and now sits under the floor`,
+      ).toBeGreaterThan(result.floorM);
     }
   });
 });

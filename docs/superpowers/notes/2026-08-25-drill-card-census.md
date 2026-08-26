@@ -246,3 +246,49 @@ list (the 44 combinations with both `fidget != 0` and `space != 0`) rather than 
 zero-effect corners, which are true but uninteresting.
 
 The plan is not cancelled. Task 2 was not started by this task, per instruction.
+
+---
+
+## Addendum, Task 7: this census classified against the floor, and the card asks about the band
+
+Nothing above is retracted. Every number in it was correctly measured against what it says it
+measured. What follows is a note about which of those measurements the drill's card actually
+asks a reader for, discovered when Task 7 built the reveal.
+
+This census classifies a cell by **the true effect against the split-half detection floor**, with
+the forecaster against the run-to-run band — each estimator judged against its own null. That is a
+defensible design and it is what the two `shape` values above mean.
+
+The card screen asks one question, and it is a different one:
+
+> Did the robot move this crowd by more than that ordinary difference, or by less?
+
+That is the true effect against the **run-to-run band**. On three of the eight cards Task 3 picked,
+the two nulls put the true effect on opposite sides:
+
+| card | paired | floor | band | census shape (vs floor) | what the card asks (vs band) |
+|---|---|---|---|---|---|
+| fastModestRoom      | 0.3869 | 0.6961 | 0.3505 | false positive | the effect **clears** the band |
+| amblingPackedRoom   | 0.6351 | 0.4579 | 0.9238 | false negative | the effect sits **under** the band |
+| unhurriedFullerRoom | 0.6494 | 0.5105 | 0.6725 | false negative | the effect sits **under** the band |
+
+So on those three, a card labelled as fooling does not fool: the corridor-readable number and the
+truth land on the same side of the band the reader was asked about. Task 7's reveal is where that
+became visible — it would have printed "your call did not match what the room did" directly under
+0.387 m and 0.351 m, the two numbers saying it did.
+
+**What changed.** `web/engine/job/cards.ts` no longer carries `"false positive" | "false negative"`.
+`CardShape` is now `"reads high" | "reads low" | "agrees"`, re-derived against the band and measured
+by `web/engine/job/__tests__/cards.slow.test.ts`, which fails on a card whose declared shape is not
+what its room does. The eight cards themselves are unchanged — the settings this census found are
+still the settings — and the census's own floor classification is still asserted there, so this
+document's numbers stay checked rather than merely recorded.
+
+**The mix is now five fooling and three agreeing, and that is the intended shape, not a shortfall.**
+If all eight fooled, a reader could score eight out of eight by inverting whatever the corridor
+number says, and would leave believing that number is systematically wrong. It is not: over sixty
+seeds it correlates 0.167 with the true effect and 0.605 with its own zero-effect reading. It is
+uninformative, not inverted, and a set where it is sometimes right is the only honest way to show
+that. The kill criterion this census was written against ("4 distinct worlds of each shape") was a
+criterion for finding raw material, and it was met; it was never a claim about how many of the
+eight chosen cards must fool a reader on the band.

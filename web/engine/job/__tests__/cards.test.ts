@@ -14,10 +14,21 @@ describe("the drill card catalogue", () => {
     expect(Object.keys(DRILL_CARDS)).toHaveLength(8);
   });
 
-  it("carries both shapes, so a reader can be wrong in both directions", () => {
+  it("declares a mix that fools in both directions and is not gameable", () => {
+    // Both halves matter. Too few fooling cards and the drill teaches nothing; NO agreeing cards
+    // and a reader can score eight out of eight by inverting whatever the corridor number says,
+    // and leaves believing that number is systematically wrong. It is uninformative, not inverted.
+    //
+    // Declared only. `cards.slow.test.ts` runs the rooms and fails on a card whose declared shape
+    // is not what it does, which is what stops this test being a check on a set of labels.
     const shapes = CARD_ORDER.map((k) => DRILL_CARDS[k].shape);
-    expect(shapes.filter((s) => s === "false positive").length).toBeGreaterThanOrEqual(3);
-    expect(shapes.filter((s) => s === "false negative").length).toBeGreaterThanOrEqual(3);
+    const readsHigh = shapes.filter((s) => s === "reads high").length;
+    const readsLow = shapes.filter((s) => s === "reads low").length;
+    const agrees = shapes.filter((s) => s === "agrees").length;
+    expect(readsHigh, "no card is left where the corridor number reads too big").toBeGreaterThanOrEqual(2);
+    expect(readsLow, "no card is left where the corridor number reads too small").toBeGreaterThanOrEqual(2);
+    expect(readsHigh + readsLow, "too few cards fool for the drill to teach anything").toBeGreaterThanOrEqual(4);
+    expect(agrees, "every card fools, so the drill can be gamed by inverting the number").toBeGreaterThanOrEqual(2);
   });
 
   it("every card builds a legal configuration", () => {

@@ -72,10 +72,12 @@ describe("the drill's state", () => {
    * on.
    *
    * It no longer draws its expectation from `cards.ts`'s `shape` field, and that is a correction.
-   * `shape` was measured for card SELECTION, against the split-half detection floor; the card
-   * screen asks about the run-to-run band, and on three of the eight cards the two comparisons
-   * disagree. So the honest call comes in from the caller, which has run the room, and this test
-   * hands in both values explicitly rather than looking one up.
+   * `shape` was classified against the split-half detection floor; the card screen asks about the
+   * run-to-run band, and on three of the eight cards the two nulls disagree. `shape` has since been
+   * re-derived against the band, but scoring still does not read it: it says what a card does to a
+   * reader who trusts the corridor number, not what a given room did. So the honest call comes in
+   * from the caller, which has run the room, and this test hands in both values explicitly rather
+   * than looking one up.
    */
   it("counts a call wrong when it disagrees with what the room did", () => {
     // The room came out under the band: "smaller" is the honest call, and both other answers miss.
