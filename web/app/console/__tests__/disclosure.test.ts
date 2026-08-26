@@ -194,3 +194,50 @@ describe("the readouts grid narrows on a narrow viewport", () => {
     expect(rule?.[1]).toMatch(/overflow-x:\s*auto/);
   });
 });
+
+/**
+ * Guardrail 12's neighbour in CLAUDE.md: none of the shipped documents is a step in a sequence, and
+ * each is reachable at any time from the others. That was a sentence and nothing else, and one
+ * feature was enough to make it false — the method card shipped linked FROM the console and TO the
+ * console and the working page, and neither the drill nor the working page knew it existed. A
+ * reader who finished the drill, which is the page most likely to leave somebody wanting to score
+ * their own metric, had to go back through the front door to find it.
+ *
+ * The page list is read from the Vite input map rather than written out here, and that is the whole
+ * difference between this test and the sentence it replaces. A fifth page added to the build has to
+ * fail this test rather than quietly not be in it — a hand-written list would have gone green
+ * through exactly the commit that broke the promise.
+ *
+ * The assertion runs against the FILE, for the same reason the ordering assertion above does: a
+ * link a script appends after load is not there for a reader with no JavaScript.
+ */
+describe("every shipped document is reachable from every other", () => {
+  const config = readFileSync("vite.config.ts", "utf8");
+  const pages = [...config.matchAll(/(\w+): resolve\(__dirname, "([^"]+)"\)/g)].map(
+    (entry) => entry[2] as string,
+  );
+
+  it("has more than one page to check, so an empty map cannot pass this silently", () => {
+    expect(pages.length).toBeGreaterThan(1);
+  });
+
+  it("links each page to all of the others, in its own markup", () => {
+    let checked = 0;
+    for (const from of pages) {
+      const source = readFileSync(from, "utf8");
+      for (const to of pages) {
+        if (to === from) {
+          continue;
+        }
+        // The pages sit in one directory and link each other document-relative, which is what
+        // makes the same build work at a project subpath, at a domain root and from a file.
+        const segments = to.split("/");
+        const filename = segments[segments.length - 1] as string;
+        const href = `href="./${filename}"`;
+        expect(source.includes(href), `${from} does not link ${to}`).toBe(true);
+        checked = checked + 1;
+      }
+    }
+    expect(checked, "no pair of pages was checked").toBe(pages.length * (pages.length - 1));
+  });
+});

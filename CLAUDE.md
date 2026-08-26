@@ -5,10 +5,16 @@ contract, and it is the only one — `docs/teaching/authoring.md` governed the n
 pages, and there is no ordering left to govern.
 
 Where this file says "there are no pages", it means the seventeen-page fixed reading order, which
-is gone. Three HTML documents ship: `web/index.html` (the console), `web/how.html` (the arithmetic,
-in sentences) and `web/drill.html` (the referee drill). None of them is a step in a sequence — each
-is reachable at any time from either of the others, and none has to be read before the console
-shows a number.
+is gone. Four HTML documents ship: `web/index.html` (the console), `web/how.html` (the arithmetic,
+in sentences), `web/drill.html` (the referee drill) and `web/method.html` (the method card). None of
+them is a step in a sequence — each is reachable at any time from any of the others, and none has to
+be read before the console shows a number.
+
+That last promise is now a test rather than a sentence. It was a sentence for three pages and one
+feature was enough to make it false: the method card shipped linked from the console and to the
+console, and neither the drill nor the working page knew it existed. `disclosure.test.ts` reads the
+page list from the Vite input map and asserts every page links every other, so a fifth page fails
+it rather than quietly not being in it.
 
 If you are looking for the research measurement instrument this project used to be, it is in
 `docs/archive/`. It governs nothing here.
@@ -196,6 +202,28 @@ was not amended for the drill, because it does not need to be: the drill scores 
 against what the room did, never a robot's performance and never a rival method's, so it never
 enters the run-list-with-pinning-and-export shape guardrail 11 already refuses.
 
+**A note on the method card**, which is the second feature built after these guardrails and the one
+that came nearest guardrail 11's line — it takes a description of somebody else's metric and scores
+it. The argument that this is not a bring-your-own-method import path is in
+`docs/superpowers/specs/2026-08-25-method-card-design.md`, and a design document is not the
+contract, so the three facts it rests on are recorded here. **Nothing is read in, and that is
+mechanical rather than intended:** the reader answers five closed multiple-choice questions and
+`method-dom.test.ts` asserts the booted page carries no textarea, no file input and no text field.
+No file is uploaded, no function is evaluated, no dataset is loaded, there is no leaderboard, and
+MIRN runs its own estimator on its own worlds. **The question table is closed**, like `COLUMNS`,
+`AXES` and `cards.ts` — no `register`, nothing added at runtime — and `questions.test.ts` walks the
+whole 288-answer cross-product a reader can give rather than an option at a time, because three of
+the five questions decide nothing and an option-by-option check would have passed this table having
+checked nothing. **The family that compares nothing is not scored as a detector.** An absolute
+quantity reads about eighteen metres against a line measured in centimetres and clears it every
+time, and clearing it says nothing whatever about the robot; printing a count beside a
+forecaster's would invite exactly the comparison this console exists to teach against. Which shape
+a family renders in is read off its own ruler rather than off its name, so a fifth absolute family
+gets the right treatment without anybody remembering.
+
+If a future change lets a user's own code or data reach the engine, that is the line, and neither
+that spec nor this note is permission to cross it.
+
 ---
 
 ## The two-implementation rule
@@ -326,39 +354,61 @@ Nothing from the virtualenv is on PATH — not `python`, not `pytest`, not `ruff
 command below is written so it runs as spelled from the repository root, with no activation step.
 
 ```bash
-npm run check                            # typecheck, vitest, vite build — 30 s
-npm run test                             # 652 tests across 56 files in 22 s
-npx vitest run --exclude '**/*.slow.test.ts'   # 633 of them in 13 s
+npm run check                            # typecheck, vitest, vite build
+npm run test                             # 766 tests across 63 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 735 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
-.venv/bin/python -m pytest -q -m "not slow"   # 275 of them in 22 s, minus the heavy nulls
+.venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity   # after any formula change
 ```
 
-Every figure above was measured on this machine on the commit that wrote them, not estimated. Two
-of them used to be wrong by a plausible-looking margin, which is the failure mode this paragraph
-exists to name: a timing nobody re-ran is a claim, and the whole point of a documented fast loop is
-that its cost is small enough to be worth it.
+**The counts travel and the seconds do not, so the seconds have moved out of the block.** The
+counts above are facts about the tree. The timings below were re-measured when the method card made
+the old ones wrong, and they were re-measured on a *different* machine — a cloud container, not the
+one that wrote the originals — so they are recorded with that said rather than written in under a
+sentence claiming otherwise. Read them as shape, not as a target to hit:
+
+| | Measured | Where |
+|---|---|---|
+| `npm run test`, 766 tests | 42.8 s | cloud container, 2026-08-26 |
+| the `.slow.test.ts` cut, 735 tests | 35.1 s | same |
+| `pytest -q -m "not slow"`, 275 tests | 35.0 s | same |
+| `npm run test`, back when it was 652 tests | 22 s | the author's own machine |
+
+Two of the original figures used to be wrong by a plausible-looking margin, which is the failure
+mode this paragraph exists to name: a timing nobody re-ran is a claim, and the whole point of a
+documented fast loop is that its cost is small enough to be worth it. That is also why the row
+above is kept rather than deleted — two machines disagreeing by 70% is the reason a single number
+here was never worth trusting.
 
 **There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
 project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
 project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
-is what the third line above does — 13 s against 22 s. The three it drops are `axes.slow.test.ts`
-(guardrail 3's every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's
-eight cards actually does, measured) and `drill-verdict.slow.test.ts` (the whole drill driven card
-by card). All three re-run the simulator many times over, which is why they cost what they cost and
-why none of them can be made fast. So it is a working loop and not the gate.
+is what the third line above does. The five it drops are `axes.slow.test.ts` (guardrail 3's
+every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's eight cards
+actually does, measured), `drill-verdict.slow.test.ts` (the whole drill driven card by card),
+`familyProbe.slow.test.ts` (what each method family reads on a world whose answer is exactly
+nothing) and `method-run.slow.test.ts` (the method card driven end to end at the shipped settings).
+All five re-run the simulator many times over, which is why they cost what they cost and why none
+of them can be made fast. So it is a working loop and not the gate.
+
+**The cut is worth much less than it was, and saying so is the point of re-measuring it.** It once
+dropped 19 tests to save 9 seconds of 22. It now drops 31 to save about 8 of 43, because two of the
+five slow files are the method card's and the suite around them has grown faster than they have.
+That is not a reason to delete the line. It is a reason to stop describing it as a large saving,
+and to expect the next feature to shrink it further.
 
 The fast pytest loop is real: the tests that dominate the runtime carry `@pytest.mark.slow`, and
 `pyproject.toml` records the measurement the cut-off came from. It skips the divergence property
 tests and the calibration suite, so it is also a loop and not a gate. `tests/test_placebo.py` is
 deliberately not marked and runs in both.
 
-Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — 38
-seconds measured, of which `npm run test` is 24 on a cold machine. Every timing in this section is
-a cold-machine figure and they do not survive being run back to back: three consecutive repeats of
-this pre-commit line measured 38, 44 and 63 seconds on the same commit with nothing else running,
-so treat any single number here as the floor and not the expectation. Full `npm run check` plus
+Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests`. Its
+timing is not quoted, for the reason the table above gives twice over. Timings here never survived
+being run back to back — three consecutive repeats of this line once measured 38, 44 and 63 seconds
+on the same commit with nothing else running — and they do not survive changing machines either, so
+any single number is a floor and not an expectation. Full `npm run check` plus
 `.venv/bin/python -m pytest -q` before any push.
 **Never claim work is complete without running it and showing the output.**
 
@@ -366,18 +416,19 @@ so treat any single number here as the floor and not the expectation. Full `npm 
 
 ## Content
 
-**Three reader-facing surfaces, and what governs each.** This section used to open "there is no
+**Four reader-facing surfaces, and what governs each.** This section used to open "there is no
 prose file", which was true of the console alone and stopped being true the moment a second page
-shipped. The rule it was protecting survives whole; what changed is that it now has to be said
-three times.
+shipped. The rule it was protecting survives whole; what changed is that it now has to be said four
+times.
 
 | Surface | Who writes the words | What holds them honest |
 |---|---|---|
 | The console's tiles, columns and controls | The catalogues alone — a `label`, a `zero`, an `assumption` or a `note` on an entry in `web/engine/job/columns.ts` or `web/engine/job/axes.ts`. Both are closed | `columns.test.ts` and `axes.slow.test.ts` run the identifier regex over the catalogue itself, so a column nobody ticked is covered too. `tile.test.ts` renders every column and fails on a numeric literal |
 | `web/how.html` | Hand-written prose, ~1,000 lines of it, the one place the arithmetic is set out in sentences | `web/app/how.test.ts`: the identifier regex over its visible text, and a scan that fails on any measured value in the file. It states formulas and never results, so nothing in it can go stale against a physics change |
 | The drill's own strings in `web/drill.ts` — `CALL_CLAUSE`, `HONEST_CLAUSE`, `WITHHELD_ZERO_HOW`, the reveal's sentences and `verdictLines` | Hand-written, because they describe a reader's call rather than a measurement, and no catalogue entry has anywhere to put them | `drill-dom.test.ts` runs the identifier regex over the booted page and over every branch of `verdictLines`; the reveal quotes no number the tiles above it are not also showing; `COUNT_WORDS` means no sentence carries a digit for something the catalogue decides |
+| The method card's own strings in `web/app/console/method.ts` — `REFUSAL`, `READING_LABEL`, `READING_ZERO_HOW`, `BAND_LABEL`, `BAND_ZERO_HOW`, `RATE_LABEL`, `RATE_NOTE`, `RATE_ZERO_HOW`, `NON_DETECTION_LABEL`, `NON_DETECTION_NOTE` — plus the hand-written prose in `web/method.html` | Hand-written, and for the drill's reason: they describe a question somebody arrived with rather than a measurement, so no catalogue entry has anywhere to put them | Three scans, one per surface. `questions.test.ts` runs the identifier regex over the closed question table. `method.test.ts` runs it, and the numeric-literal scan, over every leaf of every family's rendered verdict, with a count guard and a meta-test each. `method-dom.test.ts` runs it over `web/method.html`'s own prose, the way `how.test.ts` does for the working page |
 
-Everything below applies to all three. A hand-written surface is not a licence to write a number
+Everything below applies to all four. A hand-written surface is not a licence to write a number
 into a sentence, to name a variable at a reader, or to say something that has not been measured.
 
 **No numeric literal appears in console copy.** Every zero line, band figure and caption renders

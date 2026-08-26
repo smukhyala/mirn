@@ -216,6 +216,52 @@ describe("the invented-crowd disclosure comes first on the method card too", () 
   });
 });
 
+/**
+ * Guardrail 12 over the page's OWN prose, which is the one surface of the method card that had no
+ * scan. The other two have had one since they were written: `questions.test.ts` runs the regex over
+ * every reader-facing string in the closed question table, and `method.test.ts` runs it over every
+ * leaf of every family's rendered verdict. What was left is the hand-written copy in
+ * `web/method.html` — the section saying what the page does, and the note under the Run button —
+ * and it was left only because it was written last, not because it needs the rule less.
+ *
+ * `how.test.ts` does exactly this job for the working page and is the shape followed here,
+ * including its ruling on brackets: the catalogue's pattern also bans `(`, `)` and `=>`, and this
+ * one does not, because prose legitimately parenthesises and the catalogue entries it guards do
+ * not.
+ */
+describe("the method card's own prose reads as English", () => {
+  /** What a reader actually sees: comments, scripts, tags and entities are not prose. */
+  function readerText(html: string): string {
+    const withoutComments = html.replace(/<!--[\s\S]*?-->/g, " ");
+    const withoutScripts = withoutComments.replace(/<script[\s\S]*?<\/script>/g, " ");
+    const withoutTags = withoutScripts.replace(/<[^>]*>/g, " ");
+    const withoutEntities = withoutTags.replace(/&[#a-zA-Z0-9]+;/g, " ");
+    return withoutEntities.replace(/\s+/g, " ");
+  }
+
+  const TEXT = readerText(HTML);
+
+  it("has prose to scan, so a stripped-to-nothing page cannot pass this silently", () => {
+    expect(TEXT.length).toBeGreaterThan(400);
+    expect(TEXT).toContain("Nothing of yours is read in");
+  });
+
+  it("spells no term the way a program spells it", () => {
+    const identifier = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b/.exec(TEXT);
+    expect(
+      identifier,
+      `web/method.html shows the bare identifier '${identifier?.[0] ?? ""}'`,
+    ).toBeNull();
+  });
+
+  it("would notice an identifier that escaped into the copy", () => {
+    // The test that tests the test. A scan whose stripping swallowed the prose is
+    // indistinguishable from a page that obeys the rule.
+    const planted = readerText("<p>the cvmResidual is computed here</p>");
+    expect(/\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b/.exec(planted)?.[0]).toBe("cvmResidual");
+  });
+});
+
 describe("the questionnaire is painted from the closed table", () => {
   it("shows every question and every answer the table holds, and nothing else", async () => {
     const page = await boot();
