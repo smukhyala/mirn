@@ -171,3 +171,92 @@ describe("a room, and the counting over rooms", () => {
     expect(() => aggregateSuppliedProbe([])).toThrow(ContractError);
   });
 });
+
+/**
+ * How many different distances came back, counted exactly.
+ *
+ * This is the only evidence available for whether a supplied method reads the rooms at all. It
+ * declares no ruler, so nothing here can inspect what it compares; what can be observed is whether
+ * its answers move when the rooms do. A method that returns one fixed number scores perfectly on a
+ * world whose true effect is nothing — it clears the drift line on no room because it never varies
+ * — and the count of distinct values is what tells that apart from a ruler that works.
+ *
+ * It is counted rather than derived from `sdReading` on purpose, and the third test below is why.
+ */
+describe("distinct readings", () => {
+  const BASE = Object.freeze({
+    kind: "suppliedProbeSeed" as const,
+    bandM: 0.1,
+    peakBandM: 0.2,
+    truthM: 0,
+    truthUnderBand: true,
+    clearedBand: false,
+  });
+
+  function reading(seed: number, valueM: number): SuppliedProbeSeed {
+    return Object.freeze({
+      ...BASE,
+      seed,
+      outcome: { kind: "read" as const, valueM },
+      clearedBand: valueM > BASE.bandM,
+    });
+  }
+
+  it("counts one for a method that answered the same on every room", () => {
+    const probe = aggregateSuppliedProbe([
+      reading(1, 0),
+      reading(2, 0),
+      reading(3, 0),
+      reading(4, 0),
+    ]);
+    expect(probe.nUsed).toBe(4);
+    expect(probe.nDistinctReadings).toBe(1);
+    // The counts that would otherwise be read as a clean sheet, pinned so the finding has stakes.
+    expect(probe.nClearedBand).toBe(0);
+    expect(probe.nFailed).toBe(0);
+  });
+
+  it("counts every different value a method gave", () => {
+    const probe = aggregateSuppliedProbe([
+      reading(1, 0.02),
+      reading(2, 0.05),
+      reading(3, 0.02),
+      reading(4, 0.31),
+    ]);
+    expect(probe.nUsed).toBe(4);
+    // Three values across four rooms: two rooms agreed, and agreeing twice is not being constant.
+    expect(probe.nDistinctReadings).toBe(3);
+  });
+
+  it("separates values whose spread is far below anything a reader could see", () => {
+    // Four readings differing only in their last bits: distinct values, and a spread of about
+    // 3e-16 m. Whether that counts as "constant" is exactly the judgement a tolerance would have to
+    // make, and any tolerance loose enough to be worth writing swallows this. Counting values makes
+    // no judgement: these answers moved with the rooms, so the count is four.
+    const probe = aggregateSuppliedProbe([
+      reading(1, 0.1),
+      reading(2, 0.1 + Number.EPSILON),
+      reading(3, 0.1 + 2 * Number.EPSILON),
+      reading(4, 0.1 + 3 * Number.EPSILON),
+    ]);
+    expect(probe.nDistinctReadings).toBe(4);
+    // The trap itself, measured rather than described. Not nought — a first draft of this test
+    // asserted it was, and it is not — but small enough that a check reading "close enough to
+    // nought" would call four different answers one answer.
+    expect(probe.sdReading).toBeGreaterThan(0);
+    expect(probe.sdReading).toBeLessThan(1e-15);
+  });
+
+  it("counts nothing for a method that never returned a distance", () => {
+    const stopped: SuppliedProbeSeed = Object.freeze({
+      ...BASE,
+      seed: 1,
+      outcome: { kind: "failed" as const, message: "it stopped" },
+    });
+    const probe = aggregateSuppliedProbe([stopped]);
+    expect(probe.nUsed).toBe(0);
+    // Nought and not one. A method that produced no number has no reading to be constant at, and
+    // a count of one here would let "it never varied" be claimed about nothing at all.
+    expect(probe.nDistinctReadings).toBe(0);
+  });
+});

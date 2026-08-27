@@ -168,6 +168,39 @@ const EVERY_ROOM = branch("every room cleared", [
   room(8, read(0.399)),
 ]);
 
+/**
+ * The method that scores perfectly and measures nothing: `() => 0`, on six rooms.
+ *
+ * Every count on this page is its best possible value. It failed on no room, contradicted itself
+ * on no room, and cleared the drift line on no room — nought out of six, which is the finding this
+ * card exists to report and is the finding a sound ruler would also produce. The difference between
+ * this and a sound ruler is not in any count here, and the page has to say so in words or it hands
+ * a reader the best score on the site for a function that ignores its input.
+ */
+const ALWAYS_ZERO = branch("constant nought", [
+  room(1, read(0)),
+  room(2, read(0)),
+  room(3, read(0)),
+  room(4, read(0)),
+  room(5, read(0)),
+  room(6, read(0)),
+]);
+
+/**
+ * The same defect wearing the opposite score: `() => 0.5`, which clears on every room.
+ *
+ * Here the count is the worst on the page rather than the best, and the method is exactly as
+ * constant. It is in the sweep so the warning is pinned to the sameness of the readings and not to
+ * the count beside them — a check that fired only on the flattering case would miss half of what
+ * it claims to detect.
+ */
+const ALWAYS_HALF = branch("constant half metre", [
+  room(1, read(0.5)),
+  room(2, read(0.5)),
+  room(3, read(0.5)),
+  room(4, read(0.5)),
+]);
+
 const BRANCHES: readonly Branch[] = Object.freeze([
   CLEAN,
   LONE,
@@ -176,6 +209,8 @@ const BRANCHES: readonly Branch[] = Object.freeze([
   INCONSISTENT,
   MIXED,
   EVERY_ROOM,
+  ALWAYS_ZERO,
+  ALWAYS_HALF,
 ]);
 
 function verdictFor(entry: Branch): ReturnType<typeof makeSuppliedVerdict> {
@@ -245,13 +280,18 @@ describe("every branch a supplied method can end in is rendered", () => {
       // Whether it answered the same way twice sits ABOVE the numbers, not beside them: a reader
       // who has already read the figures has already been misled, and a caveat underneath them
       // arrives after the damage. The refusal is last, as flatly stated as the numbers.
-      expect(parts, `${entry.name} renders the parts in another order`).toEqual([
-        "ran",
-        "consistency",
-        "numbers",
-        "failures",
-        "refusal",
-      ]);
+      //
+      // "constancy" is the one part that is not always there — it is rendered only for a method
+      // whose readings never moved, because its reassuring form would read as a pass mark. So the
+      // expected order is BUILT from the verdict rather than relaxed to let either shape through:
+      // a branch that renders it when the warning is null, or omits it when the warning is set,
+      // fails here rather than passing under a loosened assertion.
+      const expected: string[] = ["ran", "consistency"];
+      if (verdictFor(entry).constantWarning !== null) {
+        expected.push("constancy");
+      }
+      expected.push("numbers", "failures", "refusal");
+      expect(parts, `${entry.name} renders the parts in another order`).toEqual(expected);
       built = built + 1;
     }
     expect(built, "no branch was rendered").toBe(BRANCHES.length);
@@ -765,5 +805,88 @@ describe("the verdict refuses a measurement it cannot honestly report", () => {
     // and throwing it away would leave a reader with a blank page and no reason for it.
     expect(() => verdictFor(ALL_FAILED)).not.toThrow();
     expect(verdictFor(ALL_FAILED).failures.nRooms).toBe(3);
+  });
+});
+
+/**
+ * The method that scores perfectly by not measuring anything.
+ *
+ * This is the one defect on this path that the counts themselves cannot report, because every
+ * count reads correctly. `() => 0` fails on no room, contradicts itself on no room, and clears the
+ * drift line on no room. Nought out of six false positives is the best number this card can print,
+ * and a sound ruler prints the same one. The card decides which it is looking at from the only
+ * evidence it has — whether the answers moved when the rooms did — and says so in words, because
+ * there is no count it could print instead that would carry the finding.
+ *
+ * The first test below is the one that establishes the stakes rather than the behaviour: it pins
+ * that the flattering counts really are what a constant method earns. Without it, the warning is a
+ * sentence with nothing behind it and a later change that quietly started scoring `() => 0` badly
+ * would leave these assertions passing for the wrong reason.
+ */
+describe("a method whose answer never moves", () => {
+  it("earns the best counts on the page, which is why the words are needed", () => {
+    const verdict = verdictFor(ALWAYS_ZERO);
+    // Nought false positives out of six, no failures, no disagreements. There is no number here a
+    // reader could use to tell this apart from a ruler that works.
+    expect(verdict.clearing.nCleared).toBe(0);
+    expect(verdict.clearing.nAttempted).toBe(6);
+    expect(verdict.failures.nRooms).toBe(0);
+    expect(verdict.consistency.nRooms).toBe(0);
+    expect(verdict.averageWarning).toBeNull();
+  });
+
+  it("is named as not reading the rooms, whichever way the count fell", () => {
+    // Both constants, opposite scores: nought out of six on one, four out of four on the other.
+    // The finding is the sameness of the readings, so it must not be pinned to either count.
+    expect(verdictFor(ALWAYS_ZERO).constantWarning).not.toBeNull();
+    expect(verdictFor(ALWAYS_HALF).constantWarning).not.toBeNull();
+    expect(verdictFor(ALWAYS_HALF).clearing.nCleared).toBe(4);
+  });
+
+  it("says it above the figures, where a reader meets it before the counts", () => {
+    const rendered = render(ALWAYS_ZERO);
+    const warning = rendered.querySelector(".supplied-warning");
+    expect(warning).not.toBeNull();
+    expect(textOf(warning)).toContain("not reading them");
+
+    // Document order, not styling: the caveat has to arrive before the number it qualifies, and a
+    // reader who has already read the figures has already been misled.
+    const parts = Array.from(rendered.querySelectorAll("[data-part]")).map((node) =>
+      node.getAttribute("data-part"),
+    );
+    expect(parts).toContain("constancy");
+    expect(parts.indexOf("constancy")).toBeLessThan(parts.indexOf("numbers"));
+  });
+
+  it("stays silent when the readings differ, rather than printing a pass mark", () => {
+    // There is no reassuring form of this. "Your readings differed" is the ordinary case, and
+    // printing it would read as a verdict on a method that has not been judged yet.
+    expect(verdictFor(CLEAN).constantWarning).toBeNull();
+    expect(render(CLEAN).querySelector('[data-part="constancy"]')).toBeNull();
+    expect(verdictFor(MIXED).constantWarning).toBeNull();
+    expect(verdictFor(EVERY_ROOM).constantWarning).toBeNull();
+  });
+
+  it("does not call one reading constant, because one room cannot show a method never moves", () => {
+    expect(LONE.probe.nUsed).toBe(1);
+    expect(LONE.probe.nDistinctReadings).toBe(1);
+    // One distinct value, and the claim still refused: the evidence for "the same on every room" is
+    // a plural of rooms, and this method has been shown once rather than shown to be constant.
+    expect(verdictFor(LONE).constantWarning).toBeNull();
+  });
+
+  it("is not confused by rooms the method failed on", () => {
+    // Two readings, both 0.037, plus two rooms that produced no number at all. The failures are not
+    // readings and must not count as variation, or a constant method could hide behind its own
+    // errors.
+    const hiding = branch("constant among failures", [
+      room(1, read(0.037)),
+      room(2, failed(OWN_WORDS)),
+      room(3, read(0.037)),
+      room(4, failed(OTHER_WORDS)),
+    ]);
+    expect(hiding.probe.nUsed).toBe(2);
+    expect(makeSuppliedVerdict({ probe: hiding.probe, settings: hiding.settings }).constantWarning)
+      .not.toBeNull();
   });
 });

@@ -48,6 +48,24 @@ export interface SuppliedProbe {
   readonly nTruthsUnderBand: number;
   readonly nFailed: number;
   readonly nNondeterministic: number;
+  /**
+   * How many different distances came back across every room that produced one.
+   *
+   * Counted exactly rather than read off `sdReading`, and the difference matters. A spread is a
+   * float, so deciding "constant" from it means picking a tolerance, and the tolerance is where the
+   * mistake would live: four readings differing in their last bits have a spread of about 3e-16 m —
+   * measured, in `suppliedProbe.test.ts`, after a first draft of that test asserted it was exactly
+   * nought and was wrong — which any tolerance loose enough to be worth writing would swallow. A
+   * count of values makes no such judgement. One means one.
+   *
+   * It exists because a method that returns the same number whatever it is handed scores perfectly
+   * on this world and deserves to score nothing. `() => 0` never clears the drift line, on any
+   * room, ever — so it posts a false-positive rate of nought out of however many rooms ran, which
+   * is the best rate on the page. It is also not a ruler. Nothing else here can tell the two apart:
+   * a supplied method declares no ruler, so the only evidence available is whether its answers move
+   * when the rooms do.
+   */
+  readonly nDistinctReadings: number;
   readonly meanReading: number;
   readonly sdReading: number;
   readonly meanBandM: number;
@@ -174,6 +192,14 @@ export function aggregateSuppliedProbe(perSeed: readonly SuppliedProbeSeed[]): S
     }
   }
 
+  // Distinct readings, counted over the values themselves. A Set compares with SameValueZero, so
+  // a method returning -0 on one room and 0 on another counts as one value rather than two, which
+  // is the right answer: those are the same distance and a reader would be told they differ.
+  const seenReadings = new Set<number>();
+  for (const reading of readings) {
+    seenReadings.add(reading);
+  }
+
   return Object.freeze({
     kind: "suppliedProbe" as const,
     unit: "metres" as UnitKey,
@@ -185,6 +211,7 @@ export function aggregateSuppliedProbe(perSeed: readonly SuppliedProbeSeed[]): S
     nTruthsUnderBand,
     nFailed,
     nNondeterministic,
+    nDistinctReadings: seenReadings.size,
     meanReading: meanOf(readings),
     sdReading: sdOf(readings),
     meanBandM: meanOf(bands),
