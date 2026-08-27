@@ -11,6 +11,7 @@ import { answer, makeDrillState, reveal, type DrillCall, type DrillState } from 
 import type { VerdictLine } from "../../../drill.js";
 import { DISCLOSURE_CLAUSES } from "../csv.js";
 import { BAND_NOT_MEASURED, BAND_WITHHELD } from "../tile.js";
+import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
 /**
  * The drill's card, booted from its real HTML with its real module.
@@ -333,10 +334,9 @@ describe("the card shows only what a corridor could give you", () => {
   });
 
   it("puts no bare code identifier in front of a reader", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const offenders: string[] = [];
     for (const chunk of textChunks(document.body)) {
-      const found = identifier.exec(chunk);
+      const found = CODE_IDENTIFIER.exec(chunk);
       if (found !== null) {
         offenders.push(found[0]);
       }
@@ -560,13 +560,12 @@ describe("the reveal shows the second run, on the instant the reader was looking
   });
 
   it("puts no bare code identifier into the reveal either", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const offenders: string[] = [];
     const reveal = document.querySelector(".drill-reveal");
     expect(reveal).not.toBeNull();
     if (reveal !== null) {
       for (const chunk of textChunks(reveal)) {
-        const found = identifier.exec(chunk);
+        const found = CODE_IDENTIFIER.exec(chunk);
         if (found !== null) {
           offenders.push(found[0]);
         }
@@ -719,7 +718,6 @@ describe("the verdict", () => {
   });
 
   it("puts no bare code identifier in any of it", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const scripts = [
       everyCard("bigger", "bigger"),
       everyCard("bigger", "smaller"),
@@ -728,12 +726,11 @@ describe("the verdict", () => {
     ];
     for (const script of scripts) {
       for (const entry of lines(walk(script), [true, false])) {
-        expect(identifier.exec(entry.text), entry.text).toBeNull();
+        expect(CODE_IDENTIFIER.exec(entry.text), entry.text).toBeNull();
       }
     }
   });
 });
-
 
 /**
  * The reading half of the drill's permalink.

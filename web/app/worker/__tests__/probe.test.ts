@@ -13,6 +13,7 @@ import {
 import { makeProbeClient, type ProbePort } from "../probe.client.js";
 import { probePhraseFor, pumpProbe } from "../probe.pump.js";
 import type { FromProbeWorker, ToProbeWorker } from "../probe.protocol.js";
+import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 /**
  * The method card's worker: what crosses the boundary, and what comes back.
@@ -91,12 +92,11 @@ describe("the pump reports progress and then the answer", () => {
   });
 
   it("writes its progress in plain English, never in code", () => {
-    const identifier = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b|[()[\]{}]|=>/;
     let phrases = 0;
     for (const key of FAMILY_ORDER) {
       for (let done = 0; done <= CHEAP.seeds.length; done++) {
         const phrase = probePhraseFor(key, done, CHEAP.seeds.length);
-        expect(identifier.test(phrase), `"${phrase}" reads as code`).toBe(false);
+        expect(CODE_IDENTIFIER_OR_SYNTAX.test(phrase), `"${phrase}" reads as code`).toBe(false);
         expect(phrase.length).toBeGreaterThan(10);
         phrases = phrases + 1;
       }

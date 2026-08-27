@@ -14,6 +14,7 @@ import {
   toCsv,
   toDrillCsv,
 } from "../csv.js";
+import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
 /**
  * The CSV is the one surface that outlives the page it came from. A spreadsheet has no standing
@@ -159,8 +160,7 @@ describe("the CSV discloses before it reports", () => {
   it("names every column in plain English, never by its key", () => {
     const text = toCsv(job(), rows(), makeCsvOptions({ generatedAtIso: AT }));
     const headerRow = text.split("\n").filter((l) => l.length > 0 && !l.startsWith("#"))[0] as string;
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
-    expect(identifier.exec(headerRow)).toBeNull();
+    expect(CODE_IDENTIFIER.exec(headerRow)).toBeNull();
   });
 
   it("exports per seed as a free variant, one row per run, with the seed spelled out", () => {
@@ -344,8 +344,7 @@ describe("the drill's own CSV discloses before it reports", () => {
     const rows = [entry(CARD_ORDER[0] as CardKey, "bigger", "bigger", 0.4, 0.2, 0.3, 0.25)];
     const text = toDrillCsv(rows, makeDrillCsvOptions({ generatedAtIso: GENERATED_AT }));
     const headerRow = text.split("\n").filter((l) => l.length > 0 && !l.startsWith("#"))[0] as string;
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
-    expect(identifier.exec(headerRow)).toBeNull();
+    expect(CODE_IDENTIFIER.exec(headerRow)).toBeNull();
   });
 
   it("writes one row per card, in the order given, with the card's plain-English name", () => {

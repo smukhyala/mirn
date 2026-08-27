@@ -10,6 +10,7 @@ import {
   type FamilyKey,
   type MethodFamily,
 } from "../families.js";
+import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 /**
  * The family catalogue is closed, total, written in English, and refuses the entries that would
@@ -22,7 +23,6 @@ import {
 
 /** A term the operator has never met, spelled the way a program spells it. Same regex the column
  *  and axis catalogues are held to, because the same reader meets all three. */
-const CODE_IDENTIFIER = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b|[()[\]{}]|=>/;
 
 /** A well-formed entry to mutate one field of at a time, so each refusal is provoked alone. */
 const GOOD: Parameters<typeof makeMethodFamily>[0] = Object.freeze({
@@ -66,9 +66,9 @@ describe("the family catalogue is total and self-consistent", () => {
   it("writes every reader-facing string in English, not in code", () => {
     for (const key of FAMILY_ORDER) {
       const family = FAMILIES[key];
-      expect(family.name).not.toMatch(CODE_IDENTIFIER);
-      expect(family.whatItIs).not.toMatch(CODE_IDENTIFIER);
-      expect(family.confound).not.toMatch(CODE_IDENTIFIER);
+      expect(family.name).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
+      expect(family.whatItIs).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
+      expect(family.confound).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       expect(family.name.length).toBeGreaterThan(10);
       expect(family.whatItIs.length).toBeGreaterThan(40);
       expect(family.confound.length).toBeGreaterThan(40);

@@ -15,6 +15,7 @@ import {
   type OptionKey,
   type QuestionKey,
 } from "../questions.js";
+import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 /**
  * The questionnaire is closed, total, written in English, and every answer a reader can give
@@ -34,7 +35,6 @@ import {
 
 /** A term the operator has never met, spelled the way a program spells it. Same regex the column,
  *  axis and family catalogues are held to, because the same reader meets all four. */
-const CODE_IDENTIFIER = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b|[()[\]{}]|=>/;
 
 /** Every complete set of answers a reader can give, as drafts ready to be validated. */
 function everyAnswerSet(): readonly MethodDraft[] {
@@ -94,16 +94,16 @@ describe("the questionnaire is a closed table", () => {
     let checked = 0;
     for (const key of QUESTION_ORDER) {
       const question = QUESTIONS[key];
-      expect(question.prompt).not.toMatch(CODE_IDENTIFIER);
-      expect(question.about).not.toMatch(CODE_IDENTIFIER);
+      expect(question.prompt).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
+      expect(question.about).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       expect(question.prompt.length).toBeGreaterThan(20);
       for (const option of question.options) {
-        expect(option.label, `${key}/${option.key} reads as code`).not.toMatch(CODE_IDENTIFIER);
+        expect(option.label, `${key}/${option.key} reads as code`).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
         if (option.approximation !== null) {
           expect(
             option.approximation,
             `${key}/${option.key}'s approximation reads as code`,
-          ).not.toMatch(CODE_IDENTIFIER);
+          ).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
           // Guardrail: no numeric literal in copy. The horizon, the checked instant, the seed
           // count and the band's replicates are all rendered from the measurement on screen, so
           // an approximation sentence that quoted one would be a claim outliving its settings.

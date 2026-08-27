@@ -173,16 +173,30 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     at first use.** Half of this guardrail genuinely died: `web/vocab.ts`, the `introduces`/`uses`
     front matter, `checkVocabulary` and `lintForwardTerms` all go, because with no reading order
     there is no first use to police — a term's first use is wherever the reader happened to start.
-    What survives is the whole rule. Its mechanical enforcement is the identifier regex, re-homed
-    from the deleted render suite onto `COLUMNS` and `AXES` in
-    `web/engine/job/__tests__/columns.test.ts` and `axes.slow.test.ts`. Pointed at the catalogue
-    rather than a rendered DOM, it also covers a column nobody ticked. Four more suites run variants
-    of the same regex over strings the catalogue does not own: `panel.test.ts` over the whole booted
-    panel's text, `permalink.test.ts` over every sentence a hand-edited link can produce,
-    `how.test.ts` over the working page's prose, and `drill-dom.test.ts` over the booted drill and
-    every branch of its verdict. Because a term can now be met on any of three documents, each one
-    that uses a defined term glosses it where it uses it, rather than relying on the reader having
-    been somewhere else first.
+    What survives is the whole rule. Its mechanical enforcement is the identifier regex, and it now
+    lives in exactly one place: `web/testing/identifiers.ts`, which exports two patterns and a
+    paragraph saying why two and not one. `CODE_IDENTIFIER_OR_SYNTAX` goes over the closed
+    catalogues — `COLUMNS`, `AXES`, `cards.ts`, `families.ts`, `questions.ts` — and bans a bracket
+    and a fat arrow as well, because a catalogue entry has no business containing either. Pointed at
+    the catalogue rather than a rendered DOM, it also covers a column nobody ticked.
+    `CODE_IDENTIFIER` goes over everything rendered, where prose legitimately parenthesises:
+    `panel.test.ts` over the whole booted panel's text, `permalink.test.ts` over every sentence a
+    hand-edited link can produce, `how.test.ts` and `method-dom.test.ts` over their pages' prose,
+    `csv.test.ts` over the export, and `drill-dom.test.ts` over the booted drill and every branch of
+    its verdict. Because a term can now be met on any of four documents, each one that uses a
+    defined term glosses it where it uses it, rather than relying on the reader having been
+    somewhere else first.
+
+    **It was written out by hand in twenty places before it was hoisted, and had drifted into three
+    different expressions** — so the guardrail was being enforced at three different strengths
+    depending on which file you landed in. Reconciling them made the two weaker forms stronger and
+    neither weaker; every surface was checked against the stronger pattern first and none of them
+    had anything to fix. `web/testing/identifiers.test.ts` now asserts things ABOUT the patterns
+    rather than only WITH them, including that neither carries a `g` flag, whose `lastIndex` would
+    make one suite's answer depend on which suite ran before it. One known hole is pinned open and
+    documented rather than quietly widened: a digit before the first capital, as in `arm2Reading`,
+    is not matched. Widening it is a behaviour change across every call site and belongs in its own
+    commit, where a new failure means a real leak rather than noise from a refactor.
 
 13. **`docs/archive/` is read-only.** Never delete or soften an `UNVERIFIED` marker in it, never
     cite it as current, and never quietly update a claim in it to match something we now believe.

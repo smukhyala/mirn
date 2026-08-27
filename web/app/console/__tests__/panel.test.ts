@@ -13,6 +13,7 @@ import {
 } from "../panel.js";
 import { decodeSettings, encodeSettings, settingsNotHonoured } from "../permalink.js";
 import { panelValuesFromSettings, settingsFromPanel } from "../preview.js";
+import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
 /**
  * The panel and the sweep picker are one table walked twice, and this file is what stops them
@@ -91,8 +92,7 @@ describe("a knob names what it moves, wherever it sits", () => {
 
   it("puts no bare code identifier in front of a reader", () => {
     const { root } = mount();
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
-    const found = identifier.exec(root.textContent ?? "");
+    const found = CODE_IDENTIFIER.exec(root.textContent ?? "");
     expect(found === null ? "" : found[0]).toBe("");
   });
 });

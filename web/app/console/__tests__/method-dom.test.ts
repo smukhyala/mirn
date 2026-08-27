@@ -21,6 +21,7 @@ import {
 } from "../../../engine/job/questions.js";
 import type { FromProbeWorker, ToProbeWorker } from "../../worker/probe.protocol.js";
 import { DISCLOSURE_CLAUSES } from "../csv.js";
+import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
 /**
  * The method card's page, booted from its real HTML with its real module.
@@ -247,7 +248,7 @@ describe("the method card's own prose reads as English", () => {
   });
 
   it("spells no term the way a program spells it", () => {
-    const identifier = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b/.exec(TEXT);
+    const identifier = CODE_IDENTIFIER.exec(TEXT);
     expect(
       identifier,
       `web/method.html shows the bare identifier '${identifier?.[0] ?? ""}'`,
@@ -258,7 +259,7 @@ describe("the method card's own prose reads as English", () => {
     // The test that tests the test. A scan whose stripping swallowed the prose is
     // indistinguishable from a page that obeys the rule.
     const planted = readerText("<p>the cvmResidual is computed here</p>");
-    expect(/\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b/.exec(planted)?.[0]).toBe("cvmResidual");
+    expect(CODE_IDENTIFIER.exec(planted)?.[0]).toBe("cvmResidual");
   });
 });
 

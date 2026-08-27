@@ -22,6 +22,7 @@ import {
   encodeSettings,
   settingsNotHonoured,
 } from "../permalink.js";
+import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
 /**
  * Every field here is set away from `DEFAULT_SETTINGS`, on purpose — all thirteen axes included,
@@ -243,13 +244,12 @@ describe("a hand-edited link", () => {
   });
 
   it("writes its notices in plain English", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const result = decodeSettings(
       `people=${String(AXES.crowdSize.max + 10)}&seeds=99999&band=1&notice=maybe`,
     );
     expect(result.notices.length).toBeGreaterThan(0);
     for (const notice of result.notices) {
-      expect(identifier.test(notice), `"${notice}" carries a code identifier`).toBe(false);
+      expect(CODE_IDENTIFIER.test(notice), `"${notice}" carries a code identifier`).toBe(false);
     }
   });
 });
@@ -370,11 +370,10 @@ describe("what the panel could not carry is said out loud", () => {
   });
 
   it("writes every one of them in plain English", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const lines = settingsNotHonoured(awkward(), DEFAULT_SETTINGS);
     expect(lines.length).toBeGreaterThan(5);
     for (const line of lines) {
-      expect(identifier.test(line), `"${line}" carries a code identifier`).toBe(false);
+      expect(CODE_IDENTIFIER.test(line), `"${line}" carries a code identifier`).toBe(false);
     }
   });
 });
@@ -454,10 +453,9 @@ describe("the drill's own link", () => {
   });
 
   it("writes its notices in plain English", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const decoded = decodeDrill("cards=not-a-real-card");
     for (const notice of decoded.notices) {
-      expect(identifier.test(notice), `"${notice}" carries a code identifier`).toBe(false);
+      expect(CODE_IDENTIFIER.test(notice), `"${notice}" carries a code identifier`).toBe(false);
     }
   });
 });
@@ -522,13 +520,12 @@ describe("the method card's link carries the answers and never the answer", () =
   });
 
   it("writes its notices in plain English", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     // Deliberately hostile: the offending value is exactly the shape of thing that would read as a
     // code identifier if the notice quoted it back. It must not.
     const decoded = decodeMethod("control=someWeird_value&source=alsoBad_one");
     expect(decoded.notices.length).toBe(2);
     for (const notice of decoded.notices) {
-      expect(identifier.test(notice), `"${notice}" carries a code identifier`).toBe(false);
+      expect(CODE_IDENTIFIER.test(notice), `"${notice}" carries a code identifier`).toBe(false);
       expect(notice).not.toContain("someWeird");
     }
   });

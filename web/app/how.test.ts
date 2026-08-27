@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { COLUMNS, COLUMN_ORDER } from "../engine/job/columns.js";
 import { DISCLOSURE_CLAUSES } from "./console/csv.js";
+import { CODE_IDENTIFIER } from "../testing/identifiers.js";
 
 /**
  * web/how.html: what every readout on the console actually computes.
@@ -147,7 +148,7 @@ describe("the page reads as English", () => {
     // Guardrail 12, and the same rule the column catalogue is held to. The bracket and arrow half
     // of that catalogue's pattern is deliberately not applied here: this page sets out arithmetic,
     // and a parenthesis in a formula is mathematics rather than a leaked identifier.
-    const identifier = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b/.exec(TEXT);
+    const identifier = CODE_IDENTIFIER.exec(TEXT);
     expect(identifier, `web/how.html shows the bare identifier '${identifier?.[0] ?? ""}'`).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { runPair } from "../../sim/run.js";
 import { COLUMNS, type ColumnKey } from "../columns.js";
 import { AXES, AXIS_ORDER, type AxisEntry } from "../axes.js";
 import { buildContext, runReport, type MeasurementParams } from "../report.js";
+import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 /**
  * SLOW ON PURPOSE: about 200 paired runs, roughly ten to twenty seconds.
@@ -48,7 +49,6 @@ const BASE_PARAMS: MeasurementParams = Object.freeze({
  * re-homed guardrail 12's only mechanical enforcement onto in columns.test.ts, since the file
  * that used to own it (web/app/__tests__/render.test.ts) is deleted in this pivot's third commit.
  * Both `label` and `note` are reader-facing prose per the AxisCommon contract, so both are checked. */
-const CODE_IDENTIFIER = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b|[()[\]{}]|=>/;
 
 /** Every dotted leaf of a config, so a diff can name the fields an axis actually wrote. */
 function flatten(value: unknown, prefix: string, out: Map<string, string>): void {
@@ -139,9 +139,9 @@ describe("the axis catalogue", () => {
       const axis = AXES[key];
       expect(axis.key).toBe(key);
       expect(axis.label.length).toBeGreaterThan(3);
-      expect(axis.label).not.toMatch(CODE_IDENTIFIER);
+      expect(axis.label).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       expect(axis.note.length).toBeGreaterThan(20);
-      expect(axis.note).not.toMatch(CODE_IDENTIFIER);
+      expect(axis.note).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       expect(axis.unit.length).toBeGreaterThan(0);
       expect(axis.movesColumns.length).toBeGreaterThan(0);
       expect(axis.min).toBeLessThan(axis.max);

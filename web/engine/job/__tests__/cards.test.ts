@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DRILL_CARDS, CARD_ORDER, cardConfig, cardRulerParams } from "../cards.js";
 import { AXES } from "../axes.js";
-
-const CODE_IDENTIFIER = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b|[()[\]{}]|=>/;
+import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 describe("the drill card catalogue", () => {
   it("has eight cards and the order names every one", () => {
@@ -58,7 +57,7 @@ describe("the drill card catalogue", () => {
     for (const key of CARD_ORDER) {
       const card = DRILL_CARDS[key];
       expect(card.name.length).toBeGreaterThan(0);
-      expect(card.name).not.toMatch(CODE_IDENTIFIER);
+      expect(card.name).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       expect(card.name).not.toMatch(/\d+\.\d+/);
     }
   });

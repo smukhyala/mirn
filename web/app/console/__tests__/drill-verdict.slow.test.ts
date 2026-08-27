@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { AXIS_QUERY_KEY, decodeDrill } from "../permalink.js";
 import { DISCLOSURE_CLAUSES, INVENTED_CROWD_DISCLOSURE } from "../csv.js";
 import { CARD_ORDER, DRILL_CARDS } from "../../../engine/job/cards.js";
+import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
 /**
  * The whole drill, eight cards, driven the way a reader drives it.
@@ -224,13 +225,12 @@ describe("eight calls end in a verdict", () => {
     // Scanned one text node at a time, not over `textContent`. That joins adjacent elements with
     // nothing between them, so the heading's "The verdict" and the first line's "You called"
     // concatenate into "verdictYou" and a camel-case scan reports an identifier no reader can see.
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const host = walked.document.querySelector("#verdict");
     expect(host).not.toBeNull();
     const offenders: string[] = [];
     if (host !== null) {
       for (const chunk of textChunks(host)) {
-        const found = identifier.exec(chunk);
+        const found = CODE_IDENTIFIER.exec(chunk);
         if (found !== null) {
           offenders.push(found[0]);
         }

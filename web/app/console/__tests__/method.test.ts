@@ -18,6 +18,7 @@ import {
   type MethodDraft,
 } from "../../../engine/job/questions.js";
 import { REFUSAL, makeMethodVerdict, renderMethodVerdict } from "../method.js";
+import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 /**
  * The verdict: what it says, what it refuses to say, and the one distinction it must not flatten.
@@ -342,11 +343,10 @@ describe("nothing on the verdict is a number somebody typed", () => {
   });
 
   it("writes no code identifier anywhere a reader can see", () => {
-    const identifier = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b|[()[\]{}]|=>/;
     let scanned = 0;
     for (const key of FAMILY_ORDER) {
       for (const leaf of leaves(render(key))) {
-        expect(identifier.test(leaf.text), `${key}: "${leaf.text.trim()}" reads as code`).toBe(false);
+        expect(CODE_IDENTIFIER_OR_SYNTAX.test(leaf.text), `${key}: "${leaf.text.trim()}" reads as code`).toBe(false);
         scanned = scanned + 1;
       }
     }
