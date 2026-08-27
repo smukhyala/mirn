@@ -1,4 +1,5 @@
 import type { FamilyProbeSettings } from "../../engine/job/familyProbe.js";
+import type { SuppliedProbe } from "../../engine/job/suppliedProbe.js";
 import type { SuppliedOutcome } from "../../engine/job/supplied.js";
 
 /**
@@ -49,10 +50,19 @@ export type FromSuppliedWorker =
   | {
       readonly kind: "done";
       /**
-       * One outcome per room, in the order the seeds were listed in the request. The seeds
-       * themselves are not repeated here: the sender already has them, and a second copy is a
-       * second thing to keep in step.
+       * The whole probe, aggregated worker-side, exactly as `probe.protocol.ts` sends a
+       * `FamilyProbe`.
+       *
+       * An earlier version of this sent the per-room OUTCOMES alone, on the reasoning that the
+       * sender already knows which seeds it asked for. That was true and insufficient: a verdict
+       * also needs each room's run-to-run band and whether the reading cleared it, and neither is
+       * recoverable from an outcome. Sending outcomes only would have meant the page re-running
+       * the simulator to rebuild what the worker had already computed and thrown away.
+       *
+       * Aggregating here rather than on the page is the same decision `aggregateProbe` records:
+       * the counts are computed in one place, so the page and the pinned measurements cannot
+       * become two implementations of the same eight numbers.
        */
-      readonly perSeed: readonly SuppliedOutcome[];
+      readonly probe: SuppliedProbe;
     }
   | { readonly kind: "failed"; readonly message: string };

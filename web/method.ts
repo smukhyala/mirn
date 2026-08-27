@@ -181,6 +181,28 @@ function paintQuestions(
   }
 }
 
+import {
+  makeSuppliedClient,
+  makeSuppliedLimit,
+  spawnSuppliedWorker,
+  suppliedPortFor,
+  suppliedTimeoutPhrase,
+  wallClockAlarm,
+} from "./app/worker/supplied.client.js";
+import { makeSuppliedVerdict, renderSuppliedVerdict } from "./app/console/suppliedVerdict.js";
+import type { SuppliedProbe } from "./engine/job/suppliedProbe.js";
+
+/**
+ * How long a supplied method gets before this page stops waiting for it.
+ *
+ * Eight rooms, each simulated and then measured twice, is seconds of honest work; a minute is
+ * generous for that and short enough that a reader whose loop never terminates finds out rather
+ * than watching a page that looks busy forever. The limit covers the WHOLE measurement rather than
+ * one room, because a method that is slow on every room is as unusable as one that hangs on the
+ * first, and a per-room clock would never notice the difference.
+ */
+const SUPPLIED_LIMIT_MS = 60000;
+
 export function bootMethodCard(doc: Document): void {
   const questionHost = el<HTMLDivElement>(doc, "question-list");
   const noticeHost = el<HTMLDivElement>(doc, "link-notices");
@@ -326,8 +348,117 @@ export function bootMethodCard(doc: Document): void {
     }
   }
 
+  bootSuppliedForm(doc, { result, verdictHost });
+
   paintQuestions(doc, questionHost, draft, choose);
   refresh();
+}
+
+/**
+ * The second route: a metric handed over rather than described.
+ *
+ * It shares the verdict region with the questionnaire and nothing else. Two routes writing into
+ * one host means whichever ran last is what is on screen, which is the honest arrangement — a page
+ * showing two verdicts at once would invite a comparison between a described method and a supplied
+ * one that neither number supports.
+ *
+ * Nothing typed here reaches the address bar. There is no copy-link control in this form and no
+ * call to `replaceState` in this function, because guardrail 10 now says a link may name a
+ * built-in method and may never carry a function body.
+ */
+function bootSuppliedForm(
+  doc: Document,
+  hosts: { readonly result: HTMLElement; readonly verdictHost: HTMLDivElement },
+): void {
+  const source = el<HTMLTextAreaElement>(doc, "supplied-source");
+  const runButton = el<HTMLButtonElement>(doc, "supplied-run");
+  const status = el<HTMLParagraphElement>(doc, "supplied-status");
+
+  let running = false;
+
+  const refreshButton = (): void => {
+    runButton.disabled = running || source.value.trim().length === 0;
+  };
+
+  source.addEventListener("input", () => {
+    // A verdict belongs to the text that produced it, exactly as the questionnaire's belongs to
+    // the answers that produced it. Leaving it up while the method is edited would put one
+    // metric's numbers under another metric's definition.
+    hosts.result.hidden = true;
+    clear(hosts.verdictHost);
+    refreshButton();
+  });
+
+  /** Spawned on the first press, for the reason the questionnaire's worker is. */
+  let client: ReturnType<typeof makeSuppliedClient> | null = null;
+
+  const finish = (keepStatus: boolean): void => {
+    running = false;
+    source.disabled = false;
+    if (!keepStatus) {
+      clear(status);
+    }
+    refreshButton();
+  };
+
+  runButton.addEventListener("click", () => {
+    if (running) {
+      return;
+    }
+    running = true;
+    runButton.disabled = true;
+    source.disabled = true;
+    hosts.result.hidden = true;
+    clear(hosts.verdictHost);
+    status.textContent = "Measuring your metric on rooms where the robot changes nothing.";
+
+    /**
+     * A fresh worker per press.
+     *
+     * The client latches shut after a timeout because it terminated the thread it would post
+     * into, so a second press has to build a new one. Reusing a latched client would leave the
+     * page pressing a button that could never answer.
+     */
+    if (client === null || client.isStopped()) {
+      const worker = spawnSuppliedWorker();
+      client = makeSuppliedClient(
+        suppliedPortFor(worker),
+        {
+          onProgress: (seedsDone: number, seedsTotal: number, phase: string): void => {
+            clear(status);
+            status.appendChild(element(doc, "span", "status-count", String(seedsDone)));
+            status.appendChild(element(doc, "span", "status-of", " of "));
+            status.appendChild(element(doc, "span", "status-count", String(seedsTotal)));
+            status.appendChild(element(doc, "span", "status-phase", ` rooms done — ${phase}`));
+          },
+          onDone: (probe: SuppliedProbe): void => {
+            const verdict = makeSuppliedVerdict({ probe, settings: PROBE_SETTINGS });
+            clear(hosts.verdictHost);
+            hosts.verdictHost.appendChild(renderSuppliedVerdict(doc, verdict));
+            hosts.result.hidden = false;
+            finish(false);
+          },
+          onFailed: (message: string): void => {
+            // The method's own words, kept. A substituted apology would throw away the one
+            // sentence a reader debugging their own metric can act on.
+            clear(status);
+            status.textContent = `The measurement stopped: ${message}`;
+            finish(true);
+          },
+        },
+        makeSuppliedLimit({
+          limitMs: SUPPLIED_LIMIT_MS,
+          terminate: (): void => {
+            worker.terminate();
+          },
+          setAlarm: wallClockAlarm,
+        }),
+      );
+    }
+    client.start(source.value, PROBE_SETTINGS);
+  });
+
+  refreshButton();
 }
 
 bootMethodCard(document);

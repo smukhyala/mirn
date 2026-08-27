@@ -165,6 +165,27 @@ function click(document: Document, id: string): void {
   button.click();
 }
 
+/**
+ * The markup of one `<form id="...">`, so an assertion can be about a region rather than a page.
+ *
+ * Scoping by region is what lets the questionnaire keep the closed-ness it always had while a
+ * second, deliberately open form exists beside it. A whole-document scan can no longer tell those
+ * apart, and the answer to that is a narrower scan rather than no scan.
+ */
+function regionOf(html: string, id: string): string {
+  const opened = html.indexOf(`<form class="method-supplied" id="${id}"`);
+  const openedOther = html.indexOf(`<form class="method-questions" id="${id}"`);
+  const start = opened >= 0 ? opened : openedOther;
+  if (start < 0) {
+    return "";
+  }
+  const end = html.indexOf("</form>", start);
+  if (end < 0) {
+    return "";
+  }
+  return html.slice(start, end);
+}
+
 describe("the method card is the page the build ships", () => {
   it("is tracked by git", () => {
     const run = (): string =>
@@ -287,12 +308,46 @@ describe("the questionnaire is painted from the closed table", () => {
   });
 
   it("offers no free text, no upload and no place to paste code", () => {
-    // Guardrail 11 in one assertion. The moment something of the reader's can be read in, this is
-    // a benchmark and the numbers start being about somebody else's robot.
-    expect(HTML).not.toMatch(/<textarea/);
+    // This used to scan the whole document and its comment read "Guardrail 11 in one assertion".
+    // Guardrail 11 was rewritten on 2026-08-27 and a supplied-method surface is now permitted, so
+    // the assertion is SCOPED rather than deleted. Deleting it would have removed the only
+    // statement of where the line runs; scoping it says the line moved and says where to.
+    //
+    // What it defends is unchanged and is the thing that mattered: the QUESTIONNAIRE is closed.
+    // Five multiple-choice questions, no free text, no upload, nothing of the reader's read in —
+    // so a reader who never touches the second form is in exactly the position they were before.
+    const questionnaire = regionOf(HTML, "questions");
+    expect(questionnaire.length, "the questionnaire region was not found").toBeGreaterThan(200);
+    expect(questionnaire).not.toMatch(/<textarea/);
+    expect(questionnaire).not.toMatch(/type="file"/);
+    expect(questionnaire).not.toMatch(/type="text"/);
+    expect(questionnaire).not.toMatch(/contenteditable/);
+  });
+
+  it("keeps free text inside the one region that is meant to have it, and nowhere else", () => {
+    // The other half, and the reason scoping is not a loosening. A textarea anywhere OUTSIDE the
+    // supplied form would be a second way in that nothing had argued for — which is how the old
+    // whole-document scan would have caught it, and what this pair has to keep catching.
+    const supplied = regionOf(HTML, "supplied");
+    expect(supplied.length, "the supplied region was not found").toBeGreaterThan(200);
+
+    const textareas = HTML.match(/<textarea/g) ?? [];
+    expect(textareas, "there should be exactly one place to type a method").toHaveLength(1);
+
+    const suppliedTextareas = supplied.match(/<textarea/g) ?? [];
+    expect(suppliedTextareas, "the one textarea is not in the supplied form").toHaveLength(1);
+
+    // Still nowhere at all, in either region or between them.
     expect(HTML).not.toMatch(/type="file"/);
-    expect(HTML).not.toMatch(/type="text"/);
     expect(HTML).not.toMatch(/contenteditable/);
+  });
+
+  it("gives the supplied form no way to put what was typed into a link", () => {
+    // Guardrail 10, as rewritten: a link may name a built-in method and may never carry a function
+    // body. The questionnaire has a copy-link control and this form deliberately does not.
+    const supplied = regionOf(HTML, "supplied");
+    expect(supplied).not.toMatch(/copy-link/);
+    expect(regionOf(HTML, "questions")).toMatch(/copy-link/);
   });
 
   it("will not run until every question has been answered", async () => {

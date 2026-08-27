@@ -884,6 +884,62 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 .method-answer-text { font-size: 0.92rem; line-height: 1.5; color: var(--mirn-ink-muted); }
 .method-answer input:checked + .method-answer-text { color: var(--mirn-ink); }
 
+/* The second route onto the method card: a metric handed over rather than described. It shares the
+   questionnaire's rule-above-the-region so the two read as siblings, because they answer the same
+   question at different fidelity rather than being a control and an escape hatch. */
+/* A supplied method's verdict carries four things the questionnaire's cannot, and they need to
+   read differently from the figures around them.
+
+   The warning is the one that matters. It appears when a method gave two different answers to the
+   same question, and it says the figures below cannot be trusted as a measurement of one thing.
+   A sentence that important set in the same weight as body copy is a sentence a reader skims, so
+   it gets the rule and the indent the drill's own caveats use. */
+.supplied-warning {
+  margin: 1.2rem 0;
+  border-left: 3px solid var(--mirn-ink);
+  padding: 0.5rem 0 0.5rem 1rem;
+  font-weight: 600;
+  color: var(--mirn-ink);
+}
+/* A failure message belongs to the reader's method, not to this page, and is set in the same
+   monospace the method was typed in so the difference is visible rather than asserted. */
+.supplied-message {
+  display: block;
+  margin: 0.3rem 0 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 1px solid var(--mirn-rule);
+  background: var(--mirn-surface);
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  font-size: 0.85rem;
+  color: var(--mirn-ink-muted);
+  white-space: pre-wrap;
+}
+.supplied-failures,
+.supplied-disagreements {
+  margin: 1.2rem 0 0;
+}
+
+.method-supplied {
+  margin: 0 0 2rem;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 1.2rem;
+}
+/* Monospace because what goes in it is code, and the reader needs to see their own indentation.
+   The stack ends in a generic so it renders somewhere sane with no webfont, of which there are
+   none on this site. */
+.method-supplied textarea {
+  inline-size: 100%;
+  margin-top: 1rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--mirn-rule);
+  border-radius: 2px;
+  background: var(--mirn-surface);
+  color: var(--mirn-ink);
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
 .method-run { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: baseline; margin-top: 1.4rem; }
 .method-status {
   margin: 0.8rem 0 0.9rem;
