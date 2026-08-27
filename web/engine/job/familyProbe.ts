@@ -253,12 +253,26 @@ function withStrangerControl(real: RunResult, decoy: RunResult): RunResult {
 
 const MEASURED = Object.freeze({ kind: "measured" as const });
 
-/** What one family reads off one room. Every branch returns a `Reading`, availability included. */
-function readFamily(
+/**
+ * What one family reads off one room. Every branch returns a `Reading`, availability included.
+ *
+ * `world` is the override set the room itself was built from. It exists for the one branch that
+ * builds a SECOND room — the stranger's control — which has to come from the same world as the
+ * first or the unpaired family is being handed a room from a different experiment. Passed in
+ * rather than assumed, because `powerCurve.ts` runs this same function on worlds where the robot
+ * is not invisible and `ZERO_EFFECT` would be the wrong world to draw a decoy from.
+ *
+ * It happens not to change a number today: `withStrangerControl` takes the decoy's CONTROL arm,
+ * which has no robot in it, so nothing about the robot reaches the reading. That is the same
+ * argument the file header makes about the band, it is asserted in `powerCurve.test.ts` rather
+ * than trusted, and it is exactly the kind of coincidence that stops being true quietly.
+ */
+export function readFamily(
   family: MethodFamily,
   settings: FamilyProbeSettings,
   config: RunConfig,
   run: RunResult,
+  world: RunConfigOverrides,
 ): Reading {
   const ruler = family.ruler;
   if (ruler.kind === "sharedNoiseTwin") {
@@ -267,7 +281,7 @@ function readFamily(
   if (ruler.kind === "separateRunTwin") {
     const decoyConfig = makeRunConfig({
       ...settings.base,
-      ...ZERO_EFFECT,
+      ...world,
       seed: config.seed + ruler.controlSeedOffset,
     });
     const decoy = runPair(decoyConfig);
@@ -308,7 +322,7 @@ export function probeSeed(
   const run = runPair(config);
   const truthM = paired(run.pair).value;
   const band = replicateBand(config, settings.bandReplicates);
-  const reading = readFamily(family, settings, config, run);
+  const reading = readFamily(family, settings, config, run, ZERO_EFFECT);
 
   // `truthUnderBand` is recorded and asserted, never branched on. It used to gate the line
   // below, and that gate could not fail: the truth here is exactly 0 and a band is a positive
