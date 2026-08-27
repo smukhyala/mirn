@@ -1,6 +1,7 @@
 import { fail } from "../../engine/core/errors.js";
 import type { FamilyKey } from "../../engine/job/families.js";
 import type { FamilyProbe, FamilyProbeSettings } from "../../engine/job/familyProbe.js";
+import type { PowerCurve } from "../../engine/job/powerCurve.js";
 import type { FromProbeWorker, ToProbeWorker } from "./probe.protocol.js";
 
 /**
@@ -28,12 +29,14 @@ export interface ProbePort {
 export interface ProbeHandlers {
   readonly onProgress: (seedsDone: number, seedsTotal: number, phase: string) => void;
   readonly onProbed: (probe: FamilyProbe) => void;
+  readonly onCurved: (curve: PowerCurve) => void;
   readonly onFailed: (message: string) => void;
 }
 
 export interface ProbeClient {
   readonly kind: "probeClient";
   readonly start: (family: FamilyKey, settings: FamilyProbeSettings) => void;
+  readonly startCurve: (family: FamilyKey, settings: FamilyProbeSettings) => void;
   readonly isRunning: () => boolean;
 }
 
@@ -54,6 +57,11 @@ export function makeProbeClient(port: ProbePort, handlers: ProbeHandlers): Probe
       handlers.onProbed(message.probe);
       return;
     }
+    if (message.kind === "curved") {
+      running = false;
+      handlers.onCurved(message.curve);
+      return;
+    }
     running = false;
     handlers.onFailed(message.message);
   });
@@ -69,9 +77,23 @@ export function makeProbeClient(port: ProbePort, handlers: ProbeHandlers): Probe
     port.postMessage({ kind: "probe", family, settings });
   };
 
+  // The same one-job-at-a-time rule, and for a sharper reason than the probe's: a curve and a
+  // count landing in one verdict would put the sweep's numbers under the single world's heading.
+  const startCurve = (family: FamilyKey, settings: FamilyProbeSettings): void => {
+    if (running) {
+      fail(
+        "a measurement is already running; two of them would land in the same verdict with no " +
+          "way to tell which family's numbers were on screen",
+      );
+    }
+    running = true;
+    port.postMessage({ kind: "curve", family, settings });
+  };
+
   return Object.freeze({
     kind: "probeClient" as const,
     start,
+    startCurve,
     isRunning: (): boolean => running,
   });
 }

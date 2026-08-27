@@ -219,6 +219,47 @@
       <button id="comparison-download" type="button">Download this table</button>
     </div>
   </section>
+
+  <section class="method-region" aria-labelledby="curve-title">
+    <h2 class="region-title" id="curve-title">And when there was something to notice, did it?</h2>
+    <p class="verdict-line">
+      Everything above is measured on one world, the one where the robot moves nobody, and counts
+      how often a ruler says otherwise. That is half of what decides whether a ruler is any use. The
+      other half is what it does when the robot really did move the crowd — because a method that
+      always answers "nothing happened" gets a perfect score on the half above and is not measuring
+      anything at all.
+    </p>
+    <p class="verdict-line">
+      So this runs the same rooms again at each setting of the dial that decides how much space the
+      robot demands, from none up to the largest the console offers. The first row is the world the
+      counts above were taken on, measured again rather than quoted, and it is what every row
+      beneath it is read against.
+    </p>
+    <p class="verdict-line">
+      The ruler swept here is the paired construction — the same room run twice, sharing every
+      random draw. It is swept rather than your own family so that there is a curve on the page
+      that rises, to set the one your family produced beside. It runs six settings rather than one,
+      so it takes several times as long as the counts above, and the line below says how far along
+      it is.
+    </p>
+    <div class="method-run">
+      <button id="curve-run" type="button">Sweep the effect from nothing upwards</button>
+    </div>
+    <p class="method-status" id="curve-status"></p>
+    <p class="region-note">
+      This is not a power calculation and no row of it says what effect size a study should be built
+      to detect. The distances are what an invented dial did to an invented crowd.
+    </p>
+  </section>
+
+  <!--
+    Empty until the sweep has run. web/method.ts builds the whole table into it and takes it down
+    again before the next run starts, so nothing claims to be a sweep before there is one.
+  -->
+  <section class="method-result" id="curve-result" aria-labelledby="curve-result-title" hidden>
+    <h2 class="region-title" id="curve-result-title">What it found, as the robot pushed harder</h2>
+    <div id="curve-verdict"></div>
+  </section>
 </main>
 
 <script type="module" src="./method.ts"></script>

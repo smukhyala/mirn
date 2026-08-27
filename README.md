@@ -157,6 +157,31 @@ four families and your own method across one shared set of rooms, so the numbers
 What it will not do is order them into a leaderboard: the crowd is invented, so the comparison
 establishes which ruler is confounded *on this toy*, never which method wins in a corridor.
 
+**And the other half of the question: when there was something to notice, did it?** Everything
+above is measured on one world — the one where the robot moves nobody — and counts how often a
+ruler says otherwise. That is a false-positive rate, and it is half of what decides whether a ruler
+is any use. A method that always answers "nothing happened" scores perfectly on it.
+
+So the bench also sweeps the dial that decides how much space the robot demands, from none up to
+the largest the console offers, and runs the same rooms again at every setting. The first row of
+that table is the world the counts above were taken on — not a similar world, the same one: the
+test asserts the two are identical bit for bit, on every room, for every ruler. So the sweep's zero
+is the number already on the page rather than a phrase asking to be trusted.
+
+What it finds: the paired construction goes from finding nothing where there is nothing to finding
+all eight rooms of eight where the robot pushes hardest, with no misses and no false alarms at any
+setting. The forecast method calls more than half the rooms at *every* setting, including the one
+where the true effect is exactly nothing, and what it reports barely moves between the two ends
+while the truth underneath it goes from nought to nearly half a metre. That is worse than a high
+false-positive rate and it is a different fault: a ruler firing at about the same rate whatever
+happened is not reporting on what happened, so neither its alarms nor its silences carry
+information.
+
+Hits, misses and false alarms are three counts and never one rate. Whether a room had anything to
+find is decided room by room rather than by the setting, so pooling them would let a ruler that
+calls every room look like a perfect detector at exactly the settings where most rooms happen to
+contain something.
+
 **How well the rate is known, and what it cost to know it better.** Run 8, 16 or 32 rooms — the
 first 8 of 32 are the same 8, so the count buys precision rather than a different measurement — and
 every false-positive rate is printed with a Wilson score interval beside it. Wilson rather than
@@ -235,14 +260,14 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 1,060 browser tests across 75 files, of which 1,029 run without the five that
+**The numbers.** 1,090 browser tests across 78 files, of which 1,054 run without the six that
 re-run the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left
 out here on purpose: the last set was measured on one machine and re-measured on another that
 disagreed by 70%, so a single number would be a claim rather than a figure. CI checks the two
 languages independently, then runs a third job for the check no human remembers: that the committed
 fixtures are current and the browser still reproduces them. The built site is four HTML files (8.98,
-58.01, 7.13 and 12.95 kB), one 22.5 kB stylesheet, about 213 kB of script across six chunks, and
-three workers of 44, 47 and 51 kB.
+58.01, 7.13 and 15.24 kB), one 23.5 kB stylesheet, about 220 kB of script across six chunks, and
+three workers of 46, 47 and 51 kB.
 
 ---
 
@@ -303,7 +328,7 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 1060 tests, production build
+npm run check        # typecheck, 1090 tests, production build
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in

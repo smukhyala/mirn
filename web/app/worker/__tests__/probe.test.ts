@@ -124,6 +124,7 @@ describe("the client is the main thread's whole view of the worker", () => {
     const client = makeProbeClient(port, {
       onProgress: (done: number, total: number): void => { seen.push(`progress ${done}/${total}`); },
       onProbed: (probe: FamilyProbe): void => { seen.push("probed"); probes.push(probe); },
+      onCurved: (): void => { seen.push("curved"); },
       onFailed: (message: string): void => { seen.push(`failed ${message}`); },
     });
     const push = (message: FromProbeWorker): void => {

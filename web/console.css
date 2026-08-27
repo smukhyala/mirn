@@ -1235,3 +1235,71 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   .method-run { flex-direction: column; align-items: stretch; }
 }
 
+
+/* --------------------------------------------------------------------------------------------
+ * The sweep table: one row per setting of the robot's push, from nothing upwards.
+ *
+ * Seven columns, so it scrolls inside its own box rather than pushing the page sideways — the same
+ * treatment the comparison gets, for the same reason.
+ * ------------------------------------------------------------------------------------------ */
+
+.power-scroll {
+  overflow-x: auto;
+  margin-block: 1.4rem;
+}
+
+.power-table {
+  inline-size: 100%;
+  min-inline-size: 46rem;
+  border-collapse: collapse;
+  text-align: start;
+}
+
+.power-table th[scope="col"] {
+  border-bottom: 1px solid var(--mirn-rule);
+  padding: 0 1.1rem 0.6rem 0;
+  vertical-align: bottom;
+  text-align: start;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mirn-ink-faint);
+}
+
+.power-row td,
+.power-row th[scope="row"] {
+  border-bottom: 1px solid var(--mirn-rule);
+  padding: 0.8rem 1.1rem 0.8rem 0;
+  vertical-align: top;
+  text-align: start;
+  font-weight: 400;
+}
+
+.power-dial {
+  font-family: var(--mirn-font-mono);
+  font-size: 0.8rem;
+  color: var(--mirn-ink-faint);
+  white-space: nowrap;
+}
+
+/* The row the counts above the table were taken on. Marked because every row below is read
+   against it, not because it is more important. */
+.power-row-zero td,
+.power-row-zero th[scope="row"] {
+  background: var(--mirn-surface);
+}
+
+.power-row .figure-anchor {
+  display: block;
+  margin-block-start: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--mirn-ink-faint);
+}
+
+.power-flat {
+  margin-block-start: 1.2rem;
+  border-left: 3px solid var(--mirn-ink);
+  padding-left: 1rem;
+}

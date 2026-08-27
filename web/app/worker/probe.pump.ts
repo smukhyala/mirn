@@ -5,6 +5,13 @@ import {
   type FamilyProbeSeed,
   type FamilyProbeSettings,
 } from "../../engine/job/familyProbe.js";
+import {
+  aggregatePowerLevel,
+  probePowerSeed,
+  PUSH_LEVELS,
+  type PowerLevel,
+  type PowerSeed,
+} from "../../engine/job/powerCurve.js";
 import type { FromProbeWorker } from "./probe.protocol.js";
 
 /**
@@ -78,6 +85,89 @@ export function pumpProbe(
     port.postMessage({ kind: "probed", probe: aggregateProbe(FAMILIES[family], perSeed) });
   } catch (error) {
     let message = "the measurement stopped before it finished, and gave no reason";
+    if (error instanceof Error && error.message.length > 0) {
+      message = error.message;
+    }
+    port.postMessage({ kind: "failed", message });
+  }
+}
+
+/**
+ * What the reader is told while the sweep runs.
+ *
+ * It counts rooms across the WHOLE sweep rather than restarting the count at each dial position,
+ * because a progress line that returns to "room 1 of 8" six times reads as a page that has got
+ * stuck. Reader-facing prose: the family is named from the catalogue, and the dial position is
+ * given as the plain "how much space the robot demands" figure a reader can find on the console.
+ */
+export function curvePhraseFor(
+  family: FamilyKey,
+  roomsDone: number,
+  roomsTotal: number,
+  pushStrength: number,
+): string {
+  if (roomsDone >= roomsTotal) {
+    return "counting up what it noticed, and what there was to notice";
+  }
+  const name = FAMILIES[family].name;
+  const push = pushStrength === 0 ? "no space at all" : `${String(pushStrength)} times the usual`;
+  return (
+    `running room ${String(roomsDone + 1)} of ${String(roomsTotal)}, with the robot demanding ` +
+    `${push}, and reading it the way "${name.toLowerCase()}" would`
+  );
+}
+
+/**
+ * Runs one family across every dial position, one room at a time.
+ *
+ * Room by room for `pumpProbe`'s reason — a room is the smallest piece with a boundary in it — and
+ * the aggregation is `aggregatePowerLevel`'s alone, so the page and the pinned measurements are one
+ * implementation rather than two that agree today. `powerCurve.slow.test.ts` runs the single-call
+ * route; this is the only other one.
+ */
+export function pumpCurve(
+  family: FamilyKey,
+  settings: FamilyProbeSettings,
+  port: ProbePort,
+): void {
+  try {
+    const roomsTotal = settings.seeds.length * PUSH_LEVELS.length;
+    let roomsDone = 0;
+    const levels: PowerLevel[] = [];
+
+    port.postMessage({
+      kind: "progress",
+      seedsDone: 0,
+      seedsTotal: roomsTotal,
+      phase: curvePhraseFor(family, 0, roomsTotal, PUSH_LEVELS[0] ?? 0),
+    });
+
+    for (const pushStrength of PUSH_LEVELS) {
+      const rooms: PowerSeed[] = [];
+      for (const seed of settings.seeds) {
+        rooms.push(probePowerSeed(FAMILIES[family], settings, seed, pushStrength));
+        roomsDone = roomsDone + 1;
+        port.postMessage({
+          kind: "progress",
+          seedsDone: roomsDone,
+          seedsTotal: roomsTotal,
+          phase: curvePhraseFor(family, roomsDone, roomsTotal, pushStrength),
+        });
+      }
+      levels.push(aggregatePowerLevel(pushStrength, rooms));
+    }
+
+    port.postMessage({
+      kind: "curved",
+      curve: Object.freeze({
+        kind: "powerCurve" as const,
+        familyKey: family,
+        unit: "metres" as const,
+        levels: Object.freeze(levels),
+      }),
+    });
+  } catch (error) {
+    let message = "the sweep stopped before it finished, and gave no reason";
     if (error instanceof Error && error.message.length > 0) {
       message = error.message;
     }
