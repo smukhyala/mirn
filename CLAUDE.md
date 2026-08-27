@@ -459,8 +459,8 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build
-npm run test                             # 773 tests across 64 files
-npx vitest run --exclude '**/*.slow.test.ts'   # 742 of them
+npm run test                             # 1060 tests across 75 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 1029 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -475,10 +475,16 @@ sentence claiming otherwise. Read them as shape, not as a target to hit:
 
 | | Measured | Where |
 |---|---|---|
-| `npm run test`, 773 tests | 42.8 s | cloud container, 2026-08-26 |
-| the `.slow.test.ts` cut, 742 tests | 35.1 s | same |
+| `npm run test`, 1060 tests | 45.5 s and 45.0 s | cloud container, 2026-08-27 |
+| the `.slow.test.ts` cut, 1029 tests | 27.2 s and 27.3 s | same |
+| `npm run test`, back when it was 773 tests | 42.8 s | cloud container, 2026-08-26 |
+| the cut, back when it was 742 tests | 35.1 s | same |
 | `pytest -q -m "not slow"`, 275 tests | 35.0 s | same |
 | `npm run test`, back when it was 652 tests | 22 s | the author's own machine |
+
+Two samples are recorded for each of the current rows rather than one, because a single number here
+has twice been the thing that went stale quietly. They agree to within half a second, which is worth
+knowing given the paragraph below says these figures once varied by 70% between repeats.
 
 Two of the original figures used to be wrong by a plausible-looking margin, which is the failure
 mode this paragraph exists to name: a timing nobody re-ran is a claim, and the whole point of a
@@ -497,11 +503,16 @@ nothing) and `method-run.slow.test.ts` (the method card driven end to end at the
 All five re-run the simulator many times over, which is why they cost what they cost and why none
 of them can be made fast. So it is a working loop and not the gate.
 
-**The cut is worth much less than it was, and saying so is the point of re-measuring it.** It once
-dropped 19 tests to save 9 seconds of 22. It now drops 31 to save about 8 of 43, because two of the
-five slow files are the method card's and the suite around them has grown faster than they have.
-That is not a reason to delete the line. It is a reason to stop describing it as a large saving,
-and to expect the next feature to shrink it further.
+**The value of the cut has now moved twice, in both directions, which is the point of re-measuring
+it rather than reasoning about it.** It once dropped 19 tests to save 9 seconds of 22. On the method
+card's commit it dropped 31 to save about 8 of 43, and this file said so and predicted the next
+feature would shrink it further. That prediction was wrong. It now drops the same 31 tests to save
+about 18 seconds of 45 — back to roughly the 40% it started at — because the features that landed
+since added 287 fast tests and not one slow file.
+
+So the line to take from this is not a number about the cut. It is that a documented saving is a
+measurement with a shelf life, and the only reliable thing about the three figures above is that
+each of them was true when it was taken and none of them stayed true. Re-run it before quoting it.
 
 The fast pytest loop is real: the tests that dominate the runtime carry `@pytest.mark.slow`, and
 `pyproject.toml` records the measurement the cut-off came from. It skips the divergence property
