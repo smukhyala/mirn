@@ -188,7 +188,7 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 766 browser tests across 63 files, of which 735 run without the five that re-run
+**The numbers.** 773 browser tests across 64 files, of which 742 run without the five that re-run
 the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left out
 here on purpose: the last set was measured on one machine and re-measured on another that disagreed
 by 70%, so a single number would be a claim rather than a figure. CI checks the two languages
@@ -256,7 +256,7 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 766 tests, production build
+npm run check        # typecheck, 773 tests, production build
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in

@@ -148,6 +148,11 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     picker's list, a slider's own notches, the three settings with no control yet) is printed above
     the controls, never rounded off quietly.
 
+    **And it carries no executable code.** Guardrail 11 opened a supplied-method path; a permalink
+    that could carry a supplied method would turn a shareable link into a shareable exploit, on a
+    static origin with no server to put it behind. A link may name a built-in method by key. It may
+    not carry a function body, and a test asserts that rather than a comment claiming it.
+
     This one used to be enforced by two prose comments, which is the position the `Math.hypot` ban
     was in before somebody wrote a test.
     `web/app/console/__tests__/nostorage.test.ts` now greps every `.ts`, `.html` and `.css` file
@@ -155,19 +160,42 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     `hypot.test.ts` carries. `history.replaceState` is the one allowed exception and is asserted
     present rather than absent, because it is how the permalink reaches the address bar.
 
-11. **The line is not "do not be a simulator"; it is between this toy, measured well, and robots,
-    characterised.** The operative half of the old rule — "which page does this make clearer?" —
-    stops working when there is no reading order to be clearer within, and it was the half that did
-    the refusing. No ROS, no
-    planner benchmark, no dataset loader, no trained model, no physics-engine dependency, no second
-    simulator backend, no leaderboard, no bring-your-own-method import path. The CSV is an export,
-    never an input format — the moment something else can be read in and scored, this is a benchmark
-    and the numbers start being about someone else's robot. A run list with pinning, diffing, a
-    sweep and an export is precisely the shape of a benchmark harness, and a column picker is an
-    extension point wearing a checkbox, so the columns are a closed table with no user-defined
-    column and no formula field. The refusal test is now: **"which readout does this move, and what
-    does that readout say when the answer is zero?"** — no answer, no feature. It folds guardrail 6
-    into the admission criterion, so a feature cannot enter without bringing its own zero.
+11. **The line has moved, deliberately, and this records where it went.** This guardrail used to
+    refuse eight things outright, and three of those refusals are lifted by owner's decision on
+    2026-08-27: a **bring-your-own-method path**, a **comparison of several methods against each
+    other**, and a **second simulator backend**. The reasoning that justified refusing them is not
+    erased — it is in this file's history and in
+    `docs/superpowers/specs/2026-08-25-method-card-design.md`, which argued at length that the
+    method card did not cross a line that no longer exists. Read those before assuming the lift was
+    careless.
+
+    **What is still refused, because nobody lifted it:** no ROS, no planner benchmark, no dataset
+    loader, no trained model, no physics-engine dependency. The CSV is still an export and never an
+    input format for *trajectories* — a reader's own crowd is a different question from a reader's
+    own ruler, and only the ruler was opened.
+
+    **What replaces the blanket ban, now that code can be read in.** A supplied method is data until
+    it runs, and then it is code on this origin:
+
+    - It runs in a **Worker with no DOM**, and nothing it returns is trusted without validation.
+      A number that comes back `NaN`, infinite or non-finite is a failed method, reported as one,
+      never rendered as a reading.
+    - **It never enters the permalink.** Guardrail 10 says a link carries the recipe and never the
+      results; it now also says a link never carries executable code. A shareable link that runs a
+      stranger's function in your browser is a shareable exploit, and this project has no server to
+      put it behind. The link may name a *built-in* method; it may not carry a supplied one.
+    - **A supplied method is never reported as a fact about robots.** Guardrail 2 is unamended and
+      does the work the old refusal used to do: the crowd is still invented, so a comparison
+      establishes which ruler is confounded *on this toy*, and never which method wins in a
+      corridor. A ranking that reads as a leaderboard of published methods is the failure mode, and
+      the wording has to refuse it where the reader meets it.
+
+    The refusal test is unchanged and now carries more weight, not less: **"which readout does this
+    move, and what does that readout say when the answer is zero?"** — no answer, no feature. It
+    folds guardrail 6 into the admission criterion, so a feature cannot enter without bringing its
+    own zero. A user-supplied method has to answer it too, which is the point: the site measures
+    what a supplied ruler reads on a world whose true effect is exactly nothing, and that is the
+    number worth having.
 
 12. **No bare code identifier on any surface a reader sees, and every term defined in plain English
     at first use.** Half of this guardrail genuinely died: `web/vocab.ts`, the `introduces`/`uses`
@@ -212,13 +240,16 @@ without the robot reaches a card before the call — is not a list of allowed co
 it is `corridorReadable` on each column descriptor, and that flag is proved rather than asserted:
 `web/engine/job/__tests__/unpaired.test.ts` swaps the control arm for a decoy from an unrelated
 crowd and fails any column claiming to need no control run that notices the swap. And guardrail 11
-was not amended for the drill, because it does not need to be: the drill scores a reader's call
-against what the room did, never a robot's performance and never a rival method's, so it never
-enters the run-list-with-pinning-and-export shape guardrail 11 already refuses.
+did not have to be amended for the drill: it scores a reader's call against what the room did, never
+a robot's performance and never a rival method's. That was written when guardrail 11 refused a
+benchmark shape outright. Guardrail 11 has since been rewritten and the refusal narrowed, so the
+sentence survives as a fact about the drill rather than as a boundary the drill was tested against.
 
 **A note on the method card**, which is the second feature built after these guardrails and the one
-that came nearest guardrail 11's line — it takes a description of somebody else's metric and scores
-it. The argument that this is not a bring-your-own-method import path is in
+that came nearest guardrail 11's line as it then stood — it takes a description of somebody else's
+metric and scores it. That line has since moved and a supplied method may now be run directly; what
+follows describes the closed-questionnaire design as built, which remains the safest path and stays
+the default. The argument that this is not a bring-your-own-method import path is in
 `docs/superpowers/specs/2026-08-25-method-card-design.md`, and a design document is not the
 contract, so the three facts it rests on are recorded here. **Nothing is read in, and that is
 mechanical rather than intended:** the reader answers five closed multiple-choice questions and
@@ -300,8 +331,9 @@ entirely — Python-only estimators are not a parity question until something po
 
 - **Plain typed records, not a plugin system.** This is a deliberate reversal of the Python side's
   framework-first convention, and it must be stated or the next agent will "fix" it back. An
-  extension point is an invitation, and guardrail 11 exists to decline it. Four divergences do not
-  need a registry.
+  extension point is an invitation, and guardrail 11 used to decline every one. It now declines all
+  but the one it names, so this convention holds everywhere except the supplied-method seam, which is
+  an extension point on purpose and is the only one. Four divergences still do not need a registry.
 - Strict mode with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`. Frozen plain
   objects, validated in a `make*` factory that throws `ContractError` — never a class, because
   everything crosses a Worker boundary and must be structured-cloneable.
@@ -369,8 +401,8 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build
-npm run test                             # 766 tests across 63 files
-npx vitest run --exclude '**/*.slow.test.ts'   # 735 of them
+npm run test                             # 773 tests across 64 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 742 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -385,8 +417,8 @@ sentence claiming otherwise. Read them as shape, not as a target to hit:
 
 | | Measured | Where |
 |---|---|---|
-| `npm run test`, 766 tests | 42.8 s | cloud container, 2026-08-26 |
-| the `.slow.test.ts` cut, 735 tests | 35.1 s | same |
+| `npm run test`, 773 tests | 42.8 s | cloud container, 2026-08-26 |
+| the `.slow.test.ts` cut, 742 tests | 35.1 s | same |
 | `pytest -q -m "not slow"`, 275 tests | 35.0 s | same |
 | `npm run test`, back when it was 652 tests | 22 s | the author's own machine |
 
