@@ -1,7 +1,8 @@
 import { fail } from "../../engine/core/errors.js";
+import { CROWD_MODEL_ORDER, type CrowdModelKey } from "../../engine/contracts/config.js";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
 import { COLUMNS } from "../../engine/job/columns.js";
-import { unitLabel } from "../../ui/labels.js";
+import { crowdLabel, unitLabel } from "../../ui/labels.js";
 
 /**
  * Every knob on the page, built by walking one table.
@@ -25,6 +26,13 @@ export interface PanelValues {
   readonly kind: "panelValues";
   readonly axisValues: Readonly<Record<AxisKey, number>>;
   readonly pedestriansSeeRobot: boolean;
+  /**
+   * Which crowd the room runs, and deliberately not an axis. Every other control here is either a
+   * numeric knob out of `AXES` or a switch; this one is a choice between two kernels, which has no
+   * minimum, no maximum and nothing in between, so it is a picker of its own rather than a scale
+   * with two notches on it.
+   */
+  readonly crowdModel: CrowdModelKey;
   readonly sweepAxis: AxisKey | null;
   readonly sweepValues: readonly number[];
   readonly seedCount: number;
@@ -82,6 +90,7 @@ const MS_PER_FRECHET_PER_PEDESTRIAN = 6.5;
 export function makePanelValues(init: {
   axisValues: Readonly<Record<string, number>>;
   pedestriansSeeRobot: boolean;
+  crowdModel: CrowdModelKey;
   sweepAxis: AxisKey | null;
   sweepValues: readonly number[];
   seedCount: number;
@@ -104,6 +113,16 @@ export function makePanelValues(init: {
       fail(`${entry.label} must be between ${entry.min} and ${entry.max}, got ${value}`);
     }
     axisValues[key] = value;
+  }
+
+  let crowdModelIsKnown = false;
+  for (const key of CROWD_MODEL_ORDER) {
+    if (key === init.crowdModel) {
+      crowdModelIsKnown = true;
+    }
+  }
+  if (!crowdModelIsKnown) {
+    fail(`the crowd must be one this bench can run, got '${String(init.crowdModel)}'`);
   }
 
   if (init.sweepAxis !== null) {
@@ -135,6 +154,7 @@ export function makePanelValues(init: {
     kind: "panelValues" as const,
     axisValues: Object.freeze(axisValues) as Readonly<Record<AxisKey, number>>,
     pedestriansSeeRobot: init.pedestriansSeeRobot,
+    crowdModel: init.crowdModel,
     sweepAxis: init.sweepAxis,
     sweepValues: Object.freeze([...init.sweepValues]),
     seedCount: init.seedCount,
@@ -301,6 +321,35 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
     }
   }
 
+  /**
+   * The crowd picker, and the one control here that is not a number.
+   *
+   * It sits with the room rather than with the ruler because it changes what the people do, not how
+   * they are measured. Its options say what each crowd DOES — one reacts to whoever is beside a
+   * person now, the other to whoever they are about to meet — because that difference is the whole
+   * reason the second one exists, and because the kernels' own names are code and a reader never
+   * sees one.
+   */
+  const crowdSelect = doc.createElement("select");
+  crowdSelect.id = "crowd-model";
+  for (const key of CROWD_MODEL_ORDER) {
+    const option = doc.createElement("option");
+    option.value = key;
+    option.textContent = crowdLabel(key);
+    crowdSelect.append(option, sep(doc));
+  }
+  // Read off the table's own first entry rather than typed here: that entry is the crowd every
+  // fixture and pinned measurement in this repo was taken on, and a hand-written default would be
+  // free to disagree with it.
+  const firstCrowdOption = crowdSelect.options[0];
+  if (firstCrowdOption !== undefined) {
+    crowdSelect.value = firstCrowdOption.value;
+  }
+  const crowdControl = doc.createElement("label");
+  crowdControl.className = "control";
+  crowdControl.append(doc.createTextNode("The crowd is "), crowdSelect);
+  worldGroup.append(crowdControl, sep(doc));
+
   const seeRobot = doc.createElement("input");
   seeRobot.type = "checkbox";
   seeRobot.id = "see-robot";
@@ -448,6 +497,10 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
     return makePanelValues({
       axisValues: currentAxisValues(),
       pedestriansSeeRobot: seeRobot.checked,
+      // A `<select>` reads back "" when it is given a value it has no option for, so this is
+      // asserted rather than assumed: `makePanelValues` refuses anything that is not one of the
+      // two crowds, the same way it refuses a slider value off its own range.
+      crowdModel: crowdSelect.value as CrowdModelKey,
       sweepAxis: axisKey,
       sweepValues: axisKey === null ? [] : parseValues(),
       seedCount: Number(seedSelect.value),
@@ -504,6 +557,7 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
       }
     }
     seeRobot.checked = initial.pedestriansSeeRobot;
+    crowdSelect.value = initial.crowdModel;
     if (initial.sweepAxis === null) {
       axisSelect.value = "";
       valuesField.value = "";
@@ -535,6 +589,7 @@ export function mountPanel(host: HTMLElement, options: PanelOptions): PanelHandl
     }
   }
   seeRobot.addEventListener("change", refresh);
+  crowdSelect.addEventListener("change", refresh);
   seedSelect.addEventListener("change", refresh);
   bandToggle.addEventListener("change", refresh);
   bandCount.addEventListener("input", refresh);

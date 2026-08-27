@@ -1,5 +1,9 @@
 import { fail } from "../../engine/core/errors.js";
-import type { RunConfigOverrides } from "../../engine/contracts/config.js";
+import {
+  CROWD_MODEL_ORDER,
+  type CrowdModelKey,
+  type RunConfigOverrides,
+} from "../../engine/contracts/config.js";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
 import { COLUMNS, COLUMN_ORDER, type ColumnKey } from "../../engine/job/columns.js";
 import {
@@ -26,8 +30,10 @@ import {
  * `AXIS_ORDER`) has no entry that writes `widthM` or `heightM` — the wireframe's "Room width"
  * slider is not a catalogued axis yet — so there is no settings field here for a bad value to
  * hide in, and nothing in this file constructs a `RunConfigOverrides` that touches room
- * dimensions. `baseOverridesFor` only ever changes `pedestriansSeeRobot` and whatever the world
- * axes in the catalogue write, and the default room (22 m by 13 m, goal at (20, 6.5)) is never
+ * dimensions. `baseOverridesFor` only ever changes `pedestriansSeeRobot`, `crowdModel` and
+ * whatever the world axes in the catalogue write — neither of the first two is a length, and a
+ * crowd kernel is a choice of how a person accelerates, not a change of room — and the default
+ * room (22 m by 13 m, goal at (20, 6.5)) is never
  * altered by anything built here, so the goal-in-room check in `makeRunConfig` cannot fire from
  * this file's own output today. Wiring an actual width control is Task 24's control panel; when
  * it lands, either the catalogue grows a `roomWidth` axis (validated the same way every other
@@ -59,6 +65,8 @@ export interface ConsoleSettings {
    *  picker cannot drift. */
   readonly axisValues: Readonly<Record<AxisKey, number>>;
   readonly pedestriansSeeRobot: boolean;
+  /** Which crowd the room is running. Not an axis: two kernels are not two points on a scale. */
+  readonly crowdModel: CrowdModelKey;
   readonly nearMissThresholdM: number;
   readonly recoveryToleranceFraction: number;
   readonly recoveryDwellSteps: number;
@@ -76,6 +84,7 @@ export interface ConsoleSettingsInit {
   kind?: "consoleSettings";
   axisValues: Readonly<Record<AxisKey, number>>;
   pedestriansSeeRobot: boolean;
+  crowdModel: CrowdModelKey;
   nearMissThresholdM: number;
   recoveryToleranceFraction: number;
   recoveryDwellSteps: number;
@@ -104,6 +113,20 @@ export function makeConsoleSettings(init: ConsoleSettingsInit): ConsoleSettings 
     if (value > entry.max) {
       fail(`${entry.label} must be at most ${String(entry.max)}, got ${String(value)}`);
     }
+  }
+
+  // `init.crowdModel` is typed as the closed union, but a permalink is decoded from a stranger's
+  // query string and a caller can hand this a string that names no crowd this bench has. The
+  // dispatch in `world.ts` would then quietly fall through to whichever branch it ends on, which
+  // is a room running something other than what the link asked for with nothing said about it.
+  let crowdModelIsKnown = false;
+  for (const key of CROWD_MODEL_ORDER) {
+    if (key === init.crowdModel) {
+      crowdModelIsKnown = true;
+    }
+  }
+  if (!crowdModelIsKnown) {
+    fail(`The crowd must be one this bench can run, got '${String(init.crowdModel)}'`);
   }
 
   if (!Number.isFinite(init.nearMissThresholdM) || init.nearMissThresholdM <= 0) {
@@ -224,6 +247,7 @@ export function makeConsoleSettings(init: ConsoleSettingsInit): ConsoleSettings 
     kind: "consoleSettings" as const,
     axisValues: Object.freeze(axisValues),
     pedestriansSeeRobot: init.pedestriansSeeRobot,
+    crowdModel: init.crowdModel,
     nearMissThresholdM: init.nearMissThresholdM,
     recoveryToleranceFraction: init.recoveryToleranceFraction,
     recoveryDwellSteps: init.recoveryDwellSteps,
@@ -248,6 +272,9 @@ function defaultAxisValues(): Record<AxisKey, number> {
 export const DEFAULT_SETTINGS: ConsoleSettings = makeConsoleSettings({
   axisValues: defaultAxisValues(),
   pedestriansSeeRobot: true,
+  // Every fixture, pinned measurement and permalink written before the second kernel existed was
+  // measured on the first one, so that is where the console opens.
+  crowdModel: "socialForce",
   nearMissThresholdM: 0.5,
   recoveryToleranceFraction: 0.1,
   recoveryDwellSteps: 20,
@@ -261,7 +288,10 @@ export const DEFAULT_SETTINGS: ConsoleSettings = makeConsoleSettings({
 });
 
 export function baseOverridesFor(settings: ConsoleSettings): RunConfigOverrides {
-  let overrides: RunConfigOverrides = { pedestriansSeeRobot: settings.pedestriansSeeRobot };
+  let overrides: RunConfigOverrides = {
+    pedestriansSeeRobot: settings.pedestriansSeeRobot,
+    crowdModel: settings.crowdModel,
+  };
   for (const key of AXIS_ORDER) {
     const entry = AXES[key];
     if (entry.kind !== "worldAxis") {

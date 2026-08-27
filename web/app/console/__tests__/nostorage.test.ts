@@ -75,8 +75,62 @@ function sourceFilesUnder(root: string): string[] {
   return found;
 }
 
+/**
+ * The one file that may NAME a network global, and the reason the exemption is three names wide
+ * rather than one file wide.
+ *
+ * `web/app/worker/supplied.sandbox.ts` shuts these doors before it runs a method somebody else
+ * wrote: it saves each global's descriptor, redefines it to nothing, and restores it afterwards.
+ * There is no way to null a global without writing its name, so the scan below sees the names of
+ * the very things being taken away and reports them as if they were being used.
+ *
+ * Exempting the whole FILE would be the wrong repair. That is precisely the module where a real
+ * network call would matter most — it is the one that runs code this project did not write — so
+ * a blanket exemption would blind the scan exactly where it is most load-bearing. The exemption is
+ * therefore per-name, and it is paid for by the assertion underneath, which fails if the sandbox
+ * ever CALLS or CONSTRUCTS one of them rather than merely naming it.
+ */
+const SANDBOX = join(WEB_DIR, "app", "worker", "supplied.sandbox.ts");
+
+/** Names the sandbox may write down, because writing them down is how it removes them. */
+const SHUTTABLE: readonly string[] = Object.freeze([
+  "XMLHttpRequest",
+  "WebSocket",
+  "EventSource",
+]);
+
 describe("no server, no storage, nothing beyond the URL", () => {
   const files = sourceFilesUnder(WEB_DIR);
+
+  it("lets the sandbox name a network global only to shut it, never to use it", () => {
+    // The price of the per-name exemption above. Naming is allowed; reaching is not. A `new
+    // WebSocket(...)` or a `fetch(...)` in that module would slip past the exemption and has to
+    // fail here instead, or the exemption would have bought the scan's silence for nothing.
+    const sandbox = stripComments(readFileSync(SANDBOX, "utf8"));
+    const reaching: readonly { readonly name: string; readonly pattern: RegExp }[] = [
+      { name: "constructs a request", pattern: /\bnew\s+XMLHttpRequest\b/ },
+      { name: "opens a socket", pattern: /\bnew\s+WebSocket\b/ },
+      { name: "opens an event stream", pattern: /\bnew\s+EventSource\b/ },
+      { name: "calls out to a host", pattern: /(?<![A-Za-z0-9_.])fetch\s*\(/ },
+      { name: "pulls in another script", pattern: /(?<![A-Za-z0-9_.])importScripts\s*\(/ },
+    ];
+    const offenders: string[] = [];
+    for (const reach of reaching) {
+      if (reach.pattern.test(sandbox)) {
+        offenders.push(`the sandbox ${reach.name}`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("still sees the names it exempted, so the exemption is not covering an empty list", () => {
+    // The canary. If the sandbox stopped shutting these, the exemption above would be dead code
+    // quietly widening the scan's blind spot for a module nobody was checking any more.
+    const sandbox = stripComments(readFileSync(SANDBOX, "utf8"));
+    for (const name of SHUTTABLE) {
+      expect(sandbox.includes(name), `the sandbox no longer shuts ${name}`).toBe(true);
+    }
+  });
 
   it("finds the files it is supposed to be checking", () => {
     // A grep test that silently scans nothing passes forever.
@@ -93,6 +147,9 @@ describe("no server, no storage, nothing beyond the URL", () => {
       for (let i = 0; i < lines.length; i++) {
         for (const banned of BANNED) {
           if (banned.pattern.test(lines[i] as string)) {
+            if (path === SANDBOX && SHUTTABLE.includes(banned.name)) {
+              continue;
+            }
             offenders.push(`${path}:${i + 1} — ${banned.name}`);
           }
         }

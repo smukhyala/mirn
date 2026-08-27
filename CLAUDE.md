@@ -1,8 +1,20 @@
 # CLAUDE.md — working agreement for MIRN
 
 MIRN is a **simulator console** for perturbation in robotics. This file is the operational
-contract, and it is the only one — `docs/teaching/authoring.md` governed page copy and there are
-no pages.
+contract, and it is the only one — `docs/teaching/authoring.md` governed the notebook's ordered
+pages, and there is no ordering left to govern.
+
+Where this file says "there are no pages", it means the seventeen-page fixed reading order, which
+is gone. Four HTML documents ship: `web/index.html` (the console), `web/how.html` (the arithmetic,
+in sentences), `web/drill.html` (the referee drill) and `web/method.html` (the method card). None of
+them is a step in a sequence — each is reachable at any time from any of the others, and none has to
+be read before the console shows a number.
+
+That last promise is now a test rather than a sentence. It was a sentence for three pages and one
+feature was enough to make it false: the method card shipped linked from the console and to the
+console, and neither the drill nor the working page knew it existed. `disclosure.test.ts` reads the
+page list from the Vite input map and asserts every page links every other, so a fifth page fails
+it rather than quietly not being in it.
 
 If you are looking for the research measurement instrument this project used to be, it is in
 `docs/archive/`. It governs nothing here.
@@ -20,9 +32,10 @@ read carefully for twenty minutes. What changed is that they act instead of read
 The notebook carried its explanation in seventeen pages, in a fixed order, before any number
 appeared. The console has no order at all: every number is reachable in any state. So the
 explanation stops *preceding* the number and starts *hanging off* it. The
-`intuition → visualization → measurement → mathematics → interpretation` shape was a page ordering
-and there are no pages. It is replaced by the one sentence that survives its loss, because that is
-what guardrails 1, 6 and 7 now rest on:
+`intuition → visualization → measurement → mathematics → interpretation` shape was a page ordering,
+and the ordering is gone — the two documents beside the console are places a reader chooses to go,
+not steps they are marched through. It is replaced by the one sentence that survives its loss,
+because that is what guardrails 1, 6 and 7 now rest on:
 
 > **Every number on screen is one interaction from what it assumes and from what it would read if
 > the answer were zero.**
@@ -48,7 +61,24 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    readouts in document order in the static HTML, and it is line one of every CSV, because a file
    outlives the page it came from.
 
-2. **Never teach a conclusion the toy cannot support.** The crowd is a social-force model. It can
+   **There is now a second kind of number, and this guardrail is about keeping the two apart.**
+   Guardrail 11 was amended on 2026-08-27 to let a real pedestrian recording be read in, for fitting
+   the crowd and for checking the fit. A reading off the simulator is still a number about an
+   invented crowd and still carries the sentence above. A goodness-of-fit figure is not: it has real
+   people on one side of it, and reusing the invented-crowd disclosure over it would be false in the
+   one direction that matters — it would understate what the number touches.
+
+   A surface showing a fit says three things instead: the recording is real, the crowd being
+   compared against it is still invented, and a close fit is not permission to read this bench's
+   disturbance numbers as measurements of anybody. The third clause is the load-bearing one. The
+   whole hazard of calibration is that it makes a toy feel like an instrument, and a reader who has
+   just been shown that the invented crowd walks like a real one is exactly the reader most likely
+   to believe the next number they see.
+
+2. **Never teach a conclusion the toy cannot support.** The crowd is invented, under either of
+   the two kernels this bench runs, and fitting one to a real recording does not stop it being
+   invented — it makes it an invented crowd that resembles one recording, in the respects that were
+   fitted, on the day it was filmed. It can
    demonstrate *that* a measurement can be confounded and *why* the paired design removes the
    confound. It cannot establish how large the effect is for real robots, which method wins in the
    field, or that any published paper is wrong. Where a readout or an expander wants one of those,
@@ -92,6 +122,21 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    a closed `<details>` is not shown. The zero is measured per axis value, never quoted from another
    cell.
 
+   **One case has a phrase and no value, and it is the drill's card.** There, the zero of a shown
+   number is itself the answer the reader is about to be asked for — the forecaster's report has a
+   `companionColumn` zero, and that companion needs the run without the robot. Computing it and
+   hiding it would be a value on the page one edit from a leak; quoting the value would hand over
+   the answer. So the tile renders the zero slot as a sentence naming which run is missing and
+   saying that this is the position a real corridor leaves you in, with no figure in it. Three
+   conditions, all mechanical, and the exception exists only where all three hold: it is
+   **derived**, from `corridorReadable` on the companion column via `zeroIsWithheld` in
+   `web/drill.ts` and never from a named column; it goes through a **separately named** function,
+   `withheldZeroRendering`, so `zeroRenderingFor`'s throw-on-unresolved guard is untouched and a
+   caller has to ask for the withheld form on purpose; and the number it sits under still carries a
+   **body-scale anchor** and a gauge, so guardrail 7 is discharged by something other than the zero.
+   The sentence is not inside a `<details>`, like every other zero. Outside those three conditions
+   this clause does not apply, and a tile with a bare number is still a build error.
+
 7. **Raw metres may appear, but never alone.** A beginner needs to see metres against something, or
    a ratio means nothing to them. On a 72-row table a body-scale phrase per cell is absurd, so the
    anchor appears on the tiles and in the column header, once. Every metre is shown next to
@@ -120,6 +165,11 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     picker's list, a slider's own notches, the three settings with no control yet) is printed above
     the controls, never rounded off quietly.
 
+    **And it carries no executable code.** Guardrail 11 opened a supplied-method path; a permalink
+    that could carry a supplied method would turn a shareable link into a shareable exploit, on a
+    static origin with no server to put it behind. A link may name a built-in method by key. It may
+    not carry a function body, and a test asserts that rather than a comment claiming it.
+
     This one used to be enforced by two prose comments, which is the position the `Math.hypot` ban
     was in before somebody wrote a test.
     `web/app/console/__tests__/nostorage.test.ts` now greps every `.ts`, `.html` and `.css` file
@@ -127,34 +177,155 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     `hypot.test.ts` carries. `history.replaceState` is the one allowed exception and is asserted
     present rather than absent, because it is how the permalink reaches the address bar.
 
-11. **The line is not "do not be a simulator"; it is between this toy, measured well, and robots,
-    characterised.** The operative half of the old rule — "which page does this make clearer?" —
-    stops working when there are no pages, and it was the half that did the refusing. No ROS, no
-    planner benchmark, no dataset loader, no trained model, no physics-engine dependency, no second
-    simulator backend, no leaderboard, no bring-your-own-method import path. The CSV is an export,
-    never an input format — the moment something else can be read in and scored, this is a benchmark
-    and the numbers start being about someone else's robot. A run list with pinning, diffing, a
-    sweep and an export is precisely the shape of a benchmark harness, and a column picker is an
-    extension point wearing a checkbox, so the columns are a closed table with no user-defined
-    column and no formula field. The refusal test is now: **"which readout does this move, and what
-    does that readout say when the answer is zero?"** — no answer, no feature. It folds guardrail 6
-    into the admission criterion, so a feature cannot enter without bringing its own zero.
+11. **The line has moved, deliberately, and this records where it went.** This guardrail used to
+    refuse eight things outright, and three of those refusals are lifted by owner's decision on
+    2026-08-27: a **bring-your-own-method path**, a **comparison of several methods against each
+    other**, and a **second simulator backend**. The reasoning that justified refusing them is not
+    erased — it is in this file's history and in
+    `docs/superpowers/specs/2026-08-25-method-card-design.md`, which argued at length that the
+    method card did not cross a line that no longer exists. Read those before assuming the lift was
+    careless.
+
+    **What is still refused, because nobody lifted it:** no ROS, no planner benchmark, no trained
+    model, no physics-engine dependency.
+
+    **Real pedestrian trajectories may now be read in, for one purpose, and that purpose is not
+    measurement.** Owner's decision, 2026-08-27. Both crowds here are calibrated against nothing,
+    which is the single largest thing standing between this bench and an instrument: it can say a
+    metric is confounded, and it cannot say by how much, because the crowd it says it about was
+    tuned to look plausible and fitted to no observation at all. Real data is how that is closed.
+
+    **It may be used to FIT the crowd, and to CHECK the fit. It may never produce a disturbance
+    number.** That is not caution, it is arithmetic, and guardrail 5 is the reason. Every number
+    this bench reports is a paired difference: the same room, run twice, once with the robot and
+    once without, from the same starting positions and the same wobble. **A corridor cannot be
+    filmed twice.** There is no second recording in which the same people, on the same day, in the
+    same mood, walked past no robot. Real trajectories have exactly one arm, so the quantity this
+    whole site is built to measure does not exist in them, and any number claiming otherwise would
+    be the confound this project exists to teach against — dressed up in real data, which makes it
+    worse rather than better.
+
+    So a recording may answer "does the invented crowd move like this one" and may never answer
+    "how much did the robot move this crowd". The first is a statement about a model; only the
+    second needs a counterfactual.
+
+    **What that costs elsewhere, stated so it is not discovered later:**
+
+    - **Guardrail 1 gains a second kind of number and must keep them apart.** A reading off the
+      simulator is a number about an invented crowd and says so. A goodness-of-fit figure has real
+      people on one side of it, and a surface showing one must say *that* — that the recording is
+      real, that the crowd being compared to it is still invented, and that a good fit is not a
+      licence to read the simulator's disturbance numbers as measurements of anybody. The existing
+      disclosure is not adequate to a fit statistic, and reusing it there would be the first lie.
+    - **Guardrail 2 is unmoved and does more work.** A crowd fitted to a real recording is a crowd
+      that resembles that recording, in the respects that were fitted, on the day it was filmed. It
+      is not a real crowd, and a metric that fails on it has still only failed here.
+    - **Guardrail 8 is engaged the moment a fitting routine exists in both languages.** A fit is a
+      formula. If Python fits and TypeScript fits, they get a parity fixture like every other
+      shared formula, or the two quietly disagree about what "calibrated" means.
+
+    **The data is somebody's movements, and that is a constraint rather than a nicety.** No
+    recording is committed to this repository and none is shipped with the site. A file a reader
+    opens is read in their own browser, stays there, and reaches no server, which guardrail 10
+    already guarantees by having no server to reach. Nothing on any surface may make an individual
+    identifiable — no per-person trace held up as an example, no identifier from a source file
+    carried onto a page. Fitted parameters are an aggregate and may be shown; the paths they were
+    fitted to are not.
+
+    **What replaces the blanket ban, now that code can be read in.** A supplied method is data until
+    it runs, and then it is code on this origin:
+
+    - It runs in a **Worker with no DOM**, and nothing it returns is trusted without validation.
+      A number that comes back `NaN`, infinite or non-finite is a failed method, reported as one,
+      never rendered as a reading.
+    - **It never enters the permalink.** Guardrail 10 says a link carries the recipe and never the
+      results; it now also says a link never carries executable code. A shareable link that runs a
+      stranger's function in your browser is a shareable exploit, and this project has no server to
+      put it behind. The link may name a *built-in* method; it may not carry a supplied one.
+    - **A supplied method is never reported as a fact about robots.** Guardrail 2 is unamended and
+      does the work the old refusal used to do: the crowd is still invented, so a comparison
+      establishes which ruler is confounded *on this toy*, and never which method wins in a
+      corridor. A ranking that reads as a leaderboard of published methods is the failure mode, and
+      the wording has to refuse it where the reader meets it.
+
+    The refusal test is unchanged and now carries more weight, not less: **"which readout does this
+    move, and what does that readout say when the answer is zero?"** — no answer, no feature. It
+    folds guardrail 6 into the admission criterion, so a feature cannot enter without bringing its
+    own zero. A user-supplied method has to answer it too, which is the point: the site measures
+    what a supplied ruler reads on a world whose true effect is exactly nothing, and that is the
+    number worth having.
 
 12. **No bare code identifier on any surface a reader sees, and every term defined in plain English
     at first use.** Half of this guardrail genuinely died: `web/vocab.ts`, the `introduces`/`uses`
-    front matter, `checkVocabulary` and `lintForwardTerms` all go, because with one page there is no
-    order to fix. What survives is the whole rule. Its mechanical enforcement is the identifier
-    regex, re-homed from the deleted render suite onto `COLUMNS` and `AXES` in
-    `web/engine/job/__tests__/columns.test.ts` and `axes.slow.test.ts`. Pointed at the catalogue
-    rather than a rendered DOM, it also covers a column nobody ticked. Two more suites run variants
-    of the same regex over strings the catalogue does not own: `panel.test.ts` over the whole
-    booted panel's text, and `permalink.test.ts` over every sentence a hand-edited link can
-    produce.
+    front matter, `checkVocabulary` and `lintForwardTerms` all go, because with no reading order
+    there is no first use to police — a term's first use is wherever the reader happened to start.
+    What survives is the whole rule. Its mechanical enforcement is the identifier regex, and it now
+    lives in exactly one place: `web/testing/identifiers.ts`, which exports two patterns and a
+    paragraph saying why two and not one. `CODE_IDENTIFIER_OR_SYNTAX` goes over the closed
+    catalogues — `COLUMNS`, `AXES`, `cards.ts`, `families.ts`, `questions.ts` — and bans a bracket
+    and a fat arrow as well, because a catalogue entry has no business containing either. Pointed at
+    the catalogue rather than a rendered DOM, it also covers a column nobody ticked.
+    `CODE_IDENTIFIER` goes over everything rendered, where prose legitimately parenthesises:
+    `panel.test.ts` over the whole booted panel's text, `permalink.test.ts` over every sentence a
+    hand-edited link can produce, `how.test.ts` and `method-dom.test.ts` over their pages' prose,
+    `csv.test.ts` over the export, and `drill-dom.test.ts` over the booted drill and every branch of
+    its verdict. Because a term can now be met on any of four documents, each one that uses a
+    defined term glosses it where it uses it, rather than relying on the reader having been
+    somewhere else first.
+
+    **It was written out by hand in twenty places before it was hoisted, and had drifted into three
+    different expressions** — so the guardrail was being enforced at three different strengths
+    depending on which file you landed in. Reconciling them made the two weaker forms stronger and
+    neither weaker; every surface was checked against the stronger pattern first and none of them
+    had anything to fix. `web/testing/identifiers.test.ts` now asserts things ABOUT the patterns
+    rather than only WITH them, including that neither carries a `g` flag, whose `lastIndex` would
+    make one suite's answer depend on which suite ran before it. One known hole is pinned open and
+    documented rather than quietly widened: a digit before the first capital, as in `arm2Reading`,
+    is not matched. Widening it is a behaviour change across every call site and belongs in its own
+    commit, where a new failure means a real leak rather than noise from a refactor.
 
 13. **`docs/archive/` is read-only.** Never delete or soften an `UNVERIFIED` marker in it, never
     cite it as current, and never quietly update a claim in it to match something we now believe.
     Any claim the lesson takes from the archive cites the primary source directly; if the archive
     marks it UNVERIFIED, the copy either verifies it independently or does not make it.
+
+**A note on the referee drill**, since it is the first feature built after these guardrails and is
+worth checking against them rather than assumed to comply. `web/engine/job/cards.ts`'s eight cards
+are a closed table, like `COLUMNS` and `AXES` — no `register`, nothing added at runtime, and
+`cards.slow.test.ts` measures every one of them against the real engine rather than trusting a
+hand-written label. The safety property the drill depends on — that no number needing the run
+without the robot reaches a card before the call — is not a list of allowed columns checked by eye;
+it is `corridorReadable` on each column descriptor, and that flag is proved rather than asserted:
+`web/engine/job/__tests__/unpaired.test.ts` swaps the control arm for a decoy from an unrelated
+crowd and fails any column claiming to need no control run that notices the swap. And guardrail 11
+did not have to be amended for the drill: it scores a reader's call against what the room did, never
+a robot's performance and never a rival method's. That was written when guardrail 11 refused a
+benchmark shape outright. Guardrail 11 has since been rewritten and the refusal narrowed, so the
+sentence survives as a fact about the drill rather than as a boundary the drill was tested against.
+
+**A note on the method card**, which is the second feature built after these guardrails and the one
+that came nearest guardrail 11's line as it then stood — it takes a description of somebody else's
+metric and scores it. That line has since moved and a supplied method may now be run directly; what
+follows describes the closed-questionnaire design as built, which remains the safest path and stays
+the default. The argument that this is not a bring-your-own-method import path is in
+`docs/superpowers/specs/2026-08-25-method-card-design.md`, and a design document is not the
+contract, so the three facts it rests on are recorded here. **Nothing is read in, and that is
+mechanical rather than intended:** the reader answers five closed multiple-choice questions and
+`method-dom.test.ts` asserts the booted page carries no textarea, no file input and no text field.
+No file is uploaded, no function is evaluated, no dataset is loaded, there is no leaderboard, and
+MIRN runs its own estimator on its own worlds. **The question table is closed**, like `COLUMNS`,
+`AXES` and `cards.ts` — no `register`, nothing added at runtime — and `questions.test.ts` walks the
+whole 288-answer cross-product a reader can give rather than an option at a time, because three of
+the five questions decide nothing and an option-by-option check would have passed this table having
+checked nothing. **The family that compares nothing is not scored as a detector.** An absolute
+quantity reads about eighteen metres against a line measured in centimetres and clears it every
+time, and clearing it says nothing whatever about the robot; printing a count beside a
+forecaster's would invite exactly the comparison this console exists to teach against. Which shape
+a family renders in is read off its own ruler rather than off its name, so a fifth absolute family
+gets the right treatment without anybody remembering.
+
+If a future change lets a user's own code or data reach the engine, that is the line, and neither
+that spec nor this note is permission to cross it.
 
 ---
 
@@ -218,8 +389,9 @@ entirely — Python-only estimators are not a parity question until something po
 
 - **Plain typed records, not a plugin system.** This is a deliberate reversal of the Python side's
   framework-first convention, and it must be stated or the next agent will "fix" it back. An
-  extension point is an invitation, and guardrail 11 exists to decline it. Four divergences do not
-  need a registry.
+  extension point is an invitation, and guardrail 11 used to decline every one. It now declines all
+  but the one it names, so this convention holds everywhere except the supplied-method seam, which is
+  an extension point on purpose and is the only one. Four divergences still do not need a registry.
 - Strict mode with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`. Frozen plain
   objects, validated in a `make*` factory that throws `ContractError` — never a class, because
   everything crosses a Worker boundary and must be structured-cloneable.
@@ -286,41 +458,82 @@ Nothing from the virtualenv is on PATH — not `python`, not `pytest`, not `ruff
 command below is written so it runs as spelled from the repository root, with no activation step.
 
 ```bash
-npm run check                            # typecheck, vitest, vite build — 28 s
-npm run test                             # 511 tests in 22 s
-npx vitest run --exclude '**/*.slow.test.ts'   # 506 of them in 14 s
+npm run check                            # typecheck, vitest, vite build
+npm run test                             # 773 tests across 64 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 742 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
-.venv/bin/python -m pytest -q -m "not slow"   # 275 of them in 22 s, minus the heavy nulls
+.venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity   # after any formula change
 ```
 
-Every figure above was measured on this machine on the commit that wrote them, not estimated. Two
-of them used to be wrong by a plausible-looking margin, which is the failure mode this paragraph
-exists to name: a timing nobody re-ran is a claim, and the whole point of a documented fast loop is
-that its cost is small enough to be worth it.
+**The counts travel and the seconds do not, so the seconds have moved out of the block.** The
+counts above are facts about the tree. The timings below were re-measured when the method card made
+the old ones wrong, and they were re-measured on a *different* machine — a cloud container, not the
+one that wrote the originals — so they are recorded with that said rather than written in under a
+sentence claiming otherwise. Read them as shape, not as a target to hit:
 
-**There is no `--project engine` fast loop, and naming one was the mistake.** It runs in 17 s
-against 22 s for everything, because `axes.slow.test.ts` is 14 s of the suite and lives inside the
-engine project. Excluding that one file is the only cut worth making, and it is what the third line
-above does — 14 s, at the cost of the guardrail-3 check, so it is a working loop and not the gate.
+| | Measured | Where |
+|---|---|---|
+| `npm run test`, 773 tests | 42.8 s | cloud container, 2026-08-26 |
+| the `.slow.test.ts` cut, 742 tests | 35.1 s | same |
+| `pytest -q -m "not slow"`, 275 tests | 35.0 s | same |
+| `npm run test`, back when it was 652 tests | 22 s | the author's own machine |
+
+Two of the original figures used to be wrong by a plausible-looking margin, which is the failure
+mode this paragraph exists to name: a timing nobody re-ran is a claim, and the whole point of a
+documented fast loop is that its cost is small enough to be worth it. That is also why the row
+above is kept rather than deleted — two machines disagreeing by 70% is the reason a single number
+here was never worth trusting.
+
+**There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
+project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
+project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
+is what the third line above does. The five it drops are `axes.slow.test.ts` (guardrail 3's
+every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's eight cards
+actually does, measured), `drill-verdict.slow.test.ts` (the whole drill driven card by card),
+`familyProbe.slow.test.ts` (what each method family reads on a world whose answer is exactly
+nothing) and `method-run.slow.test.ts` (the method card driven end to end at the shipped settings).
+All five re-run the simulator many times over, which is why they cost what they cost and why none
+of them can be made fast. So it is a working loop and not the gate.
+
+**The cut is worth much less than it was, and saying so is the point of re-measuring it.** It once
+dropped 19 tests to save 9 seconds of 22. It now drops 31 to save about 8 of 43, because two of the
+five slow files are the method card's and the suite around them has grown faster than they have.
+That is not a reason to delete the line. It is a reason to stop describing it as a large saving,
+and to expect the next feature to shrink it further.
 
 The fast pytest loop is real: the tests that dominate the runtime carry `@pytest.mark.slow`, and
 `pyproject.toml` records the measurement the cut-off came from. It skips the divergence property
 tests and the calibration suite, so it is also a loop and not a gate. `tests/test_placebo.py` is
 deliberately not marked and runs in both.
 
-Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests` — 27
-seconds measured. Full `npm run check` plus `.venv/bin/python -m pytest -q` before any push.
+Pre-commit: `npm run typecheck && npm run test && .venv/bin/python -m ruff check src tests`. Its
+timing is not quoted, for the reason the table above gives twice over. Timings here never survived
+being run back to back — three consecutive repeats of this line once measured 38, 44 and 63 seconds
+on the same commit with nothing else running — and they do not survive changing machines either, so
+any single number is a floor and not an expectation. Full `npm run check` plus
+`.venv/bin/python -m pytest -q` before any push.
 **Never claim work is complete without running it and showing the output.**
 
 ---
 
 ## Content
 
-There is no prose file. Every word a reader sees is a `label`, a `zero`, an `assumption` or a
-`note` on an entry in `web/engine/job/columns.ts` or `web/engine/job/axes.ts`, and those two
-catalogues are closed.
+**Four reader-facing surfaces, and what governs each.** This section used to open "there is no
+prose file", which was true of the console alone and stopped being true the moment a second page
+shipped. The rule it was protecting survives whole; what changed is that it now has to be said four
+times.
+
+| Surface | Who writes the words | What holds them honest |
+|---|---|---|
+| The console's tiles, columns and controls | The catalogues alone — a `label`, a `zero`, an `assumption` or a `note` on an entry in `web/engine/job/columns.ts` or `web/engine/job/axes.ts`. Both are closed | `columns.test.ts` and `axes.slow.test.ts` run the identifier regex over the catalogue itself, so a column nobody ticked is covered too. `tile.test.ts` renders every column and fails on a numeric literal |
+| `web/how.html` | Hand-written prose, ~1,000 lines of it, the one place the arithmetic is set out in sentences | `web/app/how.test.ts`: the identifier regex over its visible text, and a scan that fails on any measured value in the file. It states formulas and never results, so nothing in it can go stale against a physics change |
+| The drill's own strings in `web/drill.ts` — `CALL_CLAUSE`, `HONEST_CLAUSE`, `WITHHELD_ZERO_HOW`, the reveal's sentences and `verdictLines` | Hand-written, because they describe a reader's call rather than a measurement, and no catalogue entry has anywhere to put them | `drill-dom.test.ts` runs the identifier regex over the booted page and over every branch of `verdictLines`; the reveal quotes no number the tiles above it are not also showing; `COUNT_WORDS` means no sentence carries a digit for something the catalogue decides |
+| The method card's own strings in `web/app/console/method.ts` — `REFUSAL`, `READING_LABEL`, `READING_ZERO_HOW`, `BAND_LABEL`, `BAND_ZERO_HOW`, `RATE_LABEL`, `RATE_NOTE`, `RATE_ZERO_HOW`, `NON_DETECTION_LABEL`, `NON_DETECTION_NOTE` — plus the hand-written prose in `web/method.html` | Hand-written, and for the drill's reason: they describe a question somebody arrived with rather than a measurement, so no catalogue entry has anywhere to put them | Three scans, one per surface. `questions.test.ts` runs the identifier regex over the closed question table. `method.test.ts` runs it, and the numeric-literal scan, over every leaf of every family's rendered verdict, with a count guard and a meta-test each. `method-dom.test.ts` runs it over `web/method.html`'s own prose, the way `how.test.ts` does for the working page |
+
+Everything below applies to all four. A hand-written surface is not a licence to write a number
+into a sentence, to name a variable at a reader, or to say something that has not been measured.
 
 **No numeric literal appears in console copy.** Every zero line, band figure and caption renders
 from the cell actually on screen, because a hardcoded number is a claim that outlives the settings

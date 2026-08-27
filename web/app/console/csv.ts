@@ -1,10 +1,12 @@
 import { fail } from "../../engine/core/errors.js";
 import { DEFAULT_CONFIG } from "../../engine/contracts/config.js";
 import { AXES } from "../../engine/job/axes.js";
+import { CARD_ORDER, DRILL_CARDS, type CardKey } from "../../engine/job/cards.js";
 import { COLUMNS, type ColumnKey, type UnitKey } from "../../engine/job/columns.js";
 import { accumulate } from "../../engine/job/runner.js";
 import type { Aggregate, AggregateReason, RunRow } from "../../engine/job/stats.js";
 import { seedFor, type SweepJob } from "../../engine/job/spec.js";
+import type { DrillCall, HonestCall } from "./drill.js";
 
 /**
  * The export, and the one surface where the standing disclosure line cannot stand.
@@ -25,9 +27,27 @@ import { seedFor, type SweepJob } from "../../engine/job/spec.js";
  * `web/app/console/state.ts` already document about themselves).
  */
 
+/**
+ * What produced the numbers in a file, as a version somebody can compare against.
+ *
+ * A measurement is only meaningful beside the arithmetic that made it. When a formula changes,
+ * every number taken before the change becomes wrong — not stale, wrong — and the file holding it
+ * says nothing at all about that. It looks exactly as it did the day it was written. So a file with
+ * no version in it is not merely undated: it is **wrong silently**, and the reader who opens it six
+ * months later has no way to find out.
+ *
+ * A version does not make an old number right. It makes an old number checkable, which is the most
+ * a file can offer once it has left the page that produced it.
+ *
+ * It lives here, in one place, and matches `package.json`'s own `version` field. Two version
+ * strings that must agree and are checked by nobody is the drift this repository has removed twice
+ * already; a second one would be the third.
+ */
+export const BENCH_VERSION = "0.1.0";
+
 export const INVENTED_CROWD_DISCLOSURE =
-  "Everything in this file is simulated. The crowd is a social-force model - invented people " +
-  "obeying invented rules - and no number here is a measurement of real pedestrians. What is " +
+  "Everything in this file is simulated. The crowd is an invented model of pedestrians - invented " +
+  "people obeying invented rules - and no number here is a measurement of real pedestrians. What is " +
   "real is the ruler: the same room is run twice, once with a robot and once without, from the " +
   "same starting positions and the same random wobble, and the difference between a person's " +
   "two paths is the robot's effect on them.";
@@ -40,10 +60,34 @@ export const INVENTED_CROWD_DISCLOSURE =
  */
 export const DISCLOSURE_CLAUSES: readonly string[] = Object.freeze([
   "simulated",
-  "social-force model",
+  // Was "social-force model" until 2026-08-27, when a second crowd kernel shipped and that clause
+  // stopped being true on any page that could show a number from the other one. Guardrail 1 wants
+  // the disclosure in the STATIC markup, before any number, so it cannot name a kernel the reader
+  // has not chosen yet — which means the sentence has to be true of every crowd this bench runs.
+  //
+  // This is a NARROWING OF A CLAIM, not a weakening of a disclosure. The obligation guardrail 1
+  // actually carries is that a beginner is told the crowd is invented before they see a number,
+  // and all four clauses still carry it. What went is an assertion about WHICH invented crowd,
+  // which the file could no longer keep. Anything carrying results names the kernel that produced
+  // them, where it can: see `CROWD_MODEL_LINE` below.
+  "invented model of pedestrians",
   "invented people obeying invented rules",
   "no number here is a measurement of real pedestrians",
 ]);
+
+/**
+ * The line a results file carries naming the crowd that produced its rows.
+ *
+ * The static disclosure cannot say this — it is written before a run and a reader may pick either
+ * kernel — but a CSV is generated after one and knows exactly. A file outlives the page it came
+ * from, so a row whose crowd is unrecorded is a number nobody can place.
+ */
+export function crowdModelLine(model: string): string {
+  const named = model === "anticipatory"
+    ? "people who steer around where somebody is about to be"
+    : "people who push away from whoever is near them";
+  return `The crowd in this file is ${named}.`;
+}
 
 export interface CsvOptions {
   readonly kind: "csvOptions";
@@ -380,5 +424,152 @@ export function toCsv(job: SweepJob, rows: readonly RunRow[], options: CsvOption
   for (const line of body) {
     lines.push(line);
   }
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The drill's own export: one row per card, and the same first-line obligation the sweep's export
+ * carries above — a downloaded file has no standing disclosure banner and no expander to hang its
+ * honesty on, so it says in words what the page says by being a page.
+ *
+ * This file's originating brief asked for a "floor" column alongside the true effect and the band.
+ * There is no such number to put in one: `web/drill.ts`'s `runCard` and `revealCard` both build
+ * their `ReportContext` with `floor: null`, on the withheld run and on the reveal alike — buying a
+ * detection floor costs a permutation test's worth of splits per card, and nothing on the drill's
+ * own page ever shows one. Fabricating a per-row value nothing computed would be exactly the
+ * failure guardrail 6 forbids, a number with nothing behind it, so this says so once, in the
+ * header, the way `provenance()` above prints "detection floor: not measured" when a sweep did not
+ * buy one either.
+ */
+
+const DRILL_ROWS_NOTE = "# rows: one row per card, in the order it was called";
+const DRILL_FLOOR_NOTE = "# detection floor: not measured; the drill does not buy one for any card";
+const DRILL_CANNOT_TELL_NOTE =
+  '# marker "cannot tell": the reader declined to call the card; counted on its own, neither right ' +
+  "nor wrong";
+
+export interface DrillCsvOptions {
+  readonly kind: "drillCsvOptions";
+  readonly generatedAtIso: string;
+}
+
+export function makeDrillCsvOptions(init: { generatedAtIso: string }): DrillCsvOptions {
+  if (init.generatedAtIso.length === 0) {
+    fail("DrillCsvOptions.generatedAtIso must be a non-empty timestamp");
+  }
+  return Object.freeze({ kind: "drillCsvOptions" as const, generatedAtIso: init.generatedAtIso });
+}
+
+/**
+ * One card's row: the reader's call, the room's honest answer, and the three metres readings the
+ * reveal actually bought for that card — the true effect, the ordinary difference between two
+ * runs, and the one corridor-readable number the drill's own verdict judges (the forecaster's
+ * report), beside what that same number reads on a run where nobody responds to the robot.
+ *
+ * `cardKey` names the card rather than its plain-English name so a caller cannot misspell the
+ * name independently of the key the rest of the drill uses; `toDrillCsv` reads the name back out
+ * of `DRILL_CARDS` itself, the same way the console's own export reads a column's label out of
+ * `COLUMNS` rather than trusting a caller to spell it the same way twice.
+ */
+export interface DrillCsvEntry {
+  readonly kind: "drillCsvEntry";
+  readonly cardKey: CardKey;
+  readonly call: DrillCall;
+  readonly honest: HonestCall;
+  readonly truthM: number;
+  readonly bandM: number;
+  readonly corridorM: number;
+  readonly corridorZeroM: number;
+}
+
+export function makeDrillCsvEntry(init: {
+  cardKey: CardKey;
+  call: DrillCall;
+  honest: HonestCall;
+  truthM: number;
+  bandM: number;
+  corridorM: number;
+  corridorZeroM: number;
+}): DrillCsvEntry {
+  if (!(init.cardKey in DRILL_CARDS)) {
+    fail(`DrillCsvEntry.cardKey must name a card in DRILL_CARDS, got '${String(init.cardKey)}'`);
+  }
+  if (init.honest !== "bigger" && init.honest !== "smaller") {
+    fail(`DrillCsvEntry.honest must be 'bigger' or 'smaller', got '${String(init.honest)}'`);
+  }
+  if (init.call !== "bigger" && init.call !== "smaller" && init.call !== "cannot tell") {
+    fail(
+      `DrillCsvEntry.call must be 'bigger', 'smaller' or 'cannot tell', got '${String(init.call)}'`,
+    );
+  }
+  if (!Number.isFinite(init.truthM)) {
+    fail(`DrillCsvEntry.truthM must be a finite number, got ${String(init.truthM)}`);
+  }
+  if (!Number.isFinite(init.bandM)) {
+    fail(`DrillCsvEntry.bandM must be a finite number, got ${String(init.bandM)}`);
+  }
+  if (!Number.isFinite(init.corridorM)) {
+    fail(`DrillCsvEntry.corridorM must be a finite number, got ${String(init.corridorM)}`);
+  }
+  if (!Number.isFinite(init.corridorZeroM)) {
+    fail(`DrillCsvEntry.corridorZeroM must be a finite number, got ${String(init.corridorZeroM)}`);
+  }
+  return Object.freeze({
+    kind: "drillCsvEntry" as const,
+    cardKey: init.cardKey,
+    call: init.call,
+    honest: init.honest,
+    truthM: init.truthM,
+    bandM: init.bandM,
+    corridorM: init.corridorM,
+    corridorZeroM: init.corridorZeroM,
+  });
+}
+
+/** "declined" rather than "no" for a card the reader would not call, so a spreadsheet's tally of
+ *  wrong answers does not silently count an honest non-answer as one. */
+function drillMatch(call: DrillCall, honest: HonestCall): string {
+  if (call === "cannot tell") {
+    return "declined";
+  }
+  return call === honest ? "yes" : "no";
+}
+
+export function toDrillCsv(entries: readonly DrillCsvEntry[], options: DrillCsvOptions): string {
+  const lines: string[] = [
+    `# ${INVENTED_CROWD_DISCLOSURE}`,
+    `# generated: ${options.generatedAtIso}`,
+    DRILL_ROWS_NOTE,
+    DRILL_FLOOR_NOTE,
+    DRILL_CANNOT_TELL_NOTE,
+    `# completeness: ${String(entries.length)} of ${String(CARD_ORDER.length)} cards called`,
+  ];
+
+  const header: string[] = [
+    csvField("Card"),
+    csvField("Your call"),
+    csvField("The honest call"),
+    csvField("Did your call match"),
+    csvField(`${COLUMNS.trueEffectM.label} (metres)`),
+    csvField(`${COLUMNS.runToRunBandM.label} (metres)`),
+    csvField(`${COLUMNS.forecastReportM.label} (metres)`),
+    csvField(`${COLUMNS.forecastZeroM.label} (metres)`),
+  ];
+  lines.push(header.join(","));
+
+  for (const entry of entries) {
+    const fields: string[] = [
+      csvField(DRILL_CARDS[entry.cardKey].name),
+      csvField(entry.call),
+      csvField(entry.honest),
+      csvField(drillMatch(entry.call, entry.honest)),
+      formatValue("metres", entry.truthM),
+      formatValue("metres", entry.bandM),
+      formatValue("metres", entry.corridorM),
+      formatValue("metres", entry.corridorZeroM),
+    ];
+    lines.push(fields.join(","));
+  }
+
   return `${lines.join("\n")}\n`;
 }

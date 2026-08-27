@@ -4,6 +4,7 @@ import type { TreatmentSpec } from "../../contracts/pairedRun.js";
 import { runPair } from "../../sim/run.js";
 import { COLUMNS, COLUMN_ORDER, HEADLINE_COLUMNS, type ColumnKey } from "../columns.js";
 import { buildContext, type MeasurementParams, type ReportContext } from "../report.js";
+import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 const PARAMS: MeasurementParams = Object.freeze({
   kind: "measurementParams" as const,
@@ -42,7 +43,6 @@ function stationaryRobotContext(): ReportContext {
 }
 
 /** A term the operator has never met, spelled the way a program spells it. */
-const CODE_IDENTIFIER = /\b(?:[a-z]+[A-Z][A-Za-z]*|[a-z_]+_[a-z_]+)\b|[()[\]{}]|=>/;
 
 describe("the column catalogue is total and self-consistent", () => {
   it("orders every key exactly once", () => {
@@ -74,12 +74,12 @@ describe("the column catalogue is total and self-consistent", () => {
     for (const key of COLUMN_ORDER) {
       const column = COLUMNS[key];
       expect(column.label.length).toBeGreaterThan(3);
-      expect(column.label).not.toMatch(CODE_IDENTIFIER);
+      expect(column.label).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       expect(column.zero.how.length).toBeGreaterThan(20);
-      expect(column.zero.how).not.toMatch(CODE_IDENTIFIER);
+      expect(column.zero.how).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       const assumption = column.assumption(context);
       expect(assumption.length).toBeGreaterThan(20);
-      expect(assumption).not.toMatch(CODE_IDENTIFIER);
+      expect(assumption).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
     }
   });
 
@@ -209,7 +209,7 @@ describe("availability", () => {
         nCovered++;
         const why = reading.availability.why;
         expect(why.length).toBeGreaterThan(20);
-        expect(why).not.toMatch(CODE_IDENTIFIER);
+        expect(why).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
       }
     }
     expect(nCovered).toBe(readings.length);

@@ -119,6 +119,15 @@ export interface ColumnDescriptor {
   readonly zero: ZeroReference;
   readonly assumption: (ctx: ReportContext) => string;
   readonly extract: (ctx: ReportContext) => Reading;
+  /**
+   * Could a real corridor produce this number?
+   *
+   * False for anything that reads the run without the robot, which does not exist outside a
+   * simulator. The drill may show only the true ones, because showing a paired number on a
+   * withheld card hands the reader the answer. `unpaired.test.ts` proves each value by swapping
+   * the control arm for a decoy and checking whether the reading moves.
+   */
+  readonly corridorReadable: boolean;
 }
 
 const NO_BAND = "The run-to-run band was not measured for this run, so there is nothing to report.";
@@ -171,7 +180,9 @@ function forecastAssumption(): string {
     "This does not identify the robot's effect. It guesses where each person was about to walk " +
     "from their own recent past, assuming they carry straight on, then reports how wrong the " +
     "guess was as if that were the robot's doing. The number contains every reason a person " +
-    "might not walk in a straight line, all of which would be there with no robot in the room."
+    "might not walk in a straight line, all of which would be there with no robot in the room. " +
+    "How far ahead it guesses and when it is checked decide how large it comes out, and neither " +
+    "of those controls changes the room."
   );
 }
 
@@ -179,6 +190,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   trueEffectM: Object.freeze({
     kind: "column" as const,
     key: "trueEffectM" as const,
+    corridorReadable: false,
     label: "How far the crowd was moved",
     unit: "metres" as const,
     group: "effect" as const,
@@ -196,6 +208,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   worstMomentM: Object.freeze({
     kind: "column" as const,
     key: "worstMomentM" as const,
+    corridorReadable: false,
     label: "Worst moment",
     unit: "metres" as const,
     group: "effect" as const,
@@ -214,6 +227,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   forecastReportM: Object.freeze({
     kind: "column" as const,
     key: "forecastReportM" as const,
+    corridorReadable: true,
     label: "What a forecaster would report",
     unit: "metres" as const,
     group: "forecast" as const,
@@ -235,6 +249,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   forecastZeroM: Object.freeze({
     kind: "column" as const,
     key: "forecastZeroM" as const,
+    corridorReadable: false,
     label: "What the forecaster reports when the answer is zero",
     unit: "metres" as const,
     group: "forecast" as const,
@@ -260,6 +275,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   runToRunBandM: Object.freeze({
     kind: "column" as const,
     key: "runToRunBandM" as const,
+    corridorReadable: false,
     label: "Ordinary difference between two runs",
     unit: "metres" as const,
     group: "null" as const,
@@ -285,6 +301,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   worstMomentNullM: Object.freeze({
     kind: "column" as const,
     key: "worstMomentNullM" as const,
+    corridorReadable: false,
     label: "Widest ordinary difference between two runs",
     unit: "metres" as const,
     group: "null" as const,
@@ -310,6 +327,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   detectionFloorM: Object.freeze({
     kind: "column" as const,
     key: "detectionFloorM" as const,
+    corridorReadable: false,
     label: "Smallest effect this crowd could resolve",
     unit: "metres" as const,
     group: "null" as const,
@@ -335,6 +353,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   robotPathM: Object.freeze({
     kind: "column" as const,
     key: "robotPathM" as const,
+    corridorReadable: true,
     label: "How far the robot travelled",
     unit: "metres" as const,
     group: "cost" as const,
@@ -361,6 +380,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   robotArrivalS: Object.freeze({
     kind: "column" as const,
     key: "robotArrivalS" as const,
+    corridorReadable: true,
     label: "How long the robot took to arrive",
     unit: "seconds" as const,
     group: "cost" as const,
@@ -393,6 +413,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   extraPathM: Object.freeze({
     kind: "column" as const,
     key: "extraPathM" as const,
+    corridorReadable: false,
     label: "Extra distance the robot walked because of the treatment",
     unit: "metres" as const,
     group: "cost" as const,
@@ -432,6 +453,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   pedestrianTimeLostS: Object.freeze({
     kind: "column" as const,
     key: "pedestrianTimeLostS" as const,
+    corridorReadable: false,
     label: "How much longer people took to settle",
     unit: "seconds" as const,
     group: "cost" as const,
@@ -460,6 +482,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   minClearanceM: Object.freeze({
     kind: "column" as const,
     key: "minClearanceM" as const,
+    corridorReadable: true,
     label: "Closest the robot came to anybody",
     unit: "metres" as const,
     group: "safety" as const,
@@ -498,6 +521,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   nearMissEpisodes: Object.freeze({
     kind: "column" as const,
     key: "nearMissEpisodes" as const,
+    corridorReadable: true,
     label: "Separate occasions it came closer than the near-miss line",
     unit: "count" as const,
     group: "safety" as const,
@@ -506,7 +530,11 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
     needsAnchor: false,
     zero: Object.freeze({
       kind: "exactZero" as const,
-      how: "A robot that never came closer than the near-miss line reads exactly 0 occasions.",
+      // Not "reads exactly 0 occasions": the value slot prints that 0 immediately to the left of
+      // this phrase, so spelling it out again is the "0.000 m ... and this reads 0.000 m" defect
+      // six other entries were corrected for. This column has no tile on the console — the drill's
+      // card is the first surface that shows it — which is why it survived that pass.
+      how: "occasions, which is what a robot that never came closer than the near-miss line reads.",
     }),
     assumption: (): string =>
       "Occasions, not instants. Counting instants below the line would make the number grow " +
@@ -537,6 +565,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   recoveryS: Object.freeze({
     kind: "column" as const,
     key: "recoveryS" as const,
+    corridorReadable: false,
     label: "How long until the crowd was back inside tolerance",
     unit: "seconds" as const,
     group: "recovery" as const,
@@ -573,6 +602,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
   frechetMeanM: Object.freeze({
     kind: "column" as const,
     key: "frechetMeanM" as const,
+    corridorReadable: false,
     label: "Shortest leash between a person's two paths",
     unit: "metres" as const,
     group: "otherRulers" as const,

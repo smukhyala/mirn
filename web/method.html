@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The method card — MIRN</title>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body class="console">
+<!--
+  The masthead and the disclosure are the console's, word for word.
+
+  Not a shortcut. Guardrail 1 asks that a beginner reads that the crowd is invented BEFORE any
+  number, in document order, on every surface that shows one — and this page shows numbers. Copying
+  the paragraph keeps the pages saying the same thing; rewriting it would make one of them the
+  softer version, and the softer version would be this one, on the page a stranger arrives at with
+  a question about their own work. web/app/console/__tests__/method-dom.test.ts checks both halves:
+  every clause the CSV's own disclosure carries appears here, and it appears above the
+  questionnaire, the Run button and the verdict.
+-->
+<header class="console-masthead">
+  <p class="eyebrow">A bench for one question</p>
+  <h1>What does a method like yours read when the answer is nothing?</h1>
+  <p class="standfirst" id="disclosure">
+    Everything on this page is simulated. The crowd is an invented model of pedestrians — invented people
+    obeying invented rules — and no number here is a measurement of real pedestrians. What is
+    real is the ruler: the same room is run twice, once with a robot and once without, from the
+    same starting positions and the same random wobble, and the difference between a person's
+    two paths is the robot's effect on them.
+  </p>
+  <p class="how-backlink"><a href="./how.html">How every number here is worked out</a></p>
+  <p class="how-backlink"><a href="./index.html">Open the console and build a room yourself</a></p>
+  <p class="how-backlink"><a href="./drill.html">Call a room yourself, before the run without the robot is shown</a></p>
+</header>
+
+<main class="console-main">
+  <section class="method-intro" aria-labelledby="intro-title">
+    <h2 class="region-title" id="intro-title">What this does</h2>
+    <p class="verdict-line">
+      You have written a disturbance metric, or you are about to. Describe how it is computed and
+      this bench will run the nearest thing it can run on a world where the robot's true effect on
+      every person is exactly nothing — not nearly nothing, exactly — and tell you what a method of
+      that shape reads there.
+    </p>
+    <p class="verdict-line">
+      Nothing of yours is read in. No code, no file, no data. You answer five closed questions,
+      those answers name one of a handful of families this bench already implements, and it runs its
+      own estimator on its own rooms and reports its own numbers. What leaves this page is a claim
+      about a shape of measurement, never a claim about your robot.
+    </p>
+  </section>
+
+  <!--
+    Empty unless a hand-edited link asked for an answer this bench does not offer. The permalink
+    carries the five answers, so a link naming an answer the closed table has never held has to be
+    answered out loud rather than rounded off in silence — the same rule the console and the drill
+    both follow above their own controls.
+  -->
+  <div class="link-notices" id="link-notices" hidden></div>
+
+  <!--
+    Filled by web/method.ts from the closed question table in web/engine/job/questions.ts. Empty
+    here on purpose: a hand-written copy of the questions in this file would be a second catalogue
+    that nothing checks against the first, and the test that walks every answer a reader can give
+    walks the table rather than this markup.
+  -->
+  <!--
+    How many rooms every route on this page runs. One control, not three: a comparison whose rows
+    were measured on different numbers of rooms is a table of numbers that cannot be set beside each
+    other, and `makeComparison` refuses one rather than drawing it.
+
+    It is NOT a recommendation, and the copy is written so it cannot be read as one. No count here
+    is marked adequate or sufficient. The method card's own design document refuses to tell a reader
+    what sample size THEIR study needs — that is a claim about an experiment this bench knows nothing
+    about — and that refusal is untouched. This says how many rooms MIRN runs for its own count.
+  -->
+  <form class="method-rooms" id="rooms" aria-labelledby="rooms-title">
+    <h2 class="region-title" id="rooms-title">How many rooms to run</h2>
+    <p class="verdict-line">
+      More rooms do not change which rooms: the first eight of thirty-two are the same eight. Asking
+      for more adds to an answer rather than replacing it, and the range around every count below
+      narrows about a number that stays where it was. It costs time in proportion.
+    </p>
+    <label class="control" for="room-count">
+      <span class="control-label">Rooms behind every count on this page</span>
+      <select id="room-count"></select>
+    </label>
+    <p class="region-note">
+      A narrower range is a more precise number, not a truer one. It says how much the count would
+      move if this bench ran the same rulers on more rooms of the same invented crowd. It says
+      nothing about the two things that actually bound these numbers: the crowd is calibrated
+      against nothing, and a room is not a corridor.
+    </p>
+  </form>
+
+  <form class="method-questions" id="questions" aria-labelledby="questions-title">
+    <h2 class="region-title" id="questions-title">Five questions about how your number is computed</h2>
+    <div id="question-list"></div>
+    <div class="method-run">
+      <button id="run" type="button" disabled>Measure this method</button>
+      <button id="copy-link" type="button">Copy a link to these answers</button>
+    </div>
+    <p class="method-status" id="status"></p>
+    <p class="region-note">
+      The link carries your five answers and nothing that was measured. There is no server behind
+      this page, nothing is saved on this machine, and reloading re-runs the simulation on today's
+      code rather than showing you an old answer.
+    </p>
+  </form>
+
+  <!--
+    The second route, and the one guardrail 11 refused until 2026-08-27.
+
+    It is a SEPARATE form from the questionnaire above, and that separation is asserted rather than
+    intended: `method-dom.test.ts` checks that the questionnaire region still carries no textarea,
+    no upload and no free text field, and that this region is the only place any of them appears.
+    Scoping the old assertion instead of deleting it keeps a statement of where the line now is —
+    deleting it would have left nothing saying the questionnaire stayed closed.
+
+    Nothing typed here reaches the address bar. Guardrail 10 says a link carries the recipe and
+    never the results, and now also that it never carries executable code: a link that ran a
+    stranger's function in your browser would be a shareable exploit on a static origin with no
+    server to put it behind. There is deliberately no "copy a link" control in this form, and a
+    test asserts the permalink never carries what is typed here.
+  -->
+  <form class="method-supplied" id="supplied" aria-labelledby="supplied-title">
+    <h2 class="region-title" id="supplied-title">Or hand it the metric itself</h2>
+    <p class="verdict-line">
+      Write the body of a function. It is handed one run — the people's paths and the robot's path,
+      which is what a corridor gives you — and returns a distance in metres. It is never handed the
+      run without the robot: a metric that could see that could subtract it and return the exact
+      answer, and what came back would describe this bench rather than your ruler.
+    </p>
+    <p class="verdict-line">
+      It runs on this machine, in a worker with no page around it, on rooms where the robot's true
+      effect on every person is exactly nothing. Nothing is uploaded and nothing is saved. What you
+      type here never enters the link.
+    </p>
+    <textarea id="supplied-source" rows="10" spellcheck="false"
+      aria-describedby="supplied-title"></textarea>
+    <div class="method-run">
+      <button id="supplied-run" type="button" disabled>Measure this metric</button>
+    </div>
+    <p class="method-status" id="supplied-status"></p>
+    <p class="region-note">
+      This can show that a metric is untrustworthy. It cannot show that one is sound — the crowd
+      here is invented, so failing is a finding and passing is not a verdict.
+    </p>
+  </form>
+
+  <!--
+    Empty until a measurement has finished. web/method.ts builds the whole verdict into it: the
+    family and its confound, what was actually run in place of what you described, the two measured
+    numbers with their zeroes, and the refusal. Nothing claims to be a verdict before there is one,
+    so a test looking for the verdict before the run finds nothing rather than an empty shell.
+  -->
+  <section class="method-result" id="result" aria-labelledby="result-title" hidden>
+    <h2 class="region-title" id="result-title">The verdict</h2>
+    <div id="verdict"></div>
+    <!--
+      A number a reader cannot carry off is not a result they can cite, check later, or hand to
+      anybody. The file opens with the invented-crowd disclosure, because a file outlives the page
+      it came from, and it records the settings that produced it so it can be reproduced rather
+      than merely believed.
+    -->
+    <div class="method-run">
+      <button id="verdict-download" type="button">Download these numbers</button>
+    </div>
+  </section>
+
+  <!--
+    The third route. Not one ruler but every ruler this bench can run, on the same rooms, at the
+    same seeds, against the same drift line, in one table.
+
+    It is a region of its own rather than a third writer into the verdict host above. A verdict and
+    a comparison on screen at once, under one heading, would invite a reading neither of them
+    supports: the verdict is about the method you described, and the table is about the shapes of
+    measurement this bench implements. So the two have separate hosts and separate headings, and
+    web/app/console/__tests__/method-dom.test.ts checks that this one is empty until a run has
+    finished, the same way it checks the verdict host is.
+
+    A metric of your own joins the table if you have already run one above. It is never re-run from
+    here and it is never required — the four described rulers are the table on their own.
+  -->
+  <section class="method-comparison" id="comparison" aria-labelledby="comparison-title">
+    <h2 class="region-title" id="comparison-title">How every ruler this bench runs does on the same rooms</h2>
+    <p class="verdict-line">
+      The described families are measured one after another, on the same rooms, at the same seeds,
+      and against the same drift line. That is what makes the last column of the table a count of
+      one thing rather than a heading over several. It takes a few seconds, and the line below says
+      which ruler is being measured and how far along it is.
+    </p>
+    <p class="verdict-line">
+      If you have already handed this page a metric of your own, it joins the table as your row.
+      Nothing of yours is re-run from here and nothing of yours is needed: press this and the
+      described rulers are measured whether or not you have written one.
+    </p>
+    <div class="method-run">
+      <button id="comparison-run" type="button">Measure every ruler on the same rooms</button>
+    </div>
+    <p class="method-status" id="comparison-status"></p>
+    <p class="region-note">
+      What comes back is which shape of ruler this invented crowd confounded, and that is the whole
+      of it. It is not a ranking of methods. There is no total, no share and no winner, and a ruler
+      that made none of these mistakes here has been shown only that it made none of them here.
+    </p>
+  </section>
+
+  <!--
+    Empty until every ruler has been measured. web/method.ts builds the whole table into it — the
+    refusal first, then what the last column counts, then the rows — and takes it down again the
+    moment anything that fed it changes. Nothing claims to be a comparison before there is one, so
+    a test looking for the table before the run finds nothing rather than an empty shell.
+  -->
+  <section class="method-result" id="comparison-result" aria-labelledby="comparison-result-title" hidden>
+    <h2 class="region-title" id="comparison-result-title">Every ruler, on the same rooms</h2>
+    <div id="comparison-verdict"></div>
+    <div class="method-run">
+      <button id="comparison-download" type="button">Download this table</button>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="./method.ts"></script>
+</body>
+</html>

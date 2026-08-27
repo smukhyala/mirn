@@ -56,6 +56,7 @@ vi.mock("../../../engine/job/runner.js", () => ({
 }));
 
 import { phraseFor, pumpSweep, type PumpDeps, type PumpPort } from "../pump.js";
+import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
 const headline: ColumnKey[] = [];
 for (const key of HEADLINE_COLUMNS) {
@@ -266,7 +267,6 @@ describe("the slice pump", () => {
   });
 
   it("describes what it is doing in plain English", () => {
-    const identifier = /\b[a-z]+[A-Z][A-Za-z0-9]*\b|\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/;
     const phrases: string[] = [
       phraseFor(jobWithAxis(null), {
         kind: "unit",
@@ -307,7 +307,7 @@ describe("the slice pump", () => {
     ];
     for (const phrase of phrases) {
       expect(phrase.length).toBeGreaterThan(10);
-      expect(identifier.test(phrase), `"${phrase}" carries a code identifier`).toBe(false);
+      expect(CODE_IDENTIFIER.test(phrase), `"${phrase}" carries a code identifier`).toBe(false);
     }
   });
 });

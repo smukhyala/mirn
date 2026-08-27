@@ -4,7 +4,11 @@ import { COLUMNS } from "../../../engine/job/columns.js";
 import type { ColumnKey } from "../../../engine/job/columns.js";
 import { configForCell, type SweepJob } from "../../../engine/job/spec.js";
 import { ContractError } from "../../../engine/core/errors.js";
-import type { RunConfig } from "../../../engine/contracts/config.js";
+import {
+  CROWD_MODEL_ORDER,
+  type CrowdModelKey,
+  type RunConfig,
+} from "../../../engine/contracts/config.js";
 import {
   DEFAULT_SETTINGS,
   jobForPreview,
@@ -93,6 +97,50 @@ describe("console settings", () => {
         sweepValues: [1, 2],
       }),
     ).toThrow(/catalogue/);
+  });
+
+  it("opens on the crowd every recorded measurement was taken on", () => {
+    expect(DEFAULT_SETTINGS.crowdModel).toBe(CROWD_MODEL_ORDER[0]);
+  });
+
+  it("carries the picked crowd into every config a run is built from", () => {
+    // The choice is not an axis, so nothing in `AXES` writes it: `baseOverridesFor` is the only
+    // path it can travel, and a crowd that stopped at the settings object would leave every cell of
+    // a sweep running the other one.
+    const second = CROWD_MODEL_ORDER[1] as CrowdModelKey;
+    const swept = makeConsoleSettings({
+      ...DEFAULT_SETTINGS,
+      crowdModel: second,
+      sweepAxis: "crowdSize",
+      sweepValues: [4, 18, 44],
+      seedCount: 2,
+    });
+    expect(configForCell(jobForPreview(swept), 0, 0).crowdModel).toBe(second);
+    const run = jobForRun(swept);
+    for (let cell = 0; cell < run.axisValues.length; cell++) {
+      for (let seed = 0; seed < run.seedIndices.length; seed++) {
+        expect(configForCell(run, cell, seed).crowdModel).toBe(second);
+      }
+    }
+    // And the default settings still build the first crowd, so nothing already recorded moved.
+    expect(configForCell(jobForRun(DEFAULT_SETTINGS), 0, 0).crowdModel).toBe(CROWD_MODEL_ORDER[0]);
+  });
+
+  it("rejects a crowd this bench cannot run", () => {
+    // Same reason the sweep axis is checked: a permalink is decoded from a stranger's query string,
+    // and a closed union is only closed if something refuses what is not in it.
+    expect(() =>
+      makeConsoleSettings({
+        ...DEFAULT_SETTINGS,
+        crowdModel: "aCrowdNobodyWrote" as unknown as CrowdModelKey,
+      }),
+    ).toThrow(ContractError);
+    expect(() =>
+      makeConsoleSettings({
+        ...DEFAULT_SETTINGS,
+        crowdModel: "aCrowdNobodyWrote" as unknown as CrowdModelKey,
+      }),
+    ).toThrow(/crowd/);
   });
 
   it("rejects a sweep whose shape is impossible", () => {

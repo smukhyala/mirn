@@ -304,7 +304,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 40,
     step: 0.5,
     defaultValue: 10,
-    note: "Late in the episode everyone has arrived and stopped, and a guess that a stationary person carries straight on is exactly right, so the forecaster reads almost nothing however bad it is.",
+    note: "Late in the episode everyone has arrived and stopped, and a guess that a stationary person carries straight on is exactly right, so the forecaster reads almost nothing however bad it is. It does not fall smoothly on the way there, because the whole reading rests on one instant: one notch can halve it or grow it by half.",
     writes: Object.freeze(["forecastEndStep"]),
     movesColumns: Object.freeze(["forecastReportM"] as ColumnKey[]),
     apply: (params: MeasurementParams, value: number): MeasurementParams => ({

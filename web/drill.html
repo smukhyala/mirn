@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The referee drill — MIRN</title>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body class="console">
+<!--
+  The masthead and the disclosure are the console's, word for word.
+
+  Not a shortcut. Guardrail 1 asks that a beginner reads that the crowd is invented BEFORE any
+  number, in document order, on every surface that shows one — and the drill shows numbers. Copying
+  the paragraph keeps the two pages saying the same thing; rewriting it would make one of them the
+  softer version, and the softer version would be this one, on the page that asks a reader to trust
+  what they are shown. web/app/console/__tests__/drill-dom.test.ts checks both halves: every clause
+  the CSV's own disclosure carries appears here, and it appears above the arena and the readouts.
+-->
+<header class="console-masthead">
+  <p class="eyebrow">A bench for one question</p>
+  <h1>How much did the robot move the crowd?</h1>
+  <p class="standfirst" id="disclosure">
+    Everything on this page is simulated. The crowd is an invented model of pedestrians — invented people
+    obeying invented rules — and no number here is a measurement of real pedestrians. What is
+    real is the ruler: the same room is run twice, once with a robot and once without, from the
+    same starting positions and the same random wobble, and the difference between a person's
+    two paths is the robot's effect on them.
+  </p>
+  <p class="how-backlink"><a href="./how.html">How every number here is worked out</a></p>
+  <p class="how-backlink"><a href="./index.html">Open the console and build a room yourself</a></p>
+  <p class="how-backlink"><a href="./method.html">Score a metric of your own against a world where the answer is nothing</a></p>
+</header>
+
+<main class="console-main">
+  <section class="stage" id="stage" aria-labelledby="card-title">
+    <h2 class="region-title" id="card-title">The card</h2>
+    <!--
+      Both of these are filled by web/drill.ts and are empty here on purpose. The count is rendered
+      from the catalogue's own length and the name from the card's own entry, so neither can go
+      stale against a ninth card or a renamed one — the same rule the console's captions follow.
+    -->
+    <p class="card-progress" id="card-progress"></p>
+    <p class="card-name" id="card-name"></p>
+    <!--
+      Empty unless a hand-edited link asked for something this drill does not have. The permalink
+      carries which cards a drill was, so a link naming a card the closed catalogue has never held
+      has to be answered out loud rather than rounded off in silence — the same rule the console
+      follows above its own panel.
+    -->
+    <div class="link-notices" id="link-notices" hidden></div>
+    <p class="region-note">Simulated crowd. Every number below comes from a model.</p>
+
+    <canvas id="arena" aria-label="A crowd crossing a room with a robot in it"></canvas>
+    <!--
+      Empty, and this is the difference from web/index.html.
+
+      There, the key is six static marks, because the console draws all six on every frame. Here the
+      run without the robot is withheld, so its dots, its dashed paths and the accented distances
+      between the two are not drawn at all — and a key naming a mark the reader cannot find is what
+      that file's own comment forbids. So the list is built from the same view object the canvas is
+      drawn from, and it lists what that view actually renders and nothing else.
+    -->
+    <ul class="arena-key" id="arena-key" aria-label="What the marks mean"></ul>
+    <p class="region-note key-note">
+      One run is drawn here. The same room, run again with no robot in it, is what would tell you
+      what the robot changed — and it is the one thing a real corridor cannot give you, so it is
+      not on this card either.
+    </p>
+
+    <div class="readouts" id="readouts"></div>
+    <p class="region-note" id="readouts-note">
+      The readouts carrying a number are the ones a real corridor could produce: a camera, a
+      stopwatch and a tape measure would give you every one of them. The blank ones need the room
+      run twice. Each tile opens on the assumption behind its number;
+      <a href="./how.html">the working</a> sets out the arithmetic for all of them.
+    </p>
+
+    <section class="call" id="call" aria-labelledby="call-title">
+      <h2 class="region-title" id="call-title">Your call</h2>
+      <p class="call-question">
+        Two runs of the same room, with nothing done to either of them, still come out different:
+        nobody walks the same line twice. Did the robot move this crowd by more than that ordinary
+        difference, or by less?
+      </p>
+      <div class="call-buttons">
+        <button id="call-bigger" type="button">By more than that</button>
+        <button id="call-smaller" type="button">By less than that</button>
+        <button id="call-cannot-tell" type="button">Cannot tell from this card</button>
+      </div>
+      <p class="call-status" id="call-status"></p>
+    </section>
+
+    <!--
+      Empty until a call is made. web/drill.ts builds the whole reveal into it: the sentence saying
+      what was called, the sentence saying what the room actually did, and the button on to the
+      next card. Nothing claims to be a reveal before there is one, so a test looking for
+      `.drill-reveal` before the click finds nothing rather than an empty shell.
+    -->
+    <div class="reveal-host" id="reveal"></div>
+  </section>
+
+  <!--
+    The running score, and the sentence saying it does not survive a reload.
+
+    That sentence is static rather than written by the script on purpose. Guardrail 10 says the
+    tally is held in memory and the page says so; a reader who has JavaScript switched off, or who
+    arrives before the module has run, still gets told. It is also the only honest thing to say —
+    there is no server, no account and no saved session behind this page, and there is not going to
+    be one.
+  -->
+  <section class="drill-tally" aria-labelledby="tally-title">
+    <h2 class="region-title" id="tally-title">Your running score</h2>
+    <p class="tally-line" id="tally"></p>
+    <p class="region-note">
+      This score is held in memory only. Reload the page and the drill starts again at the first
+      card: nothing here is written down, on this machine or anywhere else.
+    </p>
+  </section>
+
+  <!--
+    Hidden until the last card has been called, and filled by web/drill.ts. Its heading carries the
+    id this section names, so the id exists by the time a reader can see either.
+  -->
+  <section class="drill-verdict" id="verdict" aria-labelledby="verdict-title" hidden></section>
+</main>
+
+<script type="module" src="./drill.ts"></script>
+</body>
+</html>

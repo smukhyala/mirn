@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { DISCLOSURE_CLAUSES } from "../csv.js";
+import { DISCLOSURE_CLAUSES, INVENTED_CROWD_DISCLOSURE } from "../csv.js";
 
 /**
  * The ordering assertion runs against the FILE, not the booted DOM. A script can move a paragraph
@@ -29,13 +29,35 @@ describe("the console page is the page the build ships", () => {
     expect(run().trim()).toBe("web/index.html");
   });
 
-  it("is the build's only entry point", () => {
+  it("is an entry point, alongside the working page, the drill, the method card and nothing else", () => {
     const config = readFileSync("vite.config.ts", "utf8");
     expect(config).toContain('index: resolve(__dirname, "web/index.html")');
-    // Asserting the ABSENCE is the point. A surviving `instrument` entry would mean the build is
-    // still emitting a page whose source this task deleted.
+    expect(config).toContain('how: resolve(__dirname, "web/how.html")');
+    expect(config).toContain('drill: resolve(__dirname, "web/drill.html")');
+    expect(config).toContain('method: resolve(__dirname, "web/method.html")');
+    // Asserting the ABSENCE is still the point, and it is what this test is actually for. A
+    // surviving `instrument` entry would mean the build is still emitting a page whose source an
+    // earlier task deleted. Both of these outlive the count below on purpose: a count alone goes
+    // green the moment somebody adds a page and forgets to delete a dead one.
     expect(config).not.toContain("instrument");
     expect(config).not.toContain("generatedPages");
+    // The entry map used to be guarded by being a single named page. It is three now, so the guard
+    // is stated directly instead of implied: every entry names a file that exists, and there are
+    // exactly as many entries as there are hand-written pages. An entry whose HTML has been
+    // deleted fails here rather than at deploy, which is the same defect the `instrument`
+    // assertion above catches for one particular name.
+    //
+    // Raised from two to three by the drill (web/drill.html), and from three to four by the method
+    // card (web/method.html). The four named `toContain`s above and this exact length together
+    // mean the map is these four pages and nothing else — which is what a `toContain` on its own
+    // would not say. Raising the number without adding the matching `toContain` above would turn
+    // this back into a bare count, which is the thing the two absence assertions exist to outlive.
+    const entries = [...config.matchAll(/(\w+): resolve\(__dirname, "([^"]+)"\)/g)];
+    expect(entries).toHaveLength(4);
+    for (const entry of entries) {
+      const page = entry[2] as string;
+      expect(existsSync(page), `${page} is an entry point with no source file`).toBe(true);
+    }
   });
 
   it("boots from its own top-level script, not from the token-mounting helper module", () => {
@@ -67,7 +89,40 @@ describe("the console page is the page the build ships", () => {
 });
 
 describe("the invented-crowd disclosure comes first", () => {
+  /**
+   * The list itself, spelled out, and this is the assertion the other five are standing on.
+   *
+   * Five loops across four files iterate `DISCLOSURE_CLAUSES` and check the surface under test
+   * contains each entry. Empty the array and all five go green at once, having checked nothing —
+   * and the only other content check compares an export's first line against the very constant
+   * that produced it, so gutting that to "" stays green too. Guardrail 1 is the one rule on this
+   * project that a reader is harmed by, so the words it turns on are written here as literals
+   * rather than derived from the thing they are meant to constrain.
+   */
+  it("still names the four things a reader has to be told", () => {
+    // Changed once, deliberately, on 2026-08-27. "social-force model" was the second clause until
+    // a second crowd kernel shipped, at which point it was false on any page that could show a
+    // number from the other one. Guardrail 1 puts the disclosure in the STATIC markup before any
+    // number, so it cannot name a kernel the reader has not picked yet.
+    //
+    // The list is pinned rather than derived precisely so that change had to be made here, on
+    // purpose, by somebody reading this comment — rather than a clause quietly going missing and
+    // the page still passing. What the obligation needs is unchanged: four clauses, and a beginner
+    // told the crowd is invented before a number reaches them.
+    expect(DISCLOSURE_CLAUSES).toEqual([
+      "simulated",
+      "invented model of pedestrians",
+      "invented people obeying invented rules",
+      "no number here is a measurement of real pedestrians",
+    ]);
+    expect(INVENTED_CROWD_DISCLOSURE).toContain("no number here is a measurement of real pedestrians");
+    for (const clause of DISCLOSURE_CLAUSES) {
+      expect(clause.length, "a disclosure clause is empty").toBeGreaterThan(0);
+    }
+  });
+
   it("carries every clause the CSV carries", () => {
+    expect(DISCLOSURE_CLAUSES.length, "there are no clauses to check for").toBeGreaterThan(0);
     for (const clause of DISCLOSURE_CLAUSES) {
       expect(FLAT).toContain(clause);
     }
@@ -146,5 +201,52 @@ describe("the readouts grid narrows on a narrow viewport", () => {
     const rule = /^\.ledger-wrap\s*\{([^}]*)\}/m.exec(css);
     expect(rule, ".ledger-wrap has no rule at all").not.toBeNull();
     expect(rule?.[1]).toMatch(/overflow-x:\s*auto/);
+  });
+});
+
+/**
+ * Guardrail 12's neighbour in CLAUDE.md: none of the shipped documents is a step in a sequence, and
+ * each is reachable at any time from the others. That was a sentence and nothing else, and one
+ * feature was enough to make it false — the method card shipped linked FROM the console and TO the
+ * console and the working page, and neither the drill nor the working page knew it existed. A
+ * reader who finished the drill, which is the page most likely to leave somebody wanting to score
+ * their own metric, had to go back through the front door to find it.
+ *
+ * The page list is read from the Vite input map rather than written out here, and that is the whole
+ * difference between this test and the sentence it replaces. A fifth page added to the build has to
+ * fail this test rather than quietly not be in it — a hand-written list would have gone green
+ * through exactly the commit that broke the promise.
+ *
+ * The assertion runs against the FILE, for the same reason the ordering assertion above does: a
+ * link a script appends after load is not there for a reader with no JavaScript.
+ */
+describe("every shipped document is reachable from every other", () => {
+  const config = readFileSync("vite.config.ts", "utf8");
+  const pages = [...config.matchAll(/(\w+): resolve\(__dirname, "([^"]+)"\)/g)].map(
+    (entry) => entry[2] as string,
+  );
+
+  it("has more than one page to check, so an empty map cannot pass this silently", () => {
+    expect(pages.length).toBeGreaterThan(1);
+  });
+
+  it("links each page to all of the others, in its own markup", () => {
+    let checked = 0;
+    for (const from of pages) {
+      const source = readFileSync(from, "utf8");
+      for (const to of pages) {
+        if (to === from) {
+          continue;
+        }
+        // The pages sit in one directory and link each other document-relative, which is what
+        // makes the same build work at a project subpath, at a domain root and from a file.
+        const segments = to.split("/");
+        const filename = segments[segments.length - 1] as string;
+        const href = `href="./${filename}"`;
+        expect(source.includes(href), `${from} does not link ${to}`).toBe(true);
+        checked = checked + 1;
+      }
+    }
+    expect(checked, "no pair of pages was checked").toBe(pages.length * (pages.length - 1));
   });
 });

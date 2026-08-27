@@ -66,6 +66,8 @@ export interface RunConfig {
    * The demo's robot-blind toggle. Kept because it is the cleanest demonstration on the whole
    * site: switch it off and the true effect is EXACTLY zero while the measured one is not.
    */
+  /** Which crowd kernel drives the people. See `CrowdModelKey`. */
+  readonly crowdModel: CrowdModelKey;
   readonly pedestriansSeeRobot: boolean;
   readonly treatment: TreatmentSpec;
 }
@@ -120,6 +122,10 @@ export const DEFAULT_CONFIG: RunConfig = Object.freeze({
   perception: Object.freeze({ positionSigmaM: 0 }),
   disturbances: Object.freeze([] as DisturbanceSpec[]),
   pedestriansSeeRobot: true,
+  // Every fixture, permalink and pinned measurement predates the second kernel, so the default
+  // is the one they were all measured under. Changing it would silently restate every number
+  // this repo has ever recorded.
+  crowdModel: "socialForce" as CrowdModelKey,
   treatment: Object.freeze({ kind: "robot-presence" as const }),
 });
 
@@ -130,6 +136,27 @@ export const DEFAULT_CONFIG: RunConfig = Object.freeze({
  * the whole robot object, which is how a default silently diverges from what a test thinks it is
  * testing. Each group is independently partial instead.
  */
+/**
+ * Which crowd is being simulated.
+ *
+ * A closed union, not a registry: two kernels, named here, and nothing added at runtime. The
+ * choice is deliberately NOT an axis — `AXES` entries are numeric knobs with a min, a max and a
+ * step that `axes.slow.test.ts` walks notch by notch, and two kernels are not two points on a
+ * scale. Inventing a number between them to fit the table would be inventing a quantity.
+ *
+ * `socialForce` repels on present distance: a person pushes away from whoever is near them now.
+ * `anticipatory` repels on predicted time to closest approach: a person steers away from whoever
+ * they are going to collide with, and ignores someone close but already moving away. The point of
+ * having both is that a confound appearing under only one is a fact about that kernel rather than
+ * about measurement.
+ */
+export type CrowdModelKey = "socialForce" | "anticipatory";
+
+export const CROWD_MODEL_ORDER: readonly CrowdModelKey[] = Object.freeze([
+  "socialForce",
+  "anticipatory",
+] as const);
+
 export interface RunConfigOverrides {
   kind?: "runConfig";
   seed?: number;
@@ -143,6 +170,7 @@ export interface RunConfigOverrides {
   perception?: Partial<RunConfig["perception"]>;
   disturbances?: readonly DisturbanceSpec[];
   pedestriansSeeRobot?: boolean;
+  crowdModel?: CrowdModelKey;
   treatment?: TreatmentSpec;
 }
 
@@ -156,6 +184,13 @@ export function makeRunConfig(overrides: RunConfigOverrides = {}): RunConfig {
     perception: Object.freeze({ ...DEFAULT_CONFIG.perception, ...(overrides.perception ?? {}) }),
     disturbances: Object.freeze([...(overrides.disturbances ?? DEFAULT_CONFIG.disturbances)]),
   });
+
+  // A closed union is only closed if something refuses what is not in it. A permalink or a
+  // hand-edited link naming a kernel this bench does not have must say so rather than fall
+  // through to whichever branch the dispatch happens to end on.
+  if (!CROWD_MODEL_ORDER.includes(merged.crowdModel)) {
+    fail(`RunConfig.crowdModel must name a crowd this bench runs, got '${String(merged.crowdModel)}'`);
+  }
 
   if (!Number.isInteger(merged.seed)) {
     fail(`RunConfig.seed must be an integer, got ${merged.seed}`);

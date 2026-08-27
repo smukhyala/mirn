@@ -1,6 +1,18 @@
+import { CROWD_MODEL_ORDER, type CrowdModelKey } from "../../engine/contracts/config.js";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
+import { CARD_ORDER, type CardKey } from "../../engine/job/cards.js";
 import type { UnitKey } from "../../engine/job/columns.js";
-import { unitLabel } from "../../ui/labels.js";
+import { crowdLabel, unitLabel } from "../../ui/labels.js";
+import {
+  EMPTY_DRAFT,
+  QUESTIONS,
+  QUESTION_ORDER,
+  optionFor,
+  type MethodDraft,
+  type OptionKey,
+  type QuestionKey,
+} from "../../engine/job/questions.js";
+import type { DrillState } from "./drill.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "./state.js";
 
 /**
@@ -44,6 +56,7 @@ export const AXIS_QUERY_KEY: Readonly<Record<AxisKey, string>> = Object.freeze({
 });
 
 const NOTICE_ROBOT = "notice";
+const CROWD = "crowd";
 const NEAR_MISS = "near_miss";
 const RECOVERY_TOLERANCE = "recovery_tol";
 const RECOVERY_DWELL = "recovery_dwell";
@@ -77,6 +90,7 @@ const SETTING = Object.freeze({
     label: "Whether the people notice the robot",
     unit: "none" as const,
   }),
+  crowdModel: Object.freeze({ label: "The crowd in the room", unit: "none" as const }),
   nearMissThresholdM: Object.freeze({ label: "The near-miss line", unit: "metres" as const }),
   recoveryToleranceFraction: Object.freeze({
     label: "The recovery tolerance",
@@ -100,6 +114,7 @@ const SETTING = Object.freeze({
 
 export const SETTING_QUERY_KEYS: readonly string[] = Object.freeze([
   NOTICE_ROBOT,
+  CROWD,
   NEAR_MISS,
   RECOVERY_TOLERANCE,
   RECOVERY_DWELL,
@@ -118,6 +133,9 @@ export function encodeSettings(settings: ConsoleSettings): string {
     parts.push(`${AXIS_QUERY_KEY[key]}=${String(settings.axisValues[key])}`);
   }
   parts.push(`${NOTICE_ROBOT}=${settings.pedestriansSeeRobot ? "1" : "0"}`);
+  // The kernel's key, not its plain-English name: this half of the link is machine-facing, and the
+  // decoder resolves it back through the same closed table. A reader only ever meets the name.
+  parts.push(`${CROWD}=${settings.crowdModel}`);
   parts.push(`${NEAR_MISS}=${String(settings.nearMissThresholdM)}`);
   parts.push(`${RECOVERY_TOLERANCE}=${String(settings.recoveryToleranceFraction)}`);
   parts.push(`${RECOVERY_DWELL}=${String(settings.recoveryDwellSteps)}`);
@@ -168,6 +186,36 @@ function readFlag(
       `as it was.`,
   );
   return fallback;
+}
+
+/**
+ * The crowd a link names, or a fallback that is said out loud.
+ *
+ * A closed union is only closed if something refuses what is not in it, and here the refusal has to
+ * be audible. A link naming a crowd this bench does not run would otherwise open a room driven by a
+ * different crowd from the one it asked for, with every number on the page quietly attributed to
+ * the wrong one — the silent fallback guardrail 10 calls worse than no link at all.
+ *
+ * The notice deliberately does NOT echo what was written. That is whatever somebody typed into a
+ * URL bar, and quoting it back is how a code identifier reaches a reader, which is the same reason
+ * `decodeMethod`'s notices name the question rather than the answer they refused. What it names
+ * instead is the crowd actually running, so the reader can tell what they are looking at.
+ */
+function readCrowdModel(params: URLSearchParams, notices: string[]): CrowdModelKey {
+  const raw = params.get(CROWD);
+  if (raw === null) {
+    return DEFAULT_SETTINGS.crowdModel;
+  }
+  for (const key of CROWD_MODEL_ORDER) {
+    if (key === raw) {
+      return key;
+    }
+  }
+  notices.push(
+    `The link named a crowd this bench does not have, so the room is running ` +
+      `${crowdLabel(DEFAULT_SETTINGS.crowdModel)}.`,
+  );
+  return DEFAULT_SETTINGS.crowdModel;
 }
 
 /**
@@ -389,6 +437,7 @@ export function decodeSettings(query: string): DecodeResult {
     SETTING.pedestriansSeeRobot.label,
     notices,
   );
+  const crowdModel = readCrowdModel(params, notices);
   const nearMissThresholdM = readBounded(
     params,
     {
@@ -488,6 +537,7 @@ export function decodeSettings(query: string): DecodeResult {
   const settings = makeConsoleSettings({
     axisValues,
     pedestriansSeeRobot,
+    crowdModel,
     nearMissThresholdM,
     recoveryToleranceFraction,
     recoveryDwellSteps,
@@ -617,6 +667,15 @@ export function settingsNotHonoured(
       ),
     );
   }
+  if (asked.crowdModel !== applied.crowdModel) {
+    lines.push(
+      notHonoured(
+        SETTING.crowdModel.label,
+        crowdLabel(asked.crowdModel),
+        crowdLabel(applied.crowdModel),
+      ),
+    );
+  }
   if (!sameSetting(asked.nearMissThresholdM, applied.nearMissThresholdM)) {
     lines.push(
       notHonoured(
@@ -711,4 +770,149 @@ export function settingsNotHonoured(
   }
 
   return Object.freeze(lines);
+}
+
+/**
+ * The drill's own permalink, and a narrower recipe than the console's.
+ *
+ * The console's link carries thirteen axes and eleven settings because a room has that many knobs.
+ * The drill has none: every card is a fixed entry in `DRILL_CARDS`, so the only thing worth naming
+ * in a link is *which* cards this drill was — the eight keys, in the order they were called. That
+ * is still a recipe rather than a result: a key resolves to a card's settings and seed through
+ * `DRILL_CARDS`, which reproduces the room exactly, and reproduces nothing about how it was called.
+ *
+ * `DrillCallRecord` also carries `call`, `honest` and `correct`, and none of the three is read here.
+ * A link that carried `correct=false` would be exactly the failure guardrail 10 exists to name: a
+ * score quoted with the new page's authority, on a page whose whole point is that the score is not
+ * the thing worth carrying.
+ *
+ * Both halves are wired, and that is the other half of guardrail 10. The verdict's Copy-link button
+ * calls `encodeDrill` and puts the query in the address bar; `web/drill.ts` calls `decodeDrill` on
+ * `window.location.search` before it builds the first card and runs exactly the cards it names, in
+ * the order it names them. A page that wrote this payload and then ignored it on the way back in
+ * would be the write-only permalink the guardrail calls worse than no link at all.
+ *
+ * `decodeDrill` follows `decodeSettings`'s own convention: an unknown card key is ignored, with a
+ * notice a reader can read, never silently and never by throwing.
+ */
+
+const DRILL_CARDS_KEY = "cards";
+
+export interface DrillLinkResult {
+  readonly kind: "drillLinkResult";
+  readonly cards: readonly CardKey[];
+  readonly notices: readonly string[];
+}
+
+/** The cards called so far, in the order they were called — never the call, the honest answer, or
+ *  whether the two agreed. */
+export function encodeDrill(state: DrillState): string {
+  const keys: string[] = [];
+  for (const record of state.calls) {
+    keys.push(record.cardKey);
+  }
+  return `${DRILL_CARDS_KEY}=${keys.join(",")}`;
+}
+
+export function decodeDrill(query: string): DrillLinkResult {
+  const trimmed = query.startsWith("?") ? query.slice(1) : query;
+  const params = new URLSearchParams(trimmed);
+  const notices: string[] = [];
+  const cards: CardKey[] = [];
+
+  const raw = params.get(DRILL_CARDS_KEY);
+  if (raw !== null && raw.length > 0) {
+    const known = new Set<string>(CARD_ORDER);
+    const alreadyReported = new Set<string>();
+    for (const piece of raw.split(",")) {
+      if (known.has(piece)) {
+        cards.push(piece as CardKey);
+        continue;
+      }
+      if (!alreadyReported.has(piece)) {
+        alreadyReported.add(piece);
+        notices.push(
+          `The link named a card this drill does not have, written as "${piece}". It was ignored.`,
+        );
+      }
+    }
+  }
+
+  return Object.freeze({
+    kind: "drillLinkResult" as const,
+    cards: Object.freeze(cards),
+    notices: Object.freeze(notices),
+  });
+}
+
+/**
+ * The method card's link: five answers, and nothing that was measured.
+ *
+ * The console's link carries thirteen axes because a room has that many knobs, and the drill's
+ * carries which cards a drill was. This one carries the five answers a reader gave, which is the
+ * recipe in the most literal sense available on this site: the answers name a family, the family
+ * names an estimator, and the estimator re-runs on today's code. A link carrying "cleared on six
+ * of eight" would be the exact failure guardrail 10 names — a measurement quoted with the new
+ * page's authority, after a physics change may have moved it.
+ *
+ * Both halves are wired. `web/method.ts` calls `decodeMethod` on `window.location.search` before
+ * it paints the questionnaire and pre-selects whatever the link named; the Copy-link button calls
+ * `encodeMethod`. A write-only permalink looks like it works and loses its payload in silence,
+ * which the guardrail calls worse than no link at all.
+ *
+ * A partial link is legal and ordinary: it pre-selects what it names and leaves the rest blank,
+ * because that is what a reader who copied a link mid-questionnaire would expect back.
+ *
+ * The notices deliberately do NOT quote the offending value. The drill's do, and can, because a
+ * card key is a word; an answer this table does not have is whatever somebody typed into a URL
+ * bar, and echoing it into a sentence is how a code identifier reaches a reader on a page whose
+ * every other string is held to a regex.
+ */
+
+export interface MethodLinkResult {
+  readonly kind: "methodLinkResult";
+  readonly draft: MethodDraft;
+  readonly notices: readonly string[];
+}
+
+/** The five answers, in the order they are asked. Never what any of them measured. */
+export function encodeMethod(draft: MethodDraft): string {
+  const parts: string[] = [];
+  for (const key of QUESTION_ORDER) {
+    const chosen = draft[key];
+    if (chosen === null) {
+      continue;
+    }
+    parts.push(`${QUESTIONS[key].queryKey}=${encodeURIComponent(chosen)}`);
+  }
+  return parts.join("&");
+}
+
+export function decodeMethod(query: string): MethodLinkResult {
+  const trimmed = query.startsWith("?") ? query.slice(1) : query;
+  const params = new URLSearchParams(trimmed);
+  const notices: string[] = [];
+  const draft: Record<QuestionKey, OptionKey | null> = { ...EMPTY_DRAFT };
+
+  for (const key of QUESTION_ORDER) {
+    const question = QUESTIONS[key];
+    const raw = params.get(question.queryKey);
+    if (raw === null || raw.length === 0) {
+      continue;
+    }
+    if (optionFor(key, raw) === null) {
+      notices.push(
+        `The link gave an answer this bench does not offer, for the question about ` +
+          `${question.about}. It was left blank for you to answer.`,
+      );
+      continue;
+    }
+    draft[key] = raw;
+  }
+
+  return Object.freeze({
+    kind: "methodLinkResult" as const,
+    draft: Object.freeze({ ...draft }),
+    notices: Object.freeze(notices),
+  });
 }

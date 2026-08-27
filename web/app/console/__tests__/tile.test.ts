@@ -8,8 +8,11 @@ import { runPair } from "../../../engine/sim/run.js";
 import { anchorFor } from "../../../ui/labels.js";
 import {
   BAND_NOT_MEASURED,
+  BAND_WITHHELD,
   makeTileProps,
   renderTile,
+  renderWithheldTile,
+  withheldZeroRendering,
   zeroRenderingFor,
   type TilePropsInit,
 } from "../tile.js";
@@ -284,5 +287,67 @@ describe("the real column catalogue, rendered", () => {
         descriptor.zero.kind === "geometricBound" ? descriptor.zero.noRunReadsBelow : false;
       expect(rendering.bound, `${key} renders the wrong kind of zero`).toBe(expected);
     }
+  });
+});
+
+describe("a withheld tile", () => {
+  it("shows the label and says the number is withheld, with no value anywhere", () => {
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const el = renderWithheldTile(dom.window.document, "How far the crowd was moved");
+    expect(el.textContent).toContain("How far the crowd was moved");
+    expect(el.textContent).toContain("withheld");
+    // No value slot at all, so guardrail 6 cannot be violated here: there is no number to
+    // show without its zero.
+    expect(el.querySelector(".tile-value")).toBeNull();
+    expect(el.textContent).not.toMatch(/\d+\.\d+/);
+  });
+
+  it("says why it is withheld, not merely that it is", () => {
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const el = renderWithheldTile(dom.window.document, "How far the crowd was moved");
+    // A reader who is told a number is hidden and not why assumes the site is being coy.
+    expect(el.textContent).toMatch(/second run|without the robot|corridor/i);
+  });
+});
+
+describe("a tile whose zero is the thing being withheld", () => {
+  /**
+   * The drill's card shows the forecaster's reading and withholds the run it would be judged
+   * against. That is a value with no zero VALUE, which is one word away from the error guardrail 6
+   * exists to stop — so what stands in its place is checked here: the zero row is still rendered,
+   * still outside the disclosure, and still carries a sentence saying what is missing.
+   */
+  it("prints the phrase where the zero would be, and no number", () => {
+    const props = makeTileProps({
+      ...BASE,
+      zero: withheldZeroRendering("withheld: it needs the run without the robot", "metres"),
+    });
+    const tile = renderTile(doc, props);
+    expect(tile.querySelector(".tile-number")?.textContent).toBe("0.352");
+    expect(tile.querySelector(".tile-zero")).not.toBeNull();
+    expect(tile.querySelector(".tile-zero")?.closest("details")).toBeNull();
+    expect(tile.querySelector(".tile-zero-value")).toBeNull();
+    expect(tile.querySelector(".tile-zero-unit")).toBeNull();
+    expect(tile.querySelector(".tile-zero-how")?.textContent).toBe(
+      "withheld: it needs the run without the robot",
+    );
+  });
+
+  it("refuses a withheld zero with nothing to say", () => {
+    // A blank zero row is indistinguishable from a missing one, which is the whole failure.
+    expect(() => withheldZeroRendering("", "metres")).toThrow(ContractError);
+  });
+
+  it("says the band is withheld rather than unmeasured, and draws neither wedge nor tick", () => {
+    // Distinct states, not two wordings of one. "Not yet measured" names a control that would
+    // measure it; on the drill's card there is none, and the runs that measure the band have no
+    // robot in them.
+    const tile = renderTile(doc, makeTileProps({ ...BASE, gauge: { kind: "bandWithheld" } }));
+    expect(tile.querySelector(".gauge-caption")?.textContent).toBe(BAND_WITHHELD);
+    expect(BAND_WITHHELD).not.toBe(BAND_NOT_MEASURED);
+    expect(tile.querySelectorAll(".gauge-wedge").length).toBe(0);
+    expect(tile.querySelectorAll(".gauge-tick").length).toBe(0);
+    // The scale itself stays: the ruler is still there, and what is missing is the mark on it.
+    expect(tile.querySelectorAll(".gauge-scale").length).toBe(1);
   });
 });

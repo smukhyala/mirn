@@ -52,8 +52,11 @@ robots, or which published method is wrong. Nothing here is a research result.
 
 ## What is on the page
 
-One page. A settings panel, an arena you can scrub, seven headline readouts with a column picker
-for the rest, a sweep curve, and a ledger of every result you kept.
+Four pages, and the console is the one you land on. A settings panel, an arena you can scrub,
+seven headline readouts with a column picker for the rest, a sweep curve, and a ledger of every
+result you kept. The other three are the referee drill, the method card and the working, all
+described below; none is a step in a sequence, and every one of them is reachable from every other
+at any time.
 
 One press of Run executes N axis values × M seeds; a single run is the degenerate 1×1 case of the
 same mechanism. Editing a setting re-simulates a live preview in about 38 ms. A 72-run sweep takes
@@ -64,6 +67,73 @@ were zero. The zero reference is never collapsible and never optional — it is 
 value, measured at the same settings. A value with nothing to judge it against is the exact error
 this thing exists to show. Two of the seven readouts are withheld from the live preview, with the
 reason stated, because they need a run-to-run band a preview does not buy.
+
+---
+
+## The referee drill
+
+**[Try the drill →](https://smukhyala.github.io/mirn/drill.html)**
+
+A second page, built from the same formulas and computing nothing new: one room, run once, with
+the second run withheld, and a question — did the robot disturb this crowd by more than the
+ordinary difference between two runs of it, or by less? Call it, and the second run is shown.
+
+Eight rooms, each answered with the same room run twice under the paired construction above, so
+the honest answer is known rather than guessed at. Five of the eight are built so that the one
+number a real corridor could hand you — a forecaster's report, computed from the run with the
+robot and nothing else — points the wrong way. Three are built so it happens to point the right
+way, and that is not a softening of the point: a drill where the number always misled would let a
+reader score perfectly by inverting it, and would teach that it is systematically backwards rather
+than what it actually is, which is unrelated to the answer. Which readings are even eligible to
+appear on a withheld card is not decided by a name sounding safe — it is proved, per reading, by
+swapping the withheld run for a decoy from an unrelated crowd and checking whether anything
+changes.
+
+At the end it says how many you called wrong and whether the misses went the same way, then hands
+the drill back two ways: a link, which carries the eight rooms and never your calls or your score,
+and a file, which carries one row per card and opens with the sentence saying the crowd is invented.
+
+**The transferable claim is not about this crowd.** It is that a paired comparison — the same
+situation, run twice, differing in one thing — settles a question a single observation cannot,
+and settles it by construction rather than by a cleverer estimate. The crowd is invented and the
+robot is a toy; the shape of the argument is not specific to either.
+
+---
+
+## The method card
+
+**[Score a method →](https://smukhyala.github.io/mirn/method.html)**
+
+The drill scores a reader. This scores a *method*. If you have written a disturbance metric, or are
+about to, answer five closed questions about how it is computed and press one button. You leave with
+what a method of that shape reads on a world where the robot's true effect on every person is
+exactly zero — not nearly zero, exactly, because the crowd is told not to react and the paired
+construction makes the answer identically nought — and, for the three families that compare against
+something, on how many of eight rooms it clears the run-to-run band anyway. That second figure is a
+false-positive rate, and nothing else here reports one.
+
+**Nothing of yours is read in.** No code, no file, no dataset, no free text — the page has no
+textarea, no file input and no text field, and a test asserts that about the booted page rather than
+trusting the markup. You supply a *description*, in multiple choice; a closed table maps it onto one
+of four families this bench already implements; and MIRN runs its own estimator on its own rooms.
+What leaves the page is a claim about a shape of measurement, never a claim about your robot.
+
+The mapping is many-to-few and the page says so where you meet the verdict rather than in a
+footnote. A learned trajectory predictor and a hand-specified intended path both run as the
+constant-velocity stand-in, because that is the family this bench can honestly run, and a reader who
+believed their own predictor had been simulated would have been misled — which would be worse than
+the page not existing. Three of the five questions decide nothing at all, and that is said out loud
+too.
+
+The fourth family is not scored as a detector. An absolute quantity — closest approach, distance
+travelled — reads about eighteen metres against a line measured in centimetres and clears it every
+time, and clearing it says nothing whatever about the robot. So it renders in a different shape with
+no headline numeral, and which shape a family gets is read off its own ruler rather than off its
+name.
+
+**What it can and cannot show:** that a method is untrustworthy, never that one is sound. The crowd
+is invented, so passing this battery is necessary and not sufficient — a counterexample refutes a
+universal, and that is the only shape of claim a simulator has to offer.
 
 ---
 
@@ -118,11 +188,14 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 515 browser tests across 47 files in 18 s. 298 Python tests, about 6 minutes, of
-which 275 run in 22 s without the heavy nulls. CI checks the two languages independently, then runs
-a third job for the check no human remembers: that the committed fixtures are current and the
-browser still reproduces them. The built site is one HTML file, one stylesheet, a 112 kB script and
-a 48 kB worker.
+**The numbers.** 773 browser tests across 64 files, of which 742 run without the five that re-run
+the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left out
+here on purpose: the last set was measured on one machine and re-measured on another that disagreed
+by 70%, so a single number would be a claim rather than a figure. CI checks the two languages
+independently, then runs a third job for the check no human remembers: that the committed fixtures
+are current and the browser still reproduces them. The built site is four HTML files (8.96, 56.44,
+6.98 and 5.13 kB), one 19 kB stylesheet, about 164 kB of script across six chunks, and two workers
+of 49 and 42 kB.
 
 ---
 
@@ -141,7 +214,7 @@ differs is what the paired run is used for. Theirs is a benchmark: it scores nav
 against each other. MIRN uses the same construction as a known ground truth for scoring the
 **rulers** — the paired difference is the answer, and the question on screen is what a method that
 cannot see the second run reports against it, including on a run where the answer is known to be
-exactly zero. Every effect is printed beside its own run-to-run noise floor. And it is interactive:
+exactly zero. Every effect is printed beside its own run-to-run band. And it is interactive:
 you turn the dial and watch the number move rather than reading a table of someone else's.
 
 ---
@@ -183,14 +256,14 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 515 tests, production build — 28 s
+npm run check        # typecheck, 773 tests, production build
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in
 full:
 
 ```bash
-.venv/bin/python -m pytest -q -m "not slow"                       # 275 tests, 22 s
+.venv/bin/python -m pytest -q -m "not slow"                       # 275 tests
 .venv/bin/python -m pytest -q                                     # all 298, about 6 minutes
 .venv/bin/python -m mirn.cli fixtures --out tests/golden/parity    # after any formula change
 ```
@@ -204,7 +277,7 @@ Changing one side alone is a red test, not a judgement call.
 
 ```
 web/            the product
-  index.html    the console — one page
+  index.html    the console; how.html, drill.html, method.html the other three
   engine/       sim, contracts, measurement, job — no DOM anywhere in here
   app/          the worker boundary and the console's own state
   ui/           canvas renderers and the palette

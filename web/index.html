@@ -11,26 +11,32 @@
   <p class="eyebrow">A bench for one question</p>
   <h1>How much did the robot move the crowd?</h1>
   <p class="standfirst" id="disclosure">
-    Everything on this page is simulated. The crowd is a social-force model — invented people
+    Everything on this page is simulated. The crowd is an invented model of pedestrians — invented people
     obeying invented rules — and no number here is a measurement of real pedestrians. What is
     real is the ruler: the same room is run twice, once with a robot and once without, from the
     same starting positions and the same random wobble, and the difference between a person's
     two paths is the robot's effect on them.
   </p>
+  <p class="how-backlink"><a href="./how.html">How every number here is worked out</a></p>
 </header>
 
 <!--
-  Four ways in, for a reader who has not met the controls yet.
+  Five ways in, for a reader who has not met the controls yet.
 
-  Plain links, not buttons: the page reads the settings out of the address on load, so these work
-  with scripting switched off and carry no state of their own. Every one of them is checked by
-  web/app/console/__tests__/presets.test.ts, which decodes each address here exactly as the page
-  does and fails if a single setting would be ignored — a link that greets a stranger with a
-  complaint is worse than no link at all.
+  The first four are plain query-string links: the page reads the settings out of the address on
+  load, so these work with scripting switched off and carry no state of their own. Every one of
+  them is checked by web/app/console/__tests__/presets.test.ts, which decodes each address here
+  exactly as the page does and fails if a single setting would be ignored — a link that greets a
+  stranger with a complaint is worse than no link at all.
 
   No sentence below quotes a number. The numbers move when a formula moves, and a caption that
   has gone stale is the failure this project exists to argue against. Each one says what to watch
   instead, and names the one control that is changing.
+
+  The fifth is different in kind, not degree: a link to another page rather than a query string
+  this one decodes, so presets.test.ts checks it separately from the first four — it asserts the
+  page link names ./drill.html and carries no query string of its own, rather than running it
+  through the settings decoder a page address was never meant to satisfy.
 -->
 <nav class="ways-in" aria-label="Ways in">
   <h2 class="region-title">Start here</h2>
@@ -55,6 +61,17 @@
       <span>Press Run. Only the crowd's aimless wobble is changing, and nobody here reacts to the
       robot, so its real effect stays flat at nothing. The forecaster keeps reporting one.</span>
     </li>
+    <li>
+      <a href="./drill.html">The referee drill</a>
+      <span>A different way in: call whether the robot disturbed an invented crowd before the
+      second run is shown, then see what the room actually did.</span>
+    </li>
+    <li>
+      <a href="./method.html">The method card</a>
+      <span>Bring a disturbance metric of your own. Answer five questions about how it is
+      computed, and see what a method of that shape reads on a world where the answer is
+      exactly nothing.</span>
+    </li>
   </ul>
 </nav>
 
@@ -63,12 +80,36 @@
     <h2 class="region-title" id="stage-title">Stage</h2>
     <p class="region-note">Simulated crowd. Every number below comes from a model.</p>
     <canvas id="arena" aria-label="Two crowds, one with a robot and one without"></canvas>
+    <!--
+      What is on the canvas.
+
+      Static, because every mark below is drawn on every frame: the console builds its view with
+      the control run and the gaps both switched on and never turns either off. A key that lists a
+      mark the reader cannot find would be worse than none.
+
+      The swatches take their colours from the same tokens the canvas does, so there is one
+      definition of "the colour of a person" and the picture and its key cannot drift apart.
+    -->
+    <ul class="arena-key" id="arena-key" aria-label="What the marks mean">
+      <li><span class="key-mark key-treated"></span>A person, in the run with the robot</li>
+      <li><span class="key-mark key-control"></span>The same person, in the run without it</li>
+      <li><span class="key-mark key-gap"></span>The distance between those two, which is the
+        robot's effect on that person</li>
+      <li><span class="key-mark key-robot"></span>The robot</li>
+      <li><span class="key-mark key-path-treated"></span>A path walked with the robot in the room</li>
+      <li><span class="key-mark key-path-control"></span>The same path, walked without it</li>
+    </ul>
+    <p class="region-note key-note">
+      Switch off the setting that lets people notice the robot and every pair lands on top of
+      itself, because then the robot changes nothing and there is no distance left to draw.
+    </p>
     <div class="transport" id="transport"></div>
     <div class="readouts" id="readouts"></div>
     <p class="region-note" id="readouts-note">
       Two of the seven measurements below need the run-to-run band. This live preview does not
       measure it, so those two are left out here rather than shown with no zero to judge them
-      against.
+      against. Each tile opens on the assumption behind its number;
+      <a href="./how.html">the working</a> sets out the arithmetic for all of them.
     </p>
     <section class="sweep" id="sweep-block" aria-labelledby="sweep-title" hidden>
       <h2 class="region-title" id="sweep-title">Sweep curve</h2>
@@ -76,9 +117,11 @@
       <ul class="sweep-legend" id="sweep-legend"></ul>
     </section>
   </section>
-
-  <aside class="settings" id="settings" aria-label="Settings"></aside>
 </main>
+
+<aside class="settings-region" id="settings" aria-labelledby="settings-title">
+  <h2 class="region-title" id="settings-title">Settings</h2>
+</aside>
 
 <div class="progress-rule" id="progress-rule" role="progressbar"
      aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>

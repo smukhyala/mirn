@@ -24,6 +24,24 @@ const UNIT_LABEL: Readonly<Record<string, string>> = {
   none: "",
 };
 
+/**
+ * The two crowds this bench can run, named by what the people in them do.
+ *
+ * Each is a noun phrase, written to complete a sentence that opens "The crowd is …", so the same
+ * string serves the picker in the control panel and the sentences a permalink writes about a crowd
+ * it could not honour. Guardrail 12 forbids the kernel's own key reaching a reader, and two
+ * hand-written spellings of the same crowd in two files is the drift this file exists to prevent —
+ * so the words live here once and both surfaces read them.
+ *
+ * What separates them is what a person reacts to: whoever is beside them now, or whoever they are
+ * about to meet. That difference is the reason the second crowd exists, so it is what the reader
+ * is told rather than a pair of names.
+ */
+const CROWD_LABEL: Readonly<Record<string, string>> = {
+  socialForce: "people who push away from whoever is near them right now",
+  anticipatory: "people who steer around whoever they are about to walk into",
+};
+
 /** The placebo experiment labels its rows by variant rather than by estimator; neither value
  *  is a card key, so they get plain-English names of their own. */
 const VARIANT_LABEL: Readonly<Record<string, string>> = {
@@ -35,6 +53,14 @@ export function unitLabel(units: string): string {
   const label = UNIT_LABEL[units];
   if (label === undefined) {
     return units;
+  }
+  return label;
+}
+
+export function crowdLabel(model: string): string {
+  const label = CROWD_LABEL[model];
+  if (label === undefined) {
+    return model;
   }
   return label;
 }

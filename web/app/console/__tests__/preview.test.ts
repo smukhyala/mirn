@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CROWD_MODEL_ORDER, type CrowdModelKey } from "../../../engine/contracts/config.js";
 import { paired } from "../../../engine/measure/estimator/index.js";
 import { HEADLINE_COLUMNS } from "../../../engine/job/columns.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings } from "../state.js";
@@ -42,6 +43,29 @@ describe("the live preview", () => {
     expect(peopleIn(settings)).toBe(18);
   });
 
+  it("runs the crowd the panel picked, in both arms and in the zero-effect run", () => {
+    // The control is only real if the choice reaches the simulator. `runPreview` builds its config
+    // through `jobForPreview` -> `baseOverridesFor`, so a crowd that stopped at the settings object
+    // would leave the arena and every live tile describing the other crowd with nothing to show it.
+    const second = CROWD_MODEL_ORDER[1] as CrowdModelKey;
+    const other = makeConsoleSettings({ ...settings, crowdModel: second });
+    const preview = runPreview(other);
+    expect(preview.config.crowdModel).toBe(second);
+    expect(preview.run.config.crowdModel).toBe(second);
+    expect(preview.zeroRun.config.crowdModel).toBe(second);
+
+    const first = runPreview(makeConsoleSettings({ ...settings, crowdModel: "socialForce" }));
+    expect(first.config.crowdModel).toBe("socialForce");
+
+    // And the readouts move, which is the point of being able to switch: the two kernels are
+    // different physics on the same seed, so the same room measured under each does not agree.
+    const underFirst = first.readings["trueEffectM"]?.value;
+    const underSecond = preview.readings["trueEffectM"]?.value;
+    expect(underFirst).toBeDefined();
+    expect(underSecond).toBeDefined();
+    expect(underSecond).not.toBe(underFirst);
+  });
+
   it("computes the zero-effect reference run at the same settings", () => {
     const preview = runPreview(settings);
     expect(preview.zeroRun.config.pedestriansSeeRobot).toBe(false);
@@ -73,7 +97,7 @@ describe("the live preview", () => {
   });
 
   it("stamps every readout with the settings it was measured at", () => {
-    const stamps = stampsFor(runPreview(settings));
+    const stamps = stampsFor(runPreview(settings).context);
     const labels = stamps.map((stamp) => stamp.label);
     expect(labels).toContain("crowd");
     expect(labels).toContain("forecast horizon");
@@ -82,7 +106,7 @@ describe("the live preview", () => {
 
   it("never labels a stamp with its own unit, which would print the word twice", () => {
     // "people 18 people": the label sits before the value and the unit suffix after it.
-    for (const stamp of stampsFor(runPreview(settings))) {
+    for (const stamp of stampsFor(runPreview(settings).context)) {
       expect(stamp.label, `the ${stamp.label} stamp repeats its unit`).not.toBe(
         unitSuffix(stamp.unit),
       );

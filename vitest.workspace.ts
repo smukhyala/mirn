@@ -19,7 +19,11 @@ export default defineWorkspace([
       name: "ui",
       globals: true,
       environment: "node",
-      include: ["web/ui/**/*.test.ts", "web/app/**/*.test.ts"],
+      // web/testing holds no product code — it is the shared assertions the suites lean on, and
+      // guardrail 12's identifier patterns are the ones that matter. They were written out by hand
+      // in twenty places until they had drifted into three, so they live in one module now, and a
+      // module nothing tests is how they drifted in the first place.
+      include: ["web/ui/**/*.test.ts", "web/app/**/*.test.ts", "web/testing/**/*.test.ts"],
       testTimeout: 20000,
     },
   },
