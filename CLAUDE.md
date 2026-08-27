@@ -61,7 +61,24 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    readouts in document order in the static HTML, and it is line one of every CSV, because a file
    outlives the page it came from.
 
-2. **Never teach a conclusion the toy cannot support.** The crowd is a social-force model. It can
+   **There is now a second kind of number, and this guardrail is about keeping the two apart.**
+   Guardrail 11 was amended on 2026-08-27 to let a real pedestrian recording be read in, for fitting
+   the crowd and for checking the fit. A reading off the simulator is still a number about an
+   invented crowd and still carries the sentence above. A goodness-of-fit figure is not: it has real
+   people on one side of it, and reusing the invented-crowd disclosure over it would be false in the
+   one direction that matters — it would understate what the number touches.
+
+   A surface showing a fit says three things instead: the recording is real, the crowd being
+   compared against it is still invented, and a close fit is not permission to read this bench's
+   disturbance numbers as measurements of anybody. The third clause is the load-bearing one. The
+   whole hazard of calibration is that it makes a toy feel like an instrument, and a reader who has
+   just been shown that the invented crowd walks like a real one is exactly the reader most likely
+   to believe the next number they see.
+
+2. **Never teach a conclusion the toy cannot support.** The crowd is invented, under either of
+   the two kernels this bench runs, and fitting one to a real recording does not stop it being
+   invented — it makes it an invented crowd that resembles one recording, in the respects that were
+   fitted, on the day it was filmed. It can
    demonstrate *that* a measurement can be confounded and *why* the paired design removes the
    confound. It cannot establish how large the effect is for real robots, which method wins in the
    field, or that any published paper is wrong. Where a readout or an expander wants one of those,
@@ -169,10 +186,51 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     method card did not cross a line that no longer exists. Read those before assuming the lift was
     careless.
 
-    **What is still refused, because nobody lifted it:** no ROS, no planner benchmark, no dataset
-    loader, no trained model, no physics-engine dependency. The CSV is still an export and never an
-    input format for *trajectories* — a reader's own crowd is a different question from a reader's
-    own ruler, and only the ruler was opened.
+    **What is still refused, because nobody lifted it:** no ROS, no planner benchmark, no trained
+    model, no physics-engine dependency.
+
+    **Real pedestrian trajectories may now be read in, for one purpose, and that purpose is not
+    measurement.** Owner's decision, 2026-08-27. Both crowds here are calibrated against nothing,
+    which is the single largest thing standing between this bench and an instrument: it can say a
+    metric is confounded, and it cannot say by how much, because the crowd it says it about was
+    tuned to look plausible and fitted to no observation at all. Real data is how that is closed.
+
+    **It may be used to FIT the crowd, and to CHECK the fit. It may never produce a disturbance
+    number.** That is not caution, it is arithmetic, and guardrail 5 is the reason. Every number
+    this bench reports is a paired difference: the same room, run twice, once with the robot and
+    once without, from the same starting positions and the same wobble. **A corridor cannot be
+    filmed twice.** There is no second recording in which the same people, on the same day, in the
+    same mood, walked past no robot. Real trajectories have exactly one arm, so the quantity this
+    whole site is built to measure does not exist in them, and any number claiming otherwise would
+    be the confound this project exists to teach against — dressed up in real data, which makes it
+    worse rather than better.
+
+    So a recording may answer "does the invented crowd move like this one" and may never answer
+    "how much did the robot move this crowd". The first is a statement about a model; only the
+    second needs a counterfactual.
+
+    **What that costs elsewhere, stated so it is not discovered later:**
+
+    - **Guardrail 1 gains a second kind of number and must keep them apart.** A reading off the
+      simulator is a number about an invented crowd and says so. A goodness-of-fit figure has real
+      people on one side of it, and a surface showing one must say *that* — that the recording is
+      real, that the crowd being compared to it is still invented, and that a good fit is not a
+      licence to read the simulator's disturbance numbers as measurements of anybody. The existing
+      disclosure is not adequate to a fit statistic, and reusing it there would be the first lie.
+    - **Guardrail 2 is unmoved and does more work.** A crowd fitted to a real recording is a crowd
+      that resembles that recording, in the respects that were fitted, on the day it was filmed. It
+      is not a real crowd, and a metric that fails on it has still only failed here.
+    - **Guardrail 8 is engaged the moment a fitting routine exists in both languages.** A fit is a
+      formula. If Python fits and TypeScript fits, they get a parity fixture like every other
+      shared formula, or the two quietly disagree about what "calibrated" means.
+
+    **The data is somebody's movements, and that is a constraint rather than a nicety.** No
+    recording is committed to this repository and none is shipped with the site. A file a reader
+    opens is read in their own browser, stays there, and reaches no server, which guardrail 10
+    already guarantees by having no server to reach. Nothing on any surface may make an individual
+    identifiable — no per-person trace held up as an example, no identifier from a source file
+    carried onto a page. Fitted parameters are an aggregate and may be shown; the paths they were
+    fitted to are not.
 
     **What replaces the blanket ban, now that code can be read in.** A supplied method is data until
     it runs, and then it is code on this origin:
