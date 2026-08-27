@@ -129,6 +129,55 @@
     <h2 class="region-title" id="result-title">The verdict</h2>
     <div id="verdict"></div>
   </section>
+
+  <!--
+    The third route. Not one ruler but every ruler this bench can run, on the same rooms, at the
+    same seeds, against the same drift line, in one table.
+
+    It is a region of its own rather than a third writer into the verdict host above. A verdict and
+    a comparison on screen at once, under one heading, would invite a reading neither of them
+    supports: the verdict is about the method you described, and the table is about the shapes of
+    measurement this bench implements. So the two have separate hosts and separate headings, and
+    web/app/console/__tests__/method-dom.test.ts checks that this one is empty until a run has
+    finished, the same way it checks the verdict host is.
+
+    A metric of your own joins the table if you have already run one above. It is never re-run from
+    here and it is never required — the four described rulers are the table on their own.
+  -->
+  <section class="method-comparison" id="comparison" aria-labelledby="comparison-title">
+    <h2 class="region-title" id="comparison-title">How every ruler this bench runs does on the same rooms</h2>
+    <p class="verdict-line">
+      The described families are measured one after another, on the same rooms, at the same seeds,
+      and against the same drift line. That is what makes the last column of the table a count of
+      one thing rather than a heading over several. It takes a few seconds, and the line below says
+      which ruler is being measured and how far along it is.
+    </p>
+    <p class="verdict-line">
+      If you have already handed this page a metric of your own, it joins the table as your row.
+      Nothing of yours is re-run from here and nothing of yours is needed: press this and the
+      described rulers are measured whether or not you have written one.
+    </p>
+    <div class="method-run">
+      <button id="comparison-run" type="button">Measure every ruler on the same rooms</button>
+    </div>
+    <p class="method-status" id="comparison-status"></p>
+    <p class="region-note">
+      What comes back is which shape of ruler this invented crowd confounded, and that is the whole
+      of it. It is not a ranking of methods. There is no total, no share and no winner, and a ruler
+      that made none of these mistakes here has been shown only that it made none of them here.
+    </p>
+  </section>
+
+  <!--
+    Empty until every ruler has been measured. web/method.ts builds the whole table into it — the
+    refusal first, then what the last column counts, then the rows — and takes it down again the
+    moment anything that fed it changes. Nothing claims to be a comparison before there is one, so
+    a test looking for the table before the run finds nothing rather than an empty shell.
+  -->
+  <section class="method-result" id="comparison-result" aria-labelledby="comparison-result-title" hidden>
+    <h2 class="region-title" id="comparison-result-title">Every ruler, on the same rooms</h2>
+    <div id="comparison-verdict"></div>
+  </section>
 </main>
 
 <script type="module" src="./method.ts"></script>

@@ -2,7 +2,8 @@
 // palette has exactly one definition and this page's CSS and canvas cannot drift apart. Imported
 // for its side effect: the module mounts the tokens on import.
 import "./app/console/boot.js";
-import { FAMILIES } from "./engine/job/families.js";
+import { ContractError } from "./engine/core/errors.js";
+import { FAMILIES, FAMILY_ORDER, type FamilyKey } from "./engine/job/families.js";
 import {
   makeFamilyProbeSettings,
   type FamilyProbe,
@@ -19,6 +20,7 @@ import {
   type OptionKey,
   type QuestionKey,
 } from "./engine/job/questions.js";
+import { makeComparison, renderComparison, type Comparison } from "./app/console/comparison.js";
 import { makeMethodVerdict, renderMethodVerdict } from "./app/console/method.js";
 import { decodeMethod, encodeMethod } from "./app/console/permalink.js";
 import { makeProbeClient, probePortFor, spawnProbeWorker } from "./app/worker/probe.client.js";
@@ -38,12 +40,19 @@ import { makeProbeClient, probePortFor, spawnProbeWorker } from "./app/worker/pr
  * counterfactual reads a third of a metre where the answer is exactly nothing" — which survives
  * leaving the site in the one way this simulator's answers can.
  *
- * ## Only the family the answers land in is measured
+ * ## The verdict measures one family; the comparison measures every one, and they are separate
  *
- * Never all four. A page that probed the whole catalogue and then showed one row would be running
- * four times the work to display a quarter of it, and — worse — it would have the other three
- * families' numbers in hand, which is one refactor away from a comparison table. A comparison
- * table across these four families is the benchmark shape guardrail 11 refuses.
+ * A run of the questionnaire probes the family the answers land in and never another, because a
+ * verdict about one described method has no use for three other rulers' numbers. What used to
+ * follow from that — that the whole catalogue must never be probed at all — was guardrail 11's
+ * refusal of a comparison, and that refusal was lifted by owner's decision on 2026-08-27.
+ *
+ * So there is a third region, and it is a REGION and not a branch of this one. It measures every
+ * ruler this bench can run, one after another, and renders into a host of its own. A verdict and a
+ * comparison on screen at once under one heading would invite a reading neither supports: the
+ * verdict says what a method of the reader's shape reads, and the table says which shape of ruler
+ * this invented crowd confounded. Guardrail 2 is unamended and is what refuses in the table, which
+ * is why the refusal is rendered above it rather than under it.
  *
  * ## Why it runs in a worker
  *
@@ -211,6 +220,19 @@ export function bootMethodCard(doc: Document): void {
   const status = el<HTMLParagraphElement>(doc, "status");
   const result = el<HTMLElement>(doc, "result");
   const verdictHost = el<HTMLDivElement>(doc, "verdict");
+  const comparisonResult = el<HTMLElement>(doc, "comparison-result");
+  const comparisonHost = el<HTMLDivElement>(doc, "comparison-verdict");
+
+  /**
+   * The reader's own row, if they have run their own metric on this visit.
+   *
+   * Held here rather than measured by the comparison: the supplied form has already run it, at the
+   * same settings, and running it a second time would cost a minute to reproduce a number that is
+   * already in hand. It is never required — the described rulers are the table on their own — and
+   * it is dropped the moment the text it came from is edited, because a row labelled as the
+   * reader's own must be the method the reader can currently see.
+   */
+  let supplied: SuppliedProbe | null = null;
 
   /**
    * The reading half of this page's permalink, read before the questionnaire is painted.
@@ -348,7 +370,26 @@ export function bootMethodCard(doc: Document): void {
     }
   }
 
-  bootSuppliedForm(doc, { result, verdictHost });
+  const comparison = bootComparison(
+    doc,
+    { result: comparisonResult, host: comparisonHost },
+    (): SuppliedProbe | null => supplied,
+  );
+
+  bootSuppliedForm(doc, {
+    result,
+    verdictHost,
+    onProbed: (probe: SuppliedProbe): void => {
+      supplied = probe;
+      // A table built before this row existed, or around an older version of it, is a table whose
+      // rows were not all measured on this visit's method. It comes down rather than staying up.
+      comparison.takeDown();
+    },
+    onEdited: (): void => {
+      supplied = null;
+      comparison.takeDown();
+    },
+  });
 
   paintQuestions(doc, questionHost, draft, choose);
   refresh();
@@ -368,7 +409,14 @@ export function bootMethodCard(doc: Document): void {
  */
 function bootSuppliedForm(
   doc: Document,
-  hosts: { readonly result: HTMLElement; readonly verdictHost: HTMLDivElement },
+  hosts: {
+    readonly result: HTMLElement;
+    readonly verdictHost: HTMLDivElement;
+    /** A measurement of the reader's own metric, offered to the comparison as their row. */
+    readonly onProbed: (probe: SuppliedProbe) => void;
+    /** The text changed, so any row built from the old text has stopped describing it. */
+    readonly onEdited: () => void;
+  },
 ): void {
   const source = el<HTMLTextAreaElement>(doc, "supplied-source");
   const runButton = el<HTMLButtonElement>(doc, "supplied-run");
@@ -386,6 +434,7 @@ function bootSuppliedForm(
     // metric's numbers under another metric's definition.
     hosts.result.hidden = true;
     clear(hosts.verdictHost);
+    hosts.onEdited();
     refreshButton();
   });
 
@@ -436,6 +485,9 @@ function bootSuppliedForm(
             clear(hosts.verdictHost);
             hosts.verdictHost.appendChild(renderSuppliedVerdict(doc, verdict));
             hosts.result.hidden = false;
+            // Offered to the comparison as the reader's own row. It was measured at the settings
+            // the described rulers are measured at, which is what makes it admissible there.
+            hosts.onProbed(probe);
             finish(false);
           },
           onFailed: (message: string): void => {
@@ -459,6 +511,182 @@ function bootSuppliedForm(
   });
 
   refreshButton();
+}
+
+/** What the comparison hands back to the page that booted it. */
+interface ComparisonRegion {
+  /** Take the table down, because something it was built from has stopped being true. */
+  readonly takeDown: () => void;
+}
+
+/**
+ * The third region: every ruler this bench can run, on the same rooms, in one table.
+ *
+ * ## One family at a time, on purpose
+ *
+ * `makeProbeClient` measures ONE family per press and refuses a second while the first is running,
+ * for the reason written in its own file: two answers landing in one verdict is two sets of numbers
+ * with no way to tell which is on screen. So the described rulers are measured in sequence — the
+ * next is asked for from inside the answer to the last — rather than by four workers at once. A
+ * family is about a third of a second in a browser, so the whole table is a few seconds, and four
+ * threads racing for the same table would buy those seconds at the price of the one guarantee that
+ * makes the counts comparable.
+ *
+ * The reader is told which ruler is being measured and how far along the four it is, because a
+ * button that goes quiet for several seconds is a button a reader decides did nothing. Every digit
+ * in that line renders into its own element, so no count is ever written into a sentence.
+ *
+ * ## Every row at the same settings, and it is refused rather than reconciled
+ *
+ * `PROBE_SETTINGS` is passed to every family and is the settings the supplied form runs at too.
+ * That is not a convention this file gets to bend: `makeComparison` compares each measurement's
+ * rooms against the settings' own seeds and each row's drift line against its neighbours', and
+ * refuses the table if either disagrees. A row measured elsewhere therefore stops the comparison
+ * with a sentence rather than joining it and quietly making the last column a count of two things.
+ * That refusal is caught here and shown in the status line, in its own words.
+ *
+ * ## What makes the table stale, and what does not
+ *
+ * The table comes down when one of the things it was built from stops being true: a fresh press of
+ * this button, a new measurement of the reader's own metric, or an edit to the text that metric was
+ * written in — a row labelled as the reader's own must be the method the reader can currently see.
+ * A questionnaire answer changing is NOT one of those, and taking the table down for it would be a
+ * page implying a link that is not there: the rows are the whole closed catalogue and the reader's
+ * own, and no answer to those five questions can add a row, remove one or move one.
+ */
+function bootComparison(
+  doc: Document,
+  hosts: { readonly result: HTMLElement; readonly host: HTMLDivElement },
+  suppliedNow: () => SuppliedProbe | null,
+): ComparisonRegion {
+  const runButton = el<HTMLButtonElement>(doc, "comparison-run");
+  const status = el<HTMLParagraphElement>(doc, "comparison-status");
+
+  let running = false;
+  let atFamily = 0;
+  const measured = new Map<FamilyKey, FamilyProbe>();
+
+  const takeDown = (): void => {
+    hosts.result.hidden = true;
+    clear(hosts.host);
+  };
+
+  /**
+   * Which ruler is being measured, how many of how many, and how far into its rooms it is.
+   *
+   * `roomsTotal` is nought until the worker has said how many rooms it is running, and the room
+   * half of the sentence is left off until then rather than printed as a count of nothing.
+   */
+  const paintStatus = (roomsDone: number, roomsTotal: number, phase: string): void => {
+    const key = FAMILY_ORDER[atFamily];
+    if (key === undefined) {
+      return;
+    }
+    clear(status);
+    status.appendChild(element(doc, "span", "status-count", String(atFamily + 1)));
+    status.appendChild(element(doc, "span", "status-of", " of "));
+    status.appendChild(element(doc, "span", "status-count", String(FAMILY_ORDER.length)));
+    status.appendChild(
+      element(doc, "span", "status-phase", ` rulers — measuring “${FAMILIES[key].name.toLowerCase()}”`),
+    );
+    if (roomsTotal > 0) {
+      status.appendChild(element(doc, "span", "status-of", " — "));
+      status.appendChild(element(doc, "span", "status-count", String(roomsDone)));
+      status.appendChild(element(doc, "span", "status-of", " of "));
+      status.appendChild(element(doc, "span", "status-count", String(roomsTotal)));
+      status.appendChild(element(doc, "span", "status-phase", ` rooms done — ${phase}`));
+    }
+  };
+
+  const finish = (keepStatus: boolean): void => {
+    running = false;
+    runButton.disabled = false;
+    if (!keepStatus) {
+      clear(status);
+    }
+  };
+
+  /** Spawned on the first press, for the reason the other two routes' workers are. */
+  let client: ReturnType<typeof makeProbeClient> | null = null;
+
+  const startNext = (): void => {
+    const key = FAMILY_ORDER[atFamily];
+    const active = client;
+    if (key === undefined || active === null) {
+      return;
+    }
+    paintStatus(0, 0, "");
+    active.start(key, PROBE_SETTINGS);
+  };
+
+  const show = (): void => {
+    let built: Comparison;
+    try {
+      built = makeComparison({
+        families: measured,
+        // The reader's own row when there is one, and nothing when there is not. A comparison of
+        // the described rulers alone is a whole table; a missing row of theirs is not a gap in it.
+        supplied: suppliedNow(),
+        settings: PROBE_SETTINGS,
+      });
+    } catch (error) {
+      // The refusals are the point of `makeComparison`, so they are shown rather than swallowed —
+      // in its own sentence, the way the worker's failures are kept in the worker's own words.
+      clear(status);
+      const said = error instanceof ContractError ? error.message : String(error);
+      status.textContent = `The comparison was not built: ${said}`;
+      finish(true);
+      return;
+    }
+    clear(hosts.host);
+    hosts.host.appendChild(renderComparison(doc, built));
+    hosts.result.hidden = false;
+    finish(false);
+  };
+
+  runButton.addEventListener("click", () => {
+    if (running) {
+      return;
+    }
+    running = true;
+    runButton.disabled = true;
+    // The table on screen belongs to the measurements that produced it. It comes down before the
+    // first ruler is asked for, so nothing older is left up beside a run in progress.
+    takeDown();
+    measured.clear();
+    atFamily = 0;
+
+    if (client === null) {
+      client = makeProbeClient(probePortFor(spawnProbeWorker()), {
+        onProgress: (seedsDone: number, seedsTotal: number, phase: string): void => {
+          paintStatus(seedsDone, seedsTotal, phase);
+        },
+        onProbed: (probe: FamilyProbe): void => {
+          const key = FAMILY_ORDER[atFamily];
+          if (key === undefined) {
+            return;
+          }
+          measured.set(key, probe);
+          atFamily = atFamily + 1;
+          if (atFamily < FAMILY_ORDER.length) {
+            // The client has already put itself down before calling this, so the next family can
+            // be asked for from here without tripping its one-at-a-time refusal.
+            startNext();
+            return;
+          }
+          show();
+        },
+        onFailed: (message: string): void => {
+          clear(status);
+          status.textContent = `The measurement stopped: ${message}`;
+          finish(true);
+        },
+      });
+    }
+    startNext();
+  });
+
+  return Object.freeze({ takeDown });
 }
 
 bootMethodCard(document);

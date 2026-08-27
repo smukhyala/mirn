@@ -483,6 +483,107 @@ describe("the page measures the family the answers select, and never another", (
   });
 });
 
+/**
+ * The third region: every ruler this bench can run, on the same rooms.
+ *
+ * What is defended here is the wiring and the document order, in the shape the two routes above
+ * are defended in. What the table SAYS — the ordering, the ruler kept out of it, the refusal above
+ * it, the leaderboard-word scan — is `comparison.test.ts`'s job and is not re-asked here. The real
+ * end-to-end run at the shipped settings is `method-run.slow.test.ts`'s.
+ */
+describe("every ruler on the same rooms is a region of its own", () => {
+  it("follows the disclosure in document order, like everything else that shows a number", () => {
+    const disclosure = HTML.indexOf('id="disclosure"');
+    expect(disclosure).toBeGreaterThan(-1);
+    for (const anchor of [
+      'id="comparison"',
+      'id="comparison-run"',
+      'id="comparison-result"',
+      'id="comparison-verdict"',
+    ]) {
+      const at = HTML.indexOf(anchor);
+      expect(at, `${anchor} is missing from web/method.html`).toBeGreaterThan(-1);
+      expect(disclosure, `${anchor} precedes the disclosure`).toBeLessThan(at);
+    }
+  });
+
+  it("offers one button, and it is ready without anything being answered or typed", async () => {
+    const page = await boot();
+    const button = page.document.querySelector<HTMLButtonElement>("#comparison-run");
+    expect(button, "the page has no way to measure every ruler").not.toBeNull();
+    // The described rulers are the table on their own, so this asks nothing of the reader first.
+    expect(button?.disabled, "the button waits on something it does not need").toBe(false);
+    expect(page.document.querySelector<HTMLButtonElement>("#run")?.disabled).toBe(true);
+  });
+
+  it("claims to be no comparison before there is one", async () => {
+    const page = await boot();
+    const host = page.document.querySelector<HTMLElement>("#comparison-verdict");
+    expect(host, "the comparison has no host of its own").not.toBeNull();
+    expect(host?.childNodes.length, "something was rendered before any ruler was measured").toBe(0);
+    expect(page.document.querySelector<HTMLElement>("#comparison-result")?.hidden).toBe(true);
+    expect(page.document.querySelector(".comparison-table")).toBeNull();
+    // And it writes into a host of its own rather than the verdict's, so a verdict and a table
+    // cannot end up on screen at once under one heading.
+    expect(page.document.querySelector("#verdict")?.childNodes.length).toBe(0);
+  });
+
+  it("measures the rulers one at a time, in the catalogue's order, never four at once", async () => {
+    const page = await boot();
+    click(page.document, "comparison-run");
+    let measured = 0;
+    for (const key of FAMILY_ORDER) {
+      expect(
+        page.asked.length,
+        `${key}: more than one ruler was in flight at the same time`,
+      ).toBe(measured + 1);
+      expect(page.asked[measured]?.kind).toBe("probe");
+      expect(
+        page.asked[measured]?.family,
+        "the rulers were not asked for in the order the catalogue declares them",
+      ).toBe(key);
+      page.reply({ kind: "probed", probe: cheapProbe(key) });
+      measured = measured + 1;
+    }
+    expect(measured, "no ruler was measured").toBe(FAMILY_ORDER.length);
+  });
+
+  it("says which ruler it is on, and how many of how many, without a digit in the sentence", async () => {
+    const page = await boot();
+    click(page.document, "comparison-run");
+    const status = page.document.querySelector("#comparison-status");
+    expect(
+      [...(status?.querySelectorAll(".status-count") ?? [])].map((node) => node.textContent),
+    ).toEqual(["1", String(FAMILY_ORDER.length)]);
+    const first = FAMILY_ORDER[0] as FamilyKey;
+    expect(status?.textContent).toContain(FAMILIES[first].name.toLowerCase());
+    for (const phrase of [...(status?.querySelectorAll(".status-phase") ?? [])]) {
+      expect(/\d/.test(phrase.textContent ?? ""), `"${phrase.textContent}" carries a digit`).toBe(
+        false,
+      );
+    }
+  });
+
+  it("refuses out loud when the rulers were not all measured at the same settings", async () => {
+    // The page asks for every ruler at the shipped settings; these are the cheap two-room probes,
+    // which is exactly the mismatch `makeComparison` exists to refuse. A table drawn from them
+    // would put counts over the wrong denominators, so nothing is drawn and the refusal is shown.
+    const page = await boot();
+    click(page.document, "comparison-run");
+    for (const key of FAMILY_ORDER) {
+      page.reply({ kind: "probed", probe: cheapProbe(key) });
+    }
+    expect(
+      page.document.querySelector(".comparison-table"),
+      "rows measured on different rooms were drawn as one table",
+    ).toBeNull();
+    expect(page.document.querySelector<HTMLElement>("#comparison-result")?.hidden).toBe(true);
+    expect(page.document.querySelector("#comparison-status")?.textContent).toContain(
+      "The comparison was not built",
+    );
+  });
+});
+
 describe("the link carries the five answers and nothing that was measured", () => {
   it("opens at the answers a link names", async () => {
     const draft = draftFor("noCounterfactual");

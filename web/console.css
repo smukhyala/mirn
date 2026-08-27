@@ -1067,6 +1067,108 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
    is the point of it. */
 .verdict-part[data-part="refusal"] .verdict-claim:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
 
+/* Every ruler on the same rooms.
+
+   The controls sit in a region of their own, set off by a rule, for the reason the supplied form
+   is: it is a third route rather than a second control on one of the first two. */
+.method-comparison {
+  margin: 2.4rem 0 0;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 1.2rem;
+}
+
+/* The table is the one thing on this site that has to be a table: the last column is a count of
+   one thing down its whole length, and a stack of blocks would lose the column that makes it so.
+   A table that cannot narrow past its columns is a page that scrolls sideways, which drags the
+   paragraphs above it out of view as well. So the part scrolls and the page does not — the reader
+   pushes the table about inside the box it lives in. */
+.verdict-part[data-part="table"] { overflow-x: auto; }
+.comparison-table {
+  inline-size: 100%;
+  min-inline-size: 44rem;
+  border-collapse: collapse;
+  text-align: start;
+}
+.comparison-heading {
+  border-bottom: 1px solid var(--mirn-rule);
+  padding: 0 1.2rem 0.6rem 0;
+  vertical-align: bottom;
+  text-align: start;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--mirn-ink-muted);
+}
+.comparison-row { border-bottom: 1px solid var(--mirn-rule); }
+.comparison-ruler {
+  inline-size: 17rem;
+  padding: 1.1rem 1.2rem 1.3rem 0;
+  vertical-align: top;
+  text-align: start;
+  font-weight: 400;
+}
+.comparison-cell {
+  padding: 1.1rem 1.2rem 1.3rem 0;
+  vertical-align: top;
+}
+.comparison-name { margin: 0; max-width: 16rem; font-size: 1rem; line-height: 1.35; color: var(--mirn-ink); }
+.comparison-what {
+  margin: 0.5rem 0 0;
+  max-width: 16rem;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--mirn-ink-muted);
+}
+.comparison-inherits-lead {
+  margin: 0.9rem 0 0.3rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mirn-ink-muted);
+}
+/* Set against a rule rather than in the accent, exactly as the verdict's confound is: it is the
+   substance of the row and not chrome to emphasise with. */
+.comparison-inherits {
+  margin: 0;
+  max-width: 16rem;
+  border-left: 2px solid var(--mirn-ink);
+  padding-left: 0.9rem;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--mirn-ink);
+}
+/* A cell is one of four across a row, so its numeral is set down from the verdict's headline
+   size. Four figures at 2rem would read as four results rather than as one row and its ruler. */
+.comparison-cell .figure-number { font-size: 1.3rem; }
+.comparison-cell .figure-denominator { font-size: 1rem; }
+.comparison-cell .figure-label,
+.comparison-cell .figure-note,
+.comparison-cell .figure-plain,
+.comparison-cell .figure-zero { max-width: 22rem; }
+
+/* The ruler that compares nothing, kept out of the table and out of the order.
+
+   A block rather than a row, laid out in as many columns as the viewport has room for and one on a
+   phone, with no media query of its own — every breakpoint in this file is written widest first
+   and a new one here would have to be narrower than the block below it to keep that order. It is
+   set on the surface colour and boxed so it cannot be read as a fifth line of the column above. */
+.comparison-loose {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem 1.6rem;
+  margin: 1.3rem 0 0;
+  border: 1px solid var(--mirn-rule);
+  background: var(--mirn-surface);
+  padding: 1.2rem 1.3rem 1.3rem;
+}
+.comparison-loose .comparison-name,
+.comparison-loose .comparison-what,
+.comparison-loose .comparison-inherits { max-width: none; }
+
 @media (max-width: 60rem) {
   .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
