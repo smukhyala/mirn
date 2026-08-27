@@ -6,17 +6,23 @@ A robot crosses a room full of people. Some of them walk differently than they w
 a browser console for measuring how much — set up an invented crowd, press Run, and compare what
 different rulers say about what the robot did to it.
 
-The crowd is a social-force model I wrote. Nobody in it is real. That is the point: because the
-room is invented, the true answer is available, and every ruler on the page can be scored against
-it.
+The crowd is a model I wrote — two of them, in fact: people who push away from whoever is near them
+right now, and people who steer around whoever they are about to walk into. Nobody in either is
+real. That is the point: because the room is invented, the true answer is available, and every
+ruler on the page can be scored against it. The second crowd is there so a finding can be asked
+whether it survives one — a result that holds under only one set of invented rules is a fact about
+those rules.
 
 **[Open the console →](https://smukhyala.github.io/mirn/)**
 
 [![CI](https://github.com/smukhyala/mirn/actions/workflows/ci.yml/badge.svg)](https://github.com/smukhyala/mirn/actions/workflows/ci.yml)
 [![Deploy](https://github.com/smukhyala/mirn/actions/workflows/pages.yml/badge.svg)](https://github.com/smukhyala/mirn/actions/workflows/pages.yml)
 
-![Three views of the console: the room being simulated, the readouts with their zero-effect
-references, and a sweep curve plotted against the run-to-run noise band](docs/media/mirn-console.gif)
+![Three views: the room being simulated with each person's two paths drawn against each other, the
+readouts each carrying the zero it would read if the answer were nothing, and every ruler measured
+on one shared set of rooms — where the forecast method reports 0.369 m and clears the drift line on
+six of eight rooms, and the paired construction reports 0.000 m and clears it on none, with the
+true effect in every one of those rooms exactly nothing](docs/media/mirn-console.gif)
 
 ---
 
@@ -61,6 +67,15 @@ at any time.
 One press of Run executes N axis values × M seeds; a single run is the degenerate 1×1 case of the
 same mechanism. Editing a setting re-simulates a live preview in about 38 ms. A 72-run sweep takes
 about 4.8 seconds.
+
+The settings panel picks which crowd runs. One steers on present distance, the other on predicted
+time to closest approach — different rules, different numbers — and the picker exists so a finding
+can be re-asked under rules it was not derived from. The confound survives the swap: on eight rooms
+whose true effect is exactly nothing, the forecast method reports 0.369 m under the first crowd and
+0.442 m under the second. What does *not* survive is the size of it — it clears the run-to-run band
+on six of those eight rooms under one crowd and two of eight under the other. So the finding
+transfers and the number does not, which is the more useful half of the answer and the reason this
+is a switch rather than a footnote.
 
 Every number is one interaction from what it assumes and from what it would read if the answer
 were zero. The zero reference is never collapsible and never optional — it is rendered beside the
@@ -109,14 +124,46 @@ about to, answer five closed questions about how it is computed and press one bu
 what a method of that shape reads on a world where the robot's true effect on every person is
 exactly zero — not nearly zero, exactly, because the crowd is told not to react and the paired
 construction makes the answer identically nought — and, for the three families that compare against
-something, on how many of eight rooms it clears the run-to-run band anyway. That second figure is a
+something, on how many of the rooms it clears the run-to-run band anyway. That second figure is a
 false-positive rate, and nothing else here reports one.
 
-**Nothing of yours is read in.** No code, no file, no dataset, no free text — the page has no
-textarea, no file input and no text field, and a test asserts that about the booted page rather than
-trusting the markup. You supply a *description*, in multiple choice; a closed table maps it onto one
-of four families this bench already implements; and MIRN runs its own estimator on its own rooms.
-What leaves the page is a claim about a shape of measurement, never a claim about your robot.
+The questionnaire reads nothing of yours in. You supply a *description*, in multiple choice; a
+closed table maps it onto one of four families this bench already implements; and MIRN runs its own
+estimator on its own rooms. What leaves the page is a claim about a shape of measurement, never a
+claim about your robot.
+
+**Or you can hand it the metric itself.** Paste a function and the bench runs it, on the same rooms,
+under the same drift line. It goes into a Worker with no DOM, no network and no storage; it is
+handed one arm — the run *with* the robot, the people's paths, the robot's path, the time step —
+and there is no parameter through which the control arm could arrive, so the restriction is a
+property of the signature rather than of anybody remembering it. Every buffer it receives is a copy,
+because a method that wrote into the live ones would corrupt every room after it and the corruption
+would look like physics. Anything it returns that is not a finite distance is a failed method,
+reported as one, in its own words. Every room is put to it twice on identical numbers and the two
+answers compared exactly, because a method that answers differently to the same question is
+answering a different question each time. And it never enters a permalink: a link may name a
+built-in method, never carry a function body, because a shareable link that runs a stranger's code
+in your browser is a shareable exploit and this site has no server to put it behind.
+
+**A method that always returns the same number is called out rather than congratulated.** It is the
+one defect the counts cannot report: `() => 0` fails on no room, contradicts itself on no room, and
+clears the drift line on no room, so it posts the best false-positive rate the page can print — the
+same one a sound ruler posts. A supplied method declares no ruler, so the only evidence available is
+whether its answers move when the rooms do. If they never move, the page says so above the figures,
+and the export carries the same sentence, because the file outlives the page.
+
+**Every ruler on the same rooms, and it refuses to call that a ranking.** The comparison runs all
+four families and your own method across one shared set of rooms, so the numbers are commensurable.
+What it will not do is order them into a leaderboard: the crowd is invented, so the comparison
+establishes which ruler is confounded *on this toy*, never which method wins in a corridor.
+
+**How well the rate is known, and what it cost to know it better.** Run 8, 16 or 32 rooms — the
+first 8 of 32 are the same 8, so the count buys precision rather than a different measurement — and
+every false-positive rate is printed with a Wilson score interval beside it. Wilson rather than
+Wald, because Wald collapses to zero width at 0 of n and at n of n, which are the two counts this
+bench produces most often and precisely where a confident-looking interval would be a lie. A
+narrower interval is a more precise number and not a truer one, and the page says that where the
+interval appears.
 
 The mapping is many-to-few and the page says so where you meet the verdict rather than in a
 footnote. A learned trajectory predictor and a hand-specified intended path both run as the
@@ -188,14 +235,14 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 773 browser tests across 64 files, of which 742 run without the five that re-run
-the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left out
-here on purpose: the last set was measured on one machine and re-measured on another that disagreed
-by 70%, so a single number would be a claim rather than a figure. CI checks the two languages
-independently, then runs a third job for the check no human remembers: that the committed fixtures
-are current and the browser still reproduces them. The built site is four HTML files (8.96, 56.44,
-6.98 and 5.13 kB), one 19 kB stylesheet, about 164 kB of script across six chunks, and two workers
-of 49 and 42 kB.
+**The numbers.** 1,060 browser tests across 75 files, of which 1,029 run without the five that
+re-run the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left
+out here on purpose: the last set was measured on one machine and re-measured on another that
+disagreed by 70%, so a single number would be a claim rather than a figure. CI checks the two
+languages independently, then runs a third job for the check no human remembers: that the committed
+fixtures are current and the browser still reproduces them. The built site is four HTML files (8.98,
+58.01, 7.13 and 12.95 kB), one 22.5 kB stylesheet, about 213 kB of script across six chunks, and
+three workers of 44, 47 and 51 kB.
 
 ---
 
@@ -256,7 +303,7 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 773 tests, production build
+npm run check        # typecheck, 1060 tests, production build
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in
@@ -294,9 +341,14 @@ docs/archive/   the research assessment this began as. Read-only, not maintained
 make the underlying research question circular — we decided how people respond to robots and then
 measured how people respond to robots. Nothing here may be cited as a finding.
 
-**Not a benchmark.** The CSV is an export, never an input format. The moment something else can be
-read in and scored, the numbers stop being about this toy and start being about someone else's
-robot.
+**Not a benchmark, even though a method can now be read in.** That sentence used to be simpler —
+"the CSV is an export, never an input format" — and the bring-your-own path is the thing it was
+written to refuse. What makes the distinction hold is not what gets read in but what gets held
+fixed: the rooms are ours, the crowd in them is invented, and the true effect in every one of them
+is exactly nothing. So a supplied method is scored on how it behaves *here*, which is a fact about
+the method's shape and never about anyone's robot. The moment the *rooms* came from somewhere else,
+this would be a benchmark and the numbers would be about somebody's hardware. The CSV is still an
+export and still never an input format.
 
 **Not a robotics platform.** No ROS, no planner, no dataset loader, no trained model, no physics
 engine. Every request to widen it answers one question: which readout does this move, and what does

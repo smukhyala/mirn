@@ -280,10 +280,29 @@ const SUPPLIED_UNKNOWN_NOTE =
   "clear the drift line on every room, and that is a fact about the quantity rather than a false " +
   "alarm";
 
+/**
+ * The sentence a file of a constant method's readings cannot be allowed to travel without.
+ *
+ * Guardrail 1 puts the disclosure on line one of every CSV because a file outlives the page it came
+ * from, and the same argument applies here with more force. A reader opening this file months later
+ * sees a column of identical distances and a clean sheet of noughts under "cleared". The page said
+ * why that is not a good score; the file has to say it too, or the export is the version of this
+ * measurement that survives and it is the version with the finding removed.
+ */
+const SUPPLIED_CONSTANT_NOTE =
+  "your method returned the same distance on every room it read, so it is not reading the rooms. " +
+  "The cleared column below follows from that and is not evidence the method is sound: a reading " +
+  "that never varies cannot clear a line, whether or not there was anything to report";
+
 export function suppliedProbeCsv(probe: SuppliedProbe, settings: FamilyProbeSettings): string {
   const head: string[] = [...preamble(settings, SUPPLIED_ROWS_NOTE)];
   head.push(`# the ruler: ${SUPPLIED_RULER_NOTE}`);
   head.push(`# ${SUPPLIED_UNKNOWN_NOTE}`);
+  // The same two conditions the page's warning is built from, read off the same probe. Two rooms at
+  // minimum, because "the same on every room" is a claim about rooms in the plural.
+  if (probe.nUsed > 1 && probe.nDistinctReadings === 1) {
+    head.push(`# ${SUPPLIED_CONSTANT_NOTE}`);
+  }
 
   const suffix = unitSuffix(probe.unit);
   const header: string[] = [

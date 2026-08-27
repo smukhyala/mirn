@@ -139,6 +139,14 @@ export interface SuppliedVerdict {
    * whether its own numbers stand without rendering it first.
    */
   readonly averageWarning: string | null;
+  /**
+   * The sentence for a method whose answer never moved, or null when it did move.
+   *
+   * Null below two readings rather than set, because "the same on every room" is a claim about
+   * rooms in the plural and one room cannot support it. A method that read exactly once has not
+   * been shown to be constant; it has been shown once.
+   */
+  readonly constantWarning: string | null;
   /** Spread across the rooms it answered on. NaN below two survivors, and then not shown. */
   readonly spread: number;
   readonly nUsed: number;
@@ -267,6 +275,34 @@ const AVERAGE_WARNING =
   "this page is therefore an average over answers to different questions, and the figures below " +
   "cannot be trusted as a measurement of one thing. Fix that first; nothing else here means " +
   "anything until it is fixed.";
+
+/**
+ * The other sentence that has to be read before the figures, and the one this page most needed.
+ *
+ * A method that returns one fixed number scores perfectly here. It clears the drift line on no
+ * room, because it does not vary, so its false-positive rate is nought out of however many rooms
+ * ran — the best count this card can print. `() => 0` earns it, and so does `() => 42`, and neither
+ * is measuring anything at all.
+ *
+ * Nothing else on this path can catch that. The method card refuses to score the family that
+ * compares nothing as a detector, and it decides that by reading the family's declared ruler; a
+ * supplied method declares nothing, which is what `RATE_NOTE_UNKNOWN_RULER` says out loud. But that
+ * sentence hands the judgement to the reader, and the reader who most needs this one is the reader
+ * least able to make it. So this is decided from behaviour instead of from a declaration: the rooms
+ * differ, and a ruler that reads them returns different numbers on them.
+ *
+ * It carries no figure, deliberately. The finding is the sameness and not the value, the value is
+ * already printed above as the average it read, and a number written into a sentence is the thing
+ * the whole Content section refuses.
+ */
+const CONSTANT_WARNING =
+  "Your method returned the same distance on every room it read. These rooms are not alike — " +
+  "different crowds, different starting positions, different paths for the robot — so a ruler " +
+  "that reads a room returns different numbers on different rooms, and this one is not reading " +
+  "them. Whatever the count below says, it follows from that and is not evidence the method is " +
+  "sound: a reading that never varies can never clear a line, so it cannot report a disturbance " +
+  "that is not there, and it could not report one that was. It would score exactly this well on a " +
+  "world where the robot moved every person in the room.";
 
 const DISCLOSURE =
   "Simulated crowd. Every figure below comes from a model, and the world it comes from is one " +
@@ -532,6 +568,10 @@ export function makeSuppliedVerdict(init: {
     consistency,
     disagreements: disagreementsFrom(probe),
     averageWarning: probe.nNondeterministic > 0 ? AVERAGE_WARNING : null,
+    // Two readings at minimum, and then one distinct value among them. Both halves are load-bearing:
+    // without the first, a method that answered on a single room would be called constant on the
+    // evidence of one number.
+    constantWarning: probe.nUsed > 1 && probe.nDistinctReadings === 1 ? CONSTANT_WARNING : null,
     spread: probe.sdReading,
     nUsed: probe.nUsed,
     nAttempted: probe.nAttempted,
@@ -796,6 +836,18 @@ export function renderSuppliedVerdict(doc: Document, verdict: SuppliedVerdict): 
     consistency.appendChild(list);
   }
   section.appendChild(consistency);
+
+  // Also before the numbers, and for the same reason the warning above it is. This one is rendered
+  // only when it fires: unlike the consistency count there is no reassuring form of it worth
+  // printing, because "your readings differed across rooms" is the ordinary case and saying so
+  // would read as a pass mark for a method that has not been judged yet.
+  if (verdict.constantWarning !== null) {
+    const constancy = part(doc, "constancy", "Whether it read the rooms at all");
+    constancy.appendChild(
+      element(doc, "p", "verdict-claim supplied-warning", verdict.constantWarning),
+    );
+    section.appendChild(constancy);
+  }
 
   const numbers = part(doc, "numbers", "What it read where the answer was nothing");
   numbers.appendChild(element(doc, "p", "region-note", DISCLOSURE));

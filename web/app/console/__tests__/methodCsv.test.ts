@@ -659,3 +659,35 @@ describe("nothing a reader meets in these files is spelled the way a program spe
     expect(CODE_IDENTIFIER.test("familyProbeCsv")).toBe(true);
   });
 });
+
+/**
+ * The finding the export could most easily lose.
+ *
+ * A file of a constant method's readings is a column of identical distances and a clean sheet of
+ * noughts under "cleared". Guardrail 1 puts the disclosure on line one of every CSV because a file
+ * outlives the page it came from, and the same reasoning applies here: strip the sentence and the
+ * surviving version of this measurement is the one with the finding removed.
+ */
+describe("a supplied method whose answer never moved", () => {
+  const CONSTANT: SuppliedProbe = suppliedProbeOf([read(0), read(0), read(0), read(0)]);
+
+  it("carries the reason its clean sheet is not a clean sheet", () => {
+    expect(CONSTANT.nDistinctReadings).toBe(1);
+    const text = suppliedProbeCsv(CONSTANT, SETTINGS);
+    expect(text).toContain("not reading the rooms");
+    // The note is a comment line, like every other sentence in the head, so a reader's spreadsheet
+    // does not parse it as a row of data.
+    for (const line of text.split("\n")) {
+      if (line.includes("not reading the rooms")) {
+        expect(line.startsWith("#")).toBe(true);
+      }
+    }
+  });
+
+  it("leaves it out when the readings differed, so it never becomes boilerplate", () => {
+    // A line printed on every export is a line nobody reads. This one has to mean something when
+    // it appears, which requires that it not appear when it is not true.
+    expect(SUPPLIED_PROBE.nDistinctReadings).toBeGreaterThan(1);
+    expect(suppliedProbeCsv(SUPPLIED_PROBE, SETTINGS)).not.toContain("not reading the rooms");
+  });
+});
