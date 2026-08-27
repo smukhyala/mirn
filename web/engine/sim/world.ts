@@ -2,6 +2,7 @@ import { SIM_CONSTANTS, type RunConfig } from "../contracts/config.js";
 import { Channel, type NoiseTape } from "../rng/tape.js";
 import type { DisturbanceSpec } from "../contracts/config.js";
 import { applyDisturbances } from "./disturbance.js";
+import { accumulateAnticipatory } from "./anticipatory.js";
 import { accumulateForces } from "./forces.js";
 import { perceive } from "./perceive.js";
 import { applyCommand, planRobot } from "./robot.js";
@@ -84,15 +85,34 @@ export function stepWorld(
     scratch.noiseY[i] = (tape(tick, uid, Channel.NoiseY) - 0.5) * amplitude;
   }
 
-  accumulateForces(
-    state,
-    config,
-    config.pedestriansSeeRobot,
-    scratch.noiseX,
-    scratch.noiseY,
-    scratch.fx,
-    scratch.fy,
-  );
+  // The one place a crowd kernel is chosen. Everything around it — the integration below, the
+  // speed cap, the wall clamp, arrival — belongs to the room rather than to the crowd, so a second
+  // model is a second way of answering "how does a person accelerate" and nothing more.
+  //
+  // Both branches are handed the SAME noise, already drawn above by address from the same tape.
+  // That is what makes guardrail 4's determinism and guardrail 5's paired invariant hold for a new
+  // kernel without a new assertion: neither branch reaches for randomness of its own.
+  if (config.crowdModel === "anticipatory") {
+    accumulateAnticipatory(
+      state,
+      config,
+      config.pedestriansSeeRobot,
+      scratch.noiseX,
+      scratch.noiseY,
+      scratch.fx,
+      scratch.fy,
+    );
+  } else {
+    accumulateForces(
+      state,
+      config,
+      config.pedestriansSeeRobot,
+      scratch.noiseX,
+      scratch.noiseY,
+      scratch.fx,
+      scratch.fy,
+    );
+  }
 
   const cap = config.crowd.desiredSpeed * SIM_CONSTANTS.speedCapFactor;
   for (let i = 0; i < state.n; i++) {

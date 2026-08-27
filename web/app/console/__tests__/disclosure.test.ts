@@ -100,9 +100,18 @@ describe("the invented-crowd disclosure comes first", () => {
    * rather than derived from the thing they are meant to constrain.
    */
   it("still names the four things a reader has to be told", () => {
+    // Changed once, deliberately, on 2026-08-27. "social-force model" was the second clause until
+    // a second crowd kernel shipped, at which point it was false on any page that could show a
+    // number from the other one. Guardrail 1 puts the disclosure in the STATIC markup before any
+    // number, so it cannot name a kernel the reader has not picked yet.
+    //
+    // The list is pinned rather than derived precisely so that change had to be made here, on
+    // purpose, by somebody reading this comment — rather than a clause quietly going missing and
+    // the page still passing. What the obligation needs is unchanged: four clauses, and a beginner
+    // told the crowd is invented before a number reaches them.
     expect(DISCLOSURE_CLAUSES).toEqual([
       "simulated",
-      "social-force model",
+      "invented model of pedestrians",
       "invented people obeying invented rules",
       "no number here is a measurement of real pedestrians",
     ]);

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../../engine/job/axes.js";
 import { CARD_ORDER } from "../../../engine/job/cards.js";
 import { answer, makeDrillState, reveal, type DrillState } from "../drill.js";
+import { CROWD_MODEL_ORDER, type CrowdModelKey } from "../../../engine/contracts/config.js";
+import { crowdLabel } from "../../../ui/labels.js";
 import { DEFAULT_SETTINGS, makeConsoleSettings, type ConsoleSettings } from "../state.js";
 import {
   EMPTY_DRAFT,
@@ -60,6 +62,7 @@ function awkward(): ConsoleSettings {
     ...DEFAULT_SETTINGS,
     axisValues,
     pedestriansSeeRobot: false,
+    crowdModel: "anticipatory",
     nearMissThresholdM: 0.3,
     recoveryToleranceFraction: 0.25,
     recoveryDwellSteps: 45,
@@ -92,8 +95,8 @@ describe("the permalink key table", () => {
 
   it("gives no axis the same name as a non-axis setting", () => {
     // The two describe blocks above only ever check axis keys against each other. The full
-    // namespace a hand-edited link actually shares is all 13 axis keys plus all 11 setting keys —
-    // 24 strings that must be pairwise distinct, or an axis and a setting would silently steal
+    // namespace a hand-edited link actually shares is all 13 axis keys plus all 12 setting keys —
+    // 25 strings that must be pairwise distinct, or an axis and a setting would silently steal
     // each other's value.
     const seen: string[] = [];
     for (const key of AXIS_ORDER) {
@@ -118,6 +121,7 @@ describe("encoding and decoding", () => {
       expect(decoded.settings.axisValues[key]).toBe(original.axisValues[key]);
     }
     expect(decoded.settings.pedestriansSeeRobot).toBe(original.pedestriansSeeRobot);
+    expect(decoded.settings.crowdModel).toBe(original.crowdModel);
     expect(decoded.settings.nearMissThresholdM).toBe(original.nearMissThresholdM);
     expect(decoded.settings.recoveryToleranceFraction).toBe(original.recoveryToleranceFraction);
     expect(decoded.settings.recoveryDwellSteps).toBe(original.recoveryDwellSteps);
@@ -151,6 +155,7 @@ describe("encoding and decoding", () => {
     expect(parts).toContain("horizon=1.5");
     expect(parts).toContain("window_end=25");
     expect(parts).toContain("notice=0");
+    expect(parts).toContain("crowd=anticipatory");
     expect(parts).toContain("near_miss=0.3");
     expect(parts).toContain("recovery_tol=0.25");
     expect(parts).toContain("recovery_dwell=45");
@@ -185,6 +190,34 @@ describe("a hand-edited link", () => {
     expect(result.settings.axisValues.crowdSize).toBe(18);
     expect(result.notices.length).toBe(1);
     expect(result.notices[0]).toContain("unicorns");
+  });
+
+  it("says so out loud when it names a crowd this bench does not have", () => {
+    // The silent version of this is the worst outcome available here: the page would open running
+    // a different crowd from the one the link asked for, with every number attributed to it.
+    const result = decodeSettings("crowd=aCrowdNobodyWrote");
+    expect(result.settings.crowdModel).toBe(DEFAULT_SETTINGS.crowdModel);
+    expect(result.notices.length).toBe(1);
+    const notice = result.notices[0] as string;
+    expect(notice).toContain("crowd");
+    // What is running is named, in words, rather than left for the reader to guess.
+    expect(notice).toContain(crowdLabel(DEFAULT_SETTINGS.crowdModel));
+    // Never echoed: whatever a stranger typed into a URL bar is not something to print at a reader.
+    expect(notice).not.toContain("aCrowdNobodyWrote");
+    expect(CODE_IDENTIFIER.test(notice), `"${notice}" carries a code identifier`).toBe(false);
+  });
+
+  it("refuses a crowd whose key is merely mis-spelled, rather than guessing at it", () => {
+    const result = decodeSettings("crowd=socialforce");
+    expect(result.settings.crowdModel).toBe(DEFAULT_SETTINGS.crowdModel);
+    expect(result.notices.length).toBe(1);
+  });
+
+  it("takes the second crowd when the link names it properly", () => {
+    const named = CROWD_MODEL_ORDER[1] as CrowdModelKey;
+    const result = decodeSettings(`crowd=${named}`);
+    expect(result.settings.crowdModel).toBe(named);
+    expect(result.notices).toEqual([]);
   });
 
   it("brings an out-of-range value back into range, and says so", () => {
@@ -224,6 +257,9 @@ describe("a hand-edited link", () => {
       "near_miss=-1",
       "recovery_dwell=0",
       "notice=maybe",
+      "crowd=",
+      "crowd=aCrowdNobodyWrote",
+      "crowd=socialforce",
       "floor=yes",
       "zero=2",
       "people=18&people=44",
@@ -305,6 +341,16 @@ describe("what the panel could not carry is said out loud", () => {
     expect(nearMissLine).toBeDefined();
     expect(nearMissLine).toContain("asked for the near-miss line to be 0.3 metres");
     expect(nearMissLine).not.toMatch(/asked for The\b/);
+  });
+
+  it("names a crowd the panel did not end up running, in both directions", () => {
+    const asked = makeConsoleSettings({ ...DEFAULT_SETTINGS, crowdModel: "anticipatory" });
+    const lines = settingsNotHonoured(asked, DEFAULT_SETTINGS);
+    expect(lines.length).toBe(1);
+    const line = lines[0] as string;
+    expect(line).toContain(crowdLabel("anticipatory"));
+    expect(line).toContain(crowdLabel(DEFAULT_SETTINGS.crowdModel));
+    expect(CODE_IDENTIFIER.test(line), `"${line}" carries a code identifier`).toBe(false);
   });
 
   it("names an axis the slider snapped, by its plain-English name", () => {

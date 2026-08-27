@@ -2,7 +2,9 @@
 import { describe, expect, it } from "vitest";
 import { AXES, AXIS_ORDER } from "../../../engine/job/axes.js";
 import { COLUMNS } from "../../../engine/job/columns.js";
+import { CROWD_MODEL_ORDER, type CrowdModelKey } from "../../../engine/contracts/config.js";
 import { ContractError } from "../../../engine/core/errors.js";
+import { crowdLabel } from "../../../ui/labels.js";
 import {
   estimateRunSeconds,
   makePanelValues,
@@ -97,6 +99,81 @@ describe("a knob names what it moves, wherever it sits", () => {
   });
 });
 
+/**
+ * The crowd picker, which is a control and deliberately not an axis.
+ *
+ * `AXES` entries are numeric knobs with a min, a max and a step that `axes.slow.test.ts` walks
+ * notch by notch, and two kernels are not two points on a scale — so this control is checked here,
+ * against `CROWD_MODEL_ORDER` itself, rather than by the axis assertions above. What the reader is
+ * offered is what each crowd DOES, because the kernels' own names are code and guardrail 12 keeps
+ * code off the page: the "no bare code identifier" test above runs over the whole booted panel,
+ * this picker's two options included.
+ */
+describe("the crowd is a control, not an axis", () => {
+  it("offers every crowd this bench can run, in the catalogue's own order", () => {
+    const { root } = mount();
+    const select = root.querySelector<HTMLSelectElement>("#crowd-model");
+    expect(select).not.toBeNull();
+    const options = Array.from((select as HTMLSelectElement).options);
+    expect(options.length).toBe(CROWD_MODEL_ORDER.length);
+    expect(options.length).toBeGreaterThan(1);
+    for (let i = 0; i < CROWD_MODEL_ORDER.length; i++) {
+      expect(options[i]?.value).toBe(CROWD_MODEL_ORDER[i]);
+    }
+  });
+
+  it("names each crowd by what its people do, never by its key", () => {
+    const { root } = mount();
+    const select = root.querySelector<HTMLSelectElement>("#crowd-model") as HTMLSelectElement;
+    for (const option of Array.from(select.options)) {
+      const text = option.textContent ?? "";
+      expect(text.length).toBeGreaterThan(0);
+      expect(text).not.toBe(option.value);
+      expect(CODE_IDENTIFIER.test(text), `"${text}" carries a code identifier`).toBe(false);
+    }
+    // The two say different things about the same room: one reacts to who is beside a person now,
+    // the other to who they are about to meet. A picker whose options read alike offers nothing.
+    const texts = Array.from(select.options).map((option) => option.textContent ?? "");
+    expect(new Set(texts).size).toBe(texts.length);
+  });
+
+  it("does not appear in the sweep picker, which is the axis table walked again", () => {
+    const { root } = mount();
+    const sweep = root.querySelector<HTMLSelectElement>("#sweep-axis") as HTMLSelectElement;
+    for (const option of Array.from(sweep.options)) {
+      expect(option.value).not.toBe("crowdModel");
+      expect(option.textContent ?? "").not.toBe(crowdLabel(CROWD_MODEL_ORDER[0] as CrowdModelKey));
+    }
+  });
+
+  it("reads the picked crowd back, and says so the moment it changes", () => {
+    const { root, seen } = mount();
+    const select = root.querySelector<HTMLSelectElement>("#crowd-model") as HTMLSelectElement;
+    const second = CROWD_MODEL_ORDER[1] as CrowdModelKey;
+    select.value = second;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    const last = seen[seen.length - 1] as PanelValues;
+    expect(last.crowdModel).toBe(second);
+  });
+
+  it("refuses a crowd this bench does not run", () => {
+    expect(() =>
+      makePanelValues({
+        axisValues: defaults(),
+        pedestriansSeeRobot: true,
+        crowdModel: "aCrowdNobodyWrote" as unknown as CrowdModelKey,
+        sweepAxis: null,
+        sweepValues: [],
+        seedCount: 1,
+        bandReplicates: 8,
+        detectionFloor: false,
+        frechet: false,
+        zeroReferenceRun: true,
+      }),
+    ).toThrow(ContractError);
+  });
+});
+
 describe("the panel reports what it is set to", () => {
   it("reads every axis back at its default", () => {
     const handle = mountPanel(host(), { onInput: () => {} });
@@ -110,6 +187,8 @@ describe("the panel reports what it is set to", () => {
     expect(values.bandReplicates).toBe(8);
     expect(values.detectionFloor).toBe(false);
     expect(values.frechet).toBe(false);
+    // The crowd every fixture and pinned measurement in this repo was taken on.
+    expect(values.crowdModel).toBe(CROWD_MODEL_ORDER[0]);
   });
 
   it("fills the sweep values from the picked axis's own range, never from a literal", () => {
@@ -158,6 +237,7 @@ describe("a hand-edited value is a contract check, not a shrug", () => {
       makePanelValues({
         axisValues: { ...defaults(), crowdSize: AXES["crowdSize"].max + 1 },
         pedestriansSeeRobot: true,
+        crowdModel: "socialForce",
         sweepAxis: null,
         sweepValues: [],
         seedCount: 1,
@@ -174,6 +254,7 @@ describe("a hand-edited value is a contract check, not a shrug", () => {
       makePanelValues({
         axisValues: defaults(),
         pedestriansSeeRobot: true,
+        crowdModel: "socialForce",
         sweepAxis: "crowdSize",
         sweepValues: [],
         seedCount: 1,
@@ -190,6 +271,7 @@ describe("a hand-edited value is a contract check, not a shrug", () => {
       makePanelValues({
         axisValues: defaults(),
         pedestriansSeeRobot: true,
+        crowdModel: "socialForce",
         sweepAxis: null,
         sweepValues: [],
         seedCount: 1,
@@ -207,6 +289,7 @@ describe("the cost of pressing Run is quoted before it is spent", () => {
     const one = makePanelValues({
       axisValues: defaults(),
       pedestriansSeeRobot: true,
+      crowdModel: "socialForce",
       sweepAxis: null,
       sweepValues: [],
       seedCount: 1,
@@ -253,6 +336,7 @@ describe("the panel opens where a link tells it to", () => {
     return makePanelValues({
       axisValues,
       pedestriansSeeRobot: true,
+      crowdModel: "socialForce",
       sweepAxis: null,
       sweepValues: [],
       seedCount: 1,
@@ -272,6 +356,7 @@ describe("the panel opens where a link tells it to", () => {
     const asked = initialValues({
       axisValues,
       pedestriansSeeRobot: false,
+      crowdModel: CROWD_MODEL_ORDER[1] as CrowdModelKey,
       sweepAxis: "crowdSize",
       sweepValues: [4, 18, 44],
       seedCount: 8,
@@ -286,6 +371,7 @@ describe("the panel opens where a link tells it to", () => {
       expect(read.axisValues[key], key).toBe(AXES[key].max);
     }
     expect(read.pedestriansSeeRobot).toBe(false);
+    expect(read.crowdModel).toBe(CROWD_MODEL_ORDER[1]);
     expect(read.sweepAxis).toBe("crowdSize");
     expect(read.sweepValues).toEqual([4, 18, 44]);
     expect(read.seedCount).toBe(8);
@@ -370,6 +456,22 @@ describe("copy a link, open the link", () => {
     const { before, after, notices, unhonoured } = copyAndOpen(() => {});
     expect(notices).toEqual([]);
     expect(unhonoured).toEqual([]);
+    expect(after).toEqual(before);
+  });
+
+  it("brings the other crowd back unchanged, rather than opening at the first one", () => {
+    // The failure this guards is the silent one: a link that names the second crowd and reopens on
+    // the first would attribute every number on the page to a room that did not produce it.
+    const second = CROWD_MODEL_ORDER[1] as CrowdModelKey;
+    const { before, after, notices, unhonoured } = copyAndOpen((root) => {
+      const crowd = root.querySelector<HTMLSelectElement>("#crowd-model") as HTMLSelectElement;
+      crowd.value = second;
+      crowd.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(notices).toEqual([]);
+    expect(unhonoured).toEqual([]);
+    expect(before.crowdModel).toBe(second);
+    expect(after.crowdModel).toBe(second);
     expect(after).toEqual(before);
   });
 

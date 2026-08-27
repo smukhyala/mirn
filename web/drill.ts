@@ -516,6 +516,9 @@ function consoleLinkFor(card: DrillCard, dt: number): string {
   const settings = makeConsoleSettings({
     axisValues,
     pedestriansSeeRobot: DEFAULT_SETTINGS.pedestriansSeeRobot,
+    // A card's own room was measured on the crowd the console opens at, so the link that reopens
+    // it must name that crowd rather than leave the console free to pick another.
+    crowdModel: DEFAULT_SETTINGS.crowdModel,
     nearMissThresholdM: DEFAULT_SETTINGS.nearMissThresholdM,
     recoveryToleranceFraction: DEFAULT_SETTINGS.recoveryToleranceFraction,
     recoveryDwellSteps: DEFAULT_SETTINGS.recoveryDwellSteps,

@@ -28,8 +28,8 @@ import type { DrillCall, HonestCall } from "./drill.js";
  */
 
 export const INVENTED_CROWD_DISCLOSURE =
-  "Everything in this file is simulated. The crowd is a social-force model - invented people " +
-  "obeying invented rules - and no number here is a measurement of real pedestrians. What is " +
+  "Everything in this file is simulated. The crowd is an invented model of pedestrians - invented " +
+  "people obeying invented rules - and no number here is a measurement of real pedestrians. What is " +
   "real is the ruler: the same room is run twice, once with a robot and once without, from the " +
   "same starting positions and the same random wobble, and the difference between a person's " +
   "two paths is the robot's effect on them.";
@@ -42,10 +42,34 @@ export const INVENTED_CROWD_DISCLOSURE =
  */
 export const DISCLOSURE_CLAUSES: readonly string[] = Object.freeze([
   "simulated",
-  "social-force model",
+  // Was "social-force model" until 2026-08-27, when a second crowd kernel shipped and that clause
+  // stopped being true on any page that could show a number from the other one. Guardrail 1 wants
+  // the disclosure in the STATIC markup, before any number, so it cannot name a kernel the reader
+  // has not chosen yet — which means the sentence has to be true of every crowd this bench runs.
+  //
+  // This is a NARROWING OF A CLAIM, not a weakening of a disclosure. The obligation guardrail 1
+  // actually carries is that a beginner is told the crowd is invented before they see a number,
+  // and all four clauses still carry it. What went is an assertion about WHICH invented crowd,
+  // which the file could no longer keep. Anything carrying results names the kernel that produced
+  // them, where it can: see `CROWD_MODEL_LINE` below.
+  "invented model of pedestrians",
   "invented people obeying invented rules",
   "no number here is a measurement of real pedestrians",
 ]);
+
+/**
+ * The line a results file carries naming the crowd that produced its rows.
+ *
+ * The static disclosure cannot say this — it is written before a run and a reader may pick either
+ * kernel — but a CSV is generated after one and knows exactly. A file outlives the page it came
+ * from, so a row whose crowd is unrecorded is a number nobody can place.
+ */
+export function crowdModelLine(model: string): string {
+  const named = model === "anticipatory"
+    ? "people who steer around where somebody is about to be"
+    : "people who push away from whoever is near them";
+  return `The crowd in this file is ${named}.`;
+}
 
 export interface CsvOptions {
   readonly kind: "csvOptions";

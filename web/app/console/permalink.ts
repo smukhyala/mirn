@@ -1,7 +1,8 @@
+import { CROWD_MODEL_ORDER, type CrowdModelKey } from "../../engine/contracts/config.js";
 import { AXES, AXIS_ORDER, type AxisKey } from "../../engine/job/axes.js";
 import { CARD_ORDER, type CardKey } from "../../engine/job/cards.js";
 import type { UnitKey } from "../../engine/job/columns.js";
-import { unitLabel } from "../../ui/labels.js";
+import { crowdLabel, unitLabel } from "../../ui/labels.js";
 import {
   EMPTY_DRAFT,
   QUESTIONS,
@@ -55,6 +56,7 @@ export const AXIS_QUERY_KEY: Readonly<Record<AxisKey, string>> = Object.freeze({
 });
 
 const NOTICE_ROBOT = "notice";
+const CROWD = "crowd";
 const NEAR_MISS = "near_miss";
 const RECOVERY_TOLERANCE = "recovery_tol";
 const RECOVERY_DWELL = "recovery_dwell";
@@ -88,6 +90,7 @@ const SETTING = Object.freeze({
     label: "Whether the people notice the robot",
     unit: "none" as const,
   }),
+  crowdModel: Object.freeze({ label: "The crowd in the room", unit: "none" as const }),
   nearMissThresholdM: Object.freeze({ label: "The near-miss line", unit: "metres" as const }),
   recoveryToleranceFraction: Object.freeze({
     label: "The recovery tolerance",
@@ -111,6 +114,7 @@ const SETTING = Object.freeze({
 
 export const SETTING_QUERY_KEYS: readonly string[] = Object.freeze([
   NOTICE_ROBOT,
+  CROWD,
   NEAR_MISS,
   RECOVERY_TOLERANCE,
   RECOVERY_DWELL,
@@ -129,6 +133,9 @@ export function encodeSettings(settings: ConsoleSettings): string {
     parts.push(`${AXIS_QUERY_KEY[key]}=${String(settings.axisValues[key])}`);
   }
   parts.push(`${NOTICE_ROBOT}=${settings.pedestriansSeeRobot ? "1" : "0"}`);
+  // The kernel's key, not its plain-English name: this half of the link is machine-facing, and the
+  // decoder resolves it back through the same closed table. A reader only ever meets the name.
+  parts.push(`${CROWD}=${settings.crowdModel}`);
   parts.push(`${NEAR_MISS}=${String(settings.nearMissThresholdM)}`);
   parts.push(`${RECOVERY_TOLERANCE}=${String(settings.recoveryToleranceFraction)}`);
   parts.push(`${RECOVERY_DWELL}=${String(settings.recoveryDwellSteps)}`);
@@ -179,6 +186,36 @@ function readFlag(
       `as it was.`,
   );
   return fallback;
+}
+
+/**
+ * The crowd a link names, or a fallback that is said out loud.
+ *
+ * A closed union is only closed if something refuses what is not in it, and here the refusal has to
+ * be audible. A link naming a crowd this bench does not run would otherwise open a room driven by a
+ * different crowd from the one it asked for, with every number on the page quietly attributed to
+ * the wrong one — the silent fallback guardrail 10 calls worse than no link at all.
+ *
+ * The notice deliberately does NOT echo what was written. That is whatever somebody typed into a
+ * URL bar, and quoting it back is how a code identifier reaches a reader, which is the same reason
+ * `decodeMethod`'s notices name the question rather than the answer they refused. What it names
+ * instead is the crowd actually running, so the reader can tell what they are looking at.
+ */
+function readCrowdModel(params: URLSearchParams, notices: string[]): CrowdModelKey {
+  const raw = params.get(CROWD);
+  if (raw === null) {
+    return DEFAULT_SETTINGS.crowdModel;
+  }
+  for (const key of CROWD_MODEL_ORDER) {
+    if (key === raw) {
+      return key;
+    }
+  }
+  notices.push(
+    `The link named a crowd this bench does not have, so the room is running ` +
+      `${crowdLabel(DEFAULT_SETTINGS.crowdModel)}.`,
+  );
+  return DEFAULT_SETTINGS.crowdModel;
 }
 
 /**
@@ -400,6 +437,7 @@ export function decodeSettings(query: string): DecodeResult {
     SETTING.pedestriansSeeRobot.label,
     notices,
   );
+  const crowdModel = readCrowdModel(params, notices);
   const nearMissThresholdM = readBounded(
     params,
     {
@@ -499,6 +537,7 @@ export function decodeSettings(query: string): DecodeResult {
   const settings = makeConsoleSettings({
     axisValues,
     pedestriansSeeRobot,
+    crowdModel,
     nearMissThresholdM,
     recoveryToleranceFraction,
     recoveryDwellSteps,
@@ -625,6 +664,15 @@ export function settingsNotHonoured(
         SETTING.pedestriansSeeRobot.label,
         describeFlag(asked.pedestriansSeeRobot),
         describeFlag(applied.pedestriansSeeRobot),
+      ),
+    );
+  }
+  if (asked.crowdModel !== applied.crowdModel) {
+    lines.push(
+      notHonoured(
+        SETTING.crowdModel.label,
+        crowdLabel(asked.crowdModel),
+        crowdLabel(applied.crowdModel),
       ),
     );
   }

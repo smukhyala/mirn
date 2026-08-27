@@ -68,6 +68,7 @@ export function settingsFromPanel(values: PanelValues): ConsoleSettings {
   return makeConsoleSettings({
     axisValues: values.axisValues,
     pedestriansSeeRobot: values.pedestriansSeeRobot,
+    crowdModel: values.crowdModel,
     nearMissThresholdM: DEFAULT_SETTINGS.nearMissThresholdM,
     recoveryToleranceFraction: DEFAULT_SETTINGS.recoveryToleranceFraction,
     recoveryDwellSteps: DEFAULT_SETTINGS.recoveryDwellSteps,
@@ -101,6 +102,7 @@ export function panelValuesFromSettings(settings: ConsoleSettings): PanelValues 
   return makePanelValues({
     axisValues: settings.axisValues,
     pedestriansSeeRobot: settings.pedestriansSeeRobot,
+    crowdModel: settings.crowdModel,
     sweepAxis: settings.sweepAxis,
     sweepValues: settings.sweepValues,
     seedCount: settings.seedCount,
