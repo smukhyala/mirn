@@ -6,7 +6,13 @@ import { isComparison } from "../../engine/job/questions.js";
 import { meanOf } from "../../engine/job/stats.js";
 import type { SuppliedProbe } from "../../engine/job/suppliedProbe.js";
 import { anchorFor } from "../../ui/labels.js";
-import { REFUSAL, type ClearingBlock, type MethodFigure } from "./method.js";
+import {
+  appendRateRange,
+  rateRangeFor,
+  REFUSAL,
+  type ClearingBlock,
+  type MethodFigure,
+} from "./method.js";
 import type { SuppliedReadingBlock } from "./suppliedVerdict.js";
 import { formatValue, unitSuffix, type SettingStamp } from "./tile.js";
 
@@ -63,6 +69,24 @@ import { formatValue, unitSuffix, type SettingStamp } from "./tile.js";
  *
  * Which of the two shapes a row gets is read off the family's own ruler, never off its key, so a
  * fifth absolute family gets the right treatment without anybody remembering to ask.
+ *
+ * ## Every count in that column says how loosely these rooms pin it down
+ *
+ * A count of rooms is a rate, and a rate over a handful of rooms is known loosely: eight of eight is
+ * consistent with a true rate anywhere from about two-thirds to certainty, and two rows whose counts
+ * differ by one may be two numbers whose ranges overlap almost entirely. A column of counts sorted
+ * descending invites exactly the comparison that ignores this, so the range is printed in the cell,
+ * under the count it qualifies.
+ *
+ * It is not a fifth column and it is not a figure. It has no heading, no headline numeral and no
+ * zero of its own — the count it hangs off already carries one, and a second zero would imply a
+ * second measurement nobody made. And the sentence beside it is guardrail 2's: a narrower range is a
+ * more precisely known number, not a truer one, and it says nothing about whether a ruler that made
+ * few mistakes here would make few in a corridor.
+ *
+ * The ruler that compares nothing gets no range, and the type is what refuses it. A range says how
+ * well a count pins a RATE down; that row's count is not a rate, so putting one on it would score it
+ * as a detector in the same breath as the block below the table says it is not one.
  *
  * ## The reader's own row, and what cannot be known about it
  *
@@ -428,6 +452,9 @@ function mistakesFor(init: {
   readonly nTruthsUnderBand: number;
 }): ClearingBlock {
   if (!init.detecting) {
+    // No range here, and the type is what refuses it rather than this comment. A range says how
+    // well a count of rooms pins a RATE down, and this count is not a rate: putting one on it
+    // would score a ruler that is not detecting anything as though it were.
     return Object.freeze({
       kind: "notADetection" as const,
       label: NON_DETECTION_LABEL,
@@ -442,6 +469,9 @@ function mistakesFor(init: {
     nCleared: init.nCleared,
     nAttempted: init.nAttempted,
     note: mistakeNoteFor(init.nUsed, init.nAttempted, init.rulerKnown),
+    // How well these rooms pin this row's rate down. Off the same two integers the cell renders,
+    // and it is a qualifier on that count rather than a fourth column.
+    range: rateRangeFor(init.nCleared, init.nAttempted),
     // Measured, not asserted: the rooms whose TRUE effect cleared the drift line, off the same
     // rooms, rather than a nought somebody typed into a sentence.
     zeroCleared: init.nAttempted - init.nTruthsUnderBand,
@@ -728,6 +758,9 @@ function fillMistakes(doc: Document, host: HTMLElement, mistakes: ClearingBlock)
     );
     host.appendChild(value);
     host.appendChild(element(doc, "p", "figure-note", mistakes.note));
+    // Inside the cell, under the count it qualifies, and only on this branch. The row below the
+    // table — the ruler that is not detecting anything — reaches the other branch and gets none.
+    appendRateRange(doc, host, mistakes.range);
 
     const zero = doc.createElement("p");
     zero.className = "figure-zero";

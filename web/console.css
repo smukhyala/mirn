@@ -919,6 +919,43 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   margin: 1.2rem 0 0;
 }
 
+/* The range under a count, and the sentence saying what it does not mean.
+
+   Set quieter than the figure it qualifies and indented under it, because it is not a second
+   measurement — it says how well the number above it is known. Giving it the weight of a reading
+   would imply a quantity that was never measured. */
+.figure-range {
+  margin: 0.5rem 0 0;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--mirn-rule);
+  color: var(--mirn-ink-muted);
+  font-size: 0.92rem;
+}
+/* Quieter still: this is the guardrail 2 sentence, and it has to be present without competing with
+   the number a reader came for. */
+.figure-range-how {
+  margin: 0.35rem 0 0;
+  padding-left: 0.9rem;
+  color: var(--mirn-ink-faint);
+  font-size: 0.88rem;
+}
+
+/* One control, deciding how many rooms every route on the page runs. */
+.method-rooms {
+  margin: 0 0 2rem;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 1.2rem;
+}
+.method-rooms .control { display: block; margin-top: 1rem; }
+.method-rooms select {
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--mirn-rule);
+  background: var(--mirn-surface);
+  color: var(--mirn-ink);
+  font: inherit;
+}
+
 .method-supplied {
   margin: 0 0 2rem;
   border-top: 1px solid var(--mirn-rule);

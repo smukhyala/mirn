@@ -11,7 +11,7 @@ import {
   type SuppliedProbe,
   type SuppliedProbeSeed,
 } from "../../../engine/job/suppliedProbe.js";
-import { REFUSAL } from "../method.js";
+import { RANGE_NOT_SOUNDNESS, RATE_RANGE_CONFIDENCE, REFUSAL } from "../method.js";
 import { makeSuppliedVerdict, renderSuppliedVerdict } from "../suppliedVerdict.js";
 import { CODE_IDENTIFIER, CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
@@ -150,6 +150,24 @@ const MIXED = branch("mixed", [
   room(5, timedOut(2000)),
 ]);
 
+/**
+ * Eight rooms, every one of them cleared: the count this bench produces most often.
+ *
+ * It is here for the range and not for the count. Eight of eight is the shape where the textbook
+ * interval has no width at all — it would print a range from certainty to certainty on eight
+ * observations — so it is the case that decides whether the range on the page is worth having.
+ */
+const EVERY_ROOM = branch("every room cleared", [
+  room(1, read(0.412)),
+  room(2, read(0.388)),
+  room(3, read(0.507)),
+  room(4, read(0.226)),
+  room(5, read(0.318)),
+  room(6, read(0.471)),
+  room(7, read(0.264)),
+  room(8, read(0.399)),
+]);
+
 const BRANCHES: readonly Branch[] = Object.freeze([
   CLEAN,
   LONE,
@@ -157,6 +175,7 @@ const BRANCHES: readonly Branch[] = Object.freeze([
   ALL_FAILED,
   INCONSISTENT,
   MIXED,
+  EVERY_ROOM,
 ]);
 
 function verdictFor(entry: Branch): ReturnType<typeof makeSuppliedVerdict> {
@@ -479,6 +498,77 @@ describe("whether it was inconsistent, and what that does to every number", () =
   });
 });
 
+describe("the count says how loosely these rooms pin the rate down", () => {
+  it("qualifies the count on every branch, inside that count's own block", () => {
+    let seen = 0;
+    for (const entry of BRANCHES) {
+      const node = render(entry);
+      const clearing = node.querySelector('[data-number="clearing"]');
+      const range = clearing?.querySelector(".figure-range") ?? null;
+      expect(range, `${entry.name} prints a rate with no range`).not.toBeNull();
+      // Inside the block rather than beside it. A range in a block of its own would read as a
+      // second measurement, and a second measurement would need a zero of its own for something
+      // nobody measured. The failure and inconsistency counts are not rates and get none.
+      expect(node.querySelectorAll(".figure-range").length, entry.name).toBe(1);
+      expect(range?.closest("[data-number]")).toBe(clearing);
+      expect(clearing?.querySelectorAll(".figure-zero").length).toBe(1);
+      for (const name of ["failures", "inconsistency"]) {
+        const count = node.querySelector(`[data-number="${name}"]`);
+        expect(count?.querySelector(".figure-range"), `${entry.name}: ${name}`).toBeNull();
+      }
+      seen = seen + 1;
+    }
+    expect(seen, "no branch was checked").toBe(BRANCHES.length);
+  });
+
+  it("draws it over the same two counts the fraction above it is printed from", () => {
+    for (const entry of BRANCHES) {
+      const interval = verdictFor(entry).clearing.range.interval;
+      expect(interval.nCleared, entry.name).toBe(entry.probe.nClearedBand);
+      expect(interval.nAttempted, entry.name).toBe(entry.probe.nAttempted);
+      expect(interval.confidence).toBe(RATE_RANGE_CONFIDENCE);
+      expect(interval.low).toBeLessThanOrEqual(interval.point);
+      expect(interval.point).toBeLessThanOrEqual(interval.high);
+    }
+  });
+
+  it("shows a bound well below every room when the method cleared on all of them", () => {
+    // The case the feature exists for, driven through the same path a reader's method takes.
+    const verdict = verdictFor(EVERY_ROOM);
+    expect(verdict.clearing.nCleared).toBe(8);
+    expect(verdict.clearing.nAttempted).toBe(8);
+    const shown: string[] = [];
+    for (const slot of render(EVERY_ROOM).querySelectorAll(".figure-range .figure-inline")) {
+      shown.push(slot.textContent ?? "");
+    }
+    expect(shown.length).toBe(4);
+    expect(shown[0]).toBe("8");
+    const low = Number(shown[1]);
+    const high = Number(shown[2]);
+    expect(low).toBeLessThan(0.75);
+    expect(low).toBeGreaterThan(0.6);
+    expect(high).toBe(1);
+    expect(high - low, "the page printed a range of no width on eight rooms").toBeGreaterThan(0.2);
+    expect(Number(shown[3])).toBe(RATE_RANGE_CONFIDENCE);
+  });
+
+  it("says what the bounds mean and refuses to let a narrow one mean a sound method", () => {
+    for (const entry of BRANCHES) {
+      const clearing = render(entry).querySelector('[data-number="clearing"]');
+      const said = textOf(clearing?.querySelector(".figure-range") ?? null);
+      expect(said, entry.name).toContain("consistent with a true rate anywhere between");
+      expect(said).toContain("a method that never clears the line");
+      // Guardrail 2, where the reader meets the range. This is the reader's OWN method, and a
+      // narrow range on their own count is the most inviting wrong conclusion on the page.
+      expect(textOf(clearing?.querySelector(".figure-range-how") ?? null)).toBe(RANGE_NOT_SOUNDNESS);
+    }
+    const whole = textOf(render(CLEAN));
+    for (const shorthand of ["Wilson", "confidence interval", "CI", "p-value", "significance"]) {
+      expect(whole, `the page says "${shorthand}" at a reader`).not.toContain(shorthand);
+    }
+  });
+});
+
 describe("nothing on the verdict is a number somebody typed", () => {
   it("keeps every digit inside a value slot, on every branch", () => {
     // The mechanical half of "no numeric literal appears in console copy". A caption quoting a
@@ -496,7 +586,9 @@ describe("nothing on the verdict is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no copy was scanned").toBeGreaterThan(20);
+    // Above what this page scanned before the range: every rate block brought six more leaves of
+    // copy with it, and a guard that did not move would not notice if they stopped rendering.
+    expect(scanned, "no copy was scanned").toBeGreaterThan(300);
   });
 
   it("would notice a digit that escaped into copy", () => {
@@ -514,6 +606,33 @@ describe("nothing on the verdict is a number somebody typed", () => {
     expect(/\d/.test(found[0]?.text ?? "")).toBe(true);
   });
 
+  it("would notice a range written into a sentence instead of into slots", () => {
+    // The range is the easiest thing on this page to write out longhand — it is a sentence with
+    // two numbers in it — so the scan is shown catching exactly that, in the element it renders
+    // into. Neither of the range's own elements is a value slot.
+    expect(isValueSlot("figure-range")).toBe(false);
+    expect(isValueSlot("figure-range-how")).toBe(false);
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const planted = dom.window.document.createElement("p");
+    planted.className = "figure-range";
+    planted.textContent = "consistent with a true rate anywhere between 0.676 and 1.000";
+    const found = leaves(planted as unknown as Element);
+    expect(found.length).toBe(1);
+    expect(isValueSlot(found[0]?.classes ?? "")).toBe(false);
+    expect(/\d/.test(found[0]?.text ?? "")).toBe(true);
+
+    // And the shipped range is that sentence with every digit lifted out of it, so the scan above
+    // passes on the real page rather than passing because nothing renders there.
+    const real = render(EVERY_ROOM).querySelector(".figure-range");
+    const copy = leaves(real as Element).filter((leaf) => !isValueSlot(leaf.classes));
+    expect(copy.length).toBeGreaterThan(3);
+    for (const leaf of copy) {
+      expect(/\d/.test(leaf.text), `"${leaf.text.trim()}" carries a number in the range`).toBe(
+        false,
+      );
+    }
+  });
+
   it("writes no code identifier anywhere a reader can see, on every branch", () => {
     let scanned = 0;
     for (const entry of BRANCHES) {
@@ -525,7 +644,7 @@ describe("nothing on the verdict is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no text was scanned").toBeGreaterThanOrEqual(20);
+    expect(scanned, "no text was scanned").toBeGreaterThanOrEqual(500);
   });
 
   it("would notice an identifier that reached the page", () => {
@@ -555,7 +674,7 @@ describe("nothing on the verdict is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no copy was scanned").toBeGreaterThanOrEqual(20);
+    expect(scanned, "no copy was scanned").toBeGreaterThanOrEqual(500);
     expect(CODE_IDENTIFIER_OR_SYNTAX.test("a phrase with a bracket ( in it")).toBe(true);
   });
 });

@@ -68,6 +68,50 @@ export const PROBE_SEEDS: readonly number[] = Object.freeze([
   BASE_SEED + 7 * SEED_STRIDE,
 ]);
 
+/**
+ * How many rooms a reader may ask for, and why turning it up refines rather than replaces.
+ *
+ * The seeds are `BASE_SEED + i * SEED_STRIDE`, so the first eight rooms of thirty-two ARE the eight
+ * rooms of eight. Asking for more does not swap the crowd out from under an answer already on
+ * screen — it adds rooms to it, and the interval around the count narrows about a number that does
+ * not jump. A random or reshuffled seed set would have made "more rooms" and "different rooms" the
+ * same button, and a reader could not have told which of the two moved their answer.
+ *
+ * A closed table, in the style of every other catalogue here. Not a slider: these are counts of
+ * simulations, each one costing real seconds, and a continuous control over a cost is a control a
+ * reader drags into a page that stops responding.
+ *
+ * It is NOT a recommendation. `docs/superpowers/specs/2026-08-25-method-card-design.md` refuses to
+ * tell a reader what sample size THEIR study needs, and that refusal is untouched: this says how
+ * many rooms MIRN runs for its own count, and nothing about anybody's experiment. No count here is
+ * marked adequate, sufficient, or enough.
+ */
+export const ROOM_COUNTS: readonly number[] = Object.freeze([8, 16, 32]);
+
+/**
+ * The first `nRooms` seeds of the one sequence.
+ *
+ * Refuses a count the table does not offer, rather than quietly running a number of rooms nobody
+ * chose — a denominator that came from somewhere other than the control is a denominator no reader
+ * can account for.
+ */
+export function probeSeedsFor(nRooms: number): readonly number[] {
+  let offered = false;
+  for (const count of ROOM_COUNTS) {
+    if (count === nRooms) {
+      offered = true;
+    }
+  }
+  if (!offered) {
+    fail(`a probe runs one of the room counts this bench offers, and was asked for ${nRooms}`);
+  }
+  const seeds: number[] = [];
+  for (let index = 0; index < nRooms; index++) {
+    seeds.push(BASE_SEED + index * SEED_STRIDE);
+  }
+  return Object.freeze(seeds);
+}
+
 /** Eight replicates give 28 pairs; six gave 15 and the band visibly jittered. See `band.ts`. */
 const DEFAULT_BAND_REPLICATES = 8;
 

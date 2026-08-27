@@ -5,7 +5,9 @@ import "./app/console/boot.js";
 import { ContractError } from "./engine/core/errors.js";
 import { FAMILIES, FAMILY_ORDER, type FamilyKey } from "./engine/job/families.js";
 import {
+  ROOM_COUNTS,
   makeFamilyProbeSettings,
+  probeSeedsFor,
   type FamilyProbe,
   type FamilyProbeSettings,
 } from "./engine/job/familyProbe.js";
@@ -21,6 +23,12 @@ import {
   type QuestionKey,
 } from "./engine/job/questions.js";
 import { makeComparison, renderComparison, type Comparison } from "./app/console/comparison.js";
+import {
+  comparisonCsv,
+  familyProbeCsv,
+  suppliedProbeCsv,
+} from "./app/console/methodCsv.js";
+import { downloadCsv } from "./app/console/table.js";
 import { makeMethodVerdict, renderMethodVerdict } from "./app/console/method.js";
 import { decodeMethod, encodeMethod } from "./app/console/permalink.js";
 import { makeProbeClient, probePortFor, spawnProbeWorker } from "./app/worker/probe.client.js";
@@ -68,7 +76,23 @@ import { makeProbeClient, probePortFor, spawnProbeWorker } from "./app/worker/pr
 /** The room every family is probed on: the console's own defaults, with the crowd told to ignore
  *  the robot. The switch that makes the truth exactly zero is not this page's to choose — it lives
  *  inside the probe and is applied whatever base is handed in. */
-const PROBE_SETTINGS: FamilyProbeSettings = makeFamilyProbeSettings({});
+/**
+ * How many rooms every route on this page runs, and the one place it is decided.
+ *
+ * It was a module constant of eight until a reader could choose. It is a mutable module value now
+ * rather than a parameter threaded through three routes, because all three MUST run the same count:
+ * a comparison whose rows were measured on different numbers of rooms is a comparison of numbers
+ * that are not comparable, and `makeComparison` refuses one — loudly, which is the right failure,
+ * but the page should never build one to be refused.
+ *
+ * Read through `settingsNow()` at the moment a button is pressed, never captured at boot, so a run
+ * uses the count that was on screen when the reader asked for it.
+ */
+let roomCount = ROOM_COUNTS[0] as number;
+
+function settingsNow(): FamilyProbeSettings {
+  return makeFamilyProbeSettings({ seeds: probeSeedsFor(roomCount) });
+}
 
 function el<T extends HTMLElement>(doc: Document, id: string): T {
   const node = doc.getElementById(id);
@@ -210,7 +234,24 @@ import type { SuppliedProbe } from "./engine/job/suppliedProbe.js";
  * one room, because a method that is slow on every room is as unusable as one that hangs on the
  * first, and a per-room clock would never notice the difference.
  */
-const SUPPLIED_LIMIT_MS = 60000;
+const SUPPLIED_LIMIT_PER_ROOM_MS = 12000;
+
+/**
+ * The limit scales with the rooms asked for, and this was a bug before it did.
+ *
+ * It was a flat sixty seconds, chosen when eight rooms was the only count there was. The room-count
+ * control then made thirty-two rooms reachable — four times the simulation, each room run twice —
+ * and a flat limit would have terminated an entirely honest method partway through and reported it
+ * as one that never returned. A reader would have been told their metric hung when what actually
+ * happened is that this page stopped waiting.
+ *
+ * The limit exists to catch a method that will never finish, not to cap work a reader deliberately
+ * asked for, so it is priced per room. Generous per room on purpose: a slow-but-terminating method
+ * should be reported with its numbers, and only a genuinely non-terminating one should hit this.
+ */
+function suppliedLimitMs(settings: FamilyProbeSettings): number {
+  return SUPPLIED_LIMIT_PER_ROOM_MS * settings.seeds.length;
+}
 
 export function bootMethodCard(doc: Document): void {
   const questionHost = el<HTMLDivElement>(doc, "question-list");
@@ -276,9 +317,27 @@ export function bootMethodCard(doc: Document): void {
    */
   let client: ReturnType<typeof makeProbeClient> | null = null;
 
-  const show = (probe: FamilyProbe, resolutionSource: MethodDraft): void => {
+  /**
+   * What is on screen, and what produced it, so the file the reader downloads is the thing they are
+   * looking at rather than whatever a fresh call would compute now.
+   *
+   * Held as a pair. A probe alone would not be enough: the settings carry the room count, the
+   * replicate count and the seeds, and a file that records its own inputs can be reproduced while
+   * one that does not is a number with a story attached.
+   */
+  let onScreen:
+    | { readonly kind: "described"; readonly probe: FamilyProbe; readonly ranAt: FamilyProbeSettings }
+    | { readonly kind: "supplied"; readonly probe: SuppliedProbe; readonly ranAt: FamilyProbeSettings }
+    | null = null;
+
+  const show = (
+    probe: FamilyProbe,
+    resolutionSource: MethodDraft,
+    ranAt: FamilyProbeSettings,
+  ): void => {
+    onScreen = { kind: "described", probe, ranAt };
     const resolution = resolveFamily(makeMethodAnswers(resolutionSource));
-    const verdict = makeMethodVerdict({ resolution, probe, settings: PROBE_SETTINGS });
+    const verdict = makeMethodVerdict({ resolution, probe, settings: ranAt });
     clear(verdictHost);
     verdictHost.appendChild(renderMethodVerdict(doc, verdict));
     result.hidden = false;
@@ -295,6 +354,10 @@ export function bootMethodCard(doc: Document): void {
     // the questionnaire is switched off below — and holding them is what makes that true rather
     // than merely likely.
     const asked: MethodDraft = { ...draft };
+    // The settings this run is about to use, held for the same reason the answers are: the room
+    // count is a live control, and a verdict built from whatever is on screen when the numbers come
+    // back would print one denominator over a measurement taken at another.
+    const askedSettings: FamilyProbeSettings = settingsNow();
 
     running = true;
     runButton.disabled = true;
@@ -337,7 +400,7 @@ export function bootMethodCard(doc: Document): void {
           status.appendChild(element(doc, "span", "status-phase", ` rooms done — ${phase}`));
         },
         onProbed: (probe: FamilyProbe): void => {
-          show(probe, asked);
+          show(probe, asked, askedSettings);
           finish(false);
         },
         onFailed: (message: string): void => {
@@ -347,7 +410,7 @@ export function bootMethodCard(doc: Document): void {
         },
       });
     }
-    client.start(resolution.family, PROBE_SETTINGS);
+    client.start(resolution.family, askedSettings);
   });
 
   copyButton.addEventListener("click", () => {
@@ -376,11 +439,55 @@ export function bootMethodCard(doc: Document): void {
     (): SuppliedProbe | null => supplied,
   );
 
+  /**
+   * The file is built from what produced the numbers on screen, never from a fresh call.
+   *
+   * A download that recomputed would hand the reader a file that disagreed with the page whenever
+   * anything had changed since the run — which is the same defect as a permalink carrying a result,
+   * and guardrail 10 refuses that one for the same reason.
+   */
+  el<HTMLButtonElement>(doc, "verdict-download").addEventListener("click", () => {
+    const current = onScreen;
+    if (current === null) {
+      return;
+    }
+    const text =
+      current.kind === "described"
+        ? familyProbeCsv(current.probe, current.ranAt)
+        : suppliedProbeCsv(current.probe, current.ranAt);
+    downloadCsv(doc, "mirn-method.csv", text);
+  });
+
+  el<HTMLButtonElement>(doc, "comparison-download").addEventListener("click", () => {
+    const built = comparison.onScreen();
+    if (built === null) {
+      return;
+    }
+    downloadCsv(doc, "mirn-comparison.csv", comparisonCsv(built.comparison, built.ranAt));
+  });
+
+  bootRoomCount(doc, () => {
+    // Every number on the page was measured at the old count, so all three routes come down
+    // together. Leaving a verdict up beside a changed denominator would put one measurement's
+    // numbers under another measurement's description, which is the one way this page could
+    // mislead without printing a wrong figure anywhere.
+    result.hidden = true;
+    clear(verdictHost);
+    onScreen = null;
+    comparison.takeDown();
+    // The reader's own row is dropped too, and this is the subtle one. It was measured at the old
+    // count, so offering it to a comparison run at the new one would put a row of a different
+    // denominator beside the rest — `makeComparison` refuses exactly that, and the page should not
+    // hand it one to refuse.
+    supplied = null;
+  });
+
   bootSuppliedForm(doc, {
     result,
     verdictHost,
-    onProbed: (probe: SuppliedProbe): void => {
+    onProbed: (probe: SuppliedProbe, ranAt: FamilyProbeSettings): void => {
       supplied = probe;
+      onScreen = { kind: "supplied", probe, ranAt };
       // A table built before this row existed, or around an older version of it, is a table whose
       // rows were not all measured on this visit's method. It comes down rather than staying up.
       comparison.takeDown();
@@ -393,6 +500,48 @@ export function bootMethodCard(doc: Document): void {
 
   paintQuestions(doc, questionHost, draft, choose);
   refresh();
+}
+
+/**
+ * The room count, and the one control that decides it for all three routes.
+ *
+ * Painted from `ROOM_COUNTS` rather than from options written into the markup, for the reason the
+ * questionnaire is painted from its own table: a hand-written copy of a closed table is a second
+ * catalogue that nothing checks against the first.
+ *
+ * No option is marked recommended, adequate or sufficient. The page offers counts and says what a
+ * larger one buys — a narrower range on its OWN number — and refuses to say anything about how many
+ * observations a reader's own experiment would need.
+ */
+function bootRoomCount(doc: Document, onChanged: () => void): void {
+  const picker = el<HTMLSelectElement>(doc, "room-count");
+  clear(picker);
+  for (const count of ROOM_COUNTS) {
+    const option = doc.createElement("option");
+    option.value = String(count);
+    option.textContent = `${String(count)} rooms`;
+    picker.appendChild(option);
+  }
+  picker.value = String(roomCount);
+
+  picker.addEventListener("change", () => {
+    const chosen = Number(picker.value);
+    let offered = false;
+    for (const count of ROOM_COUNTS) {
+      if (count === chosen) {
+        offered = true;
+      }
+    }
+    if (!offered) {
+      // The picker is painted from the table, so this cannot happen from the page. It can happen
+      // from a console, and a count nobody offered would give every denominator on the page a
+      // provenance no reader could account for.
+      picker.value = String(roomCount);
+      return;
+    }
+    roomCount = chosen;
+    onChanged();
+  });
 }
 
 /**
@@ -413,7 +562,7 @@ function bootSuppliedForm(
     readonly result: HTMLElement;
     readonly verdictHost: HTMLDivElement;
     /** A measurement of the reader's own metric, offered to the comparison as their row. */
-    readonly onProbed: (probe: SuppliedProbe) => void;
+    readonly onProbed: (probe: SuppliedProbe, ranAt: FamilyProbeSettings) => void;
     /** The text changed, so any row built from the old text has stopped describing it. */
     readonly onEdited: () => void;
   },
@@ -440,6 +589,12 @@ function bootSuppliedForm(
 
   /** Spawned on the first press, for the reason the questionnaire's worker is. */
   let client: ReturnType<typeof makeSuppliedClient> | null = null;
+  /** The allowance the live client was built with, so a changed one forces a rebuild. */
+  let builtForMs = 0;
+  /** Stops the worker behind the live client and forgets it. */
+  let stopClient = (): void => {
+    client = null;
+  };
 
   const finish = (keepStatus: boolean): void => {
     running = false;
@@ -455,6 +610,10 @@ function bootSuppliedForm(
       return;
     }
     running = true;
+    // Held at the press, for the reason the questionnaire holds its answers: the room
+    // count can change while a measurement is in flight, and a verdict must print the
+    // denominator its own numbers were taken at.
+    const ranAt: FamilyProbeSettings = settingsNow();
     runButton.disabled = true;
     source.disabled = true;
     hosts.result.hidden = true;
@@ -468,6 +627,16 @@ function bootSuppliedForm(
      * into, so a second press has to build a new one. Reusing a latched client would leave the
      * page pressing a button that could never answer.
      */
+    // A client carries its limit from the moment it is built, so one built for eight rooms is
+    // still enforcing an eight-room limit when the reader asks for thirty-two. Reusing it would
+    // terminate four times the work under a quarter of the allowance and report an honest metric
+    // as one that never returned — which is the bug the per-room limit above was meant to fix and
+    // only half fixed. Rebuilt whenever the allowance changes, and the old worker is stopped
+    // rather than left running.
+    const wanted = suppliedLimitMs(ranAt);
+    if (client !== null && builtForMs !== wanted) {
+      stopClient();
+    }
     if (client === null || client.isStopped()) {
       const worker = spawnSuppliedWorker();
       client = makeSuppliedClient(
@@ -481,13 +650,13 @@ function bootSuppliedForm(
             status.appendChild(element(doc, "span", "status-phase", ` rooms done — ${phase}`));
           },
           onDone: (probe: SuppliedProbe): void => {
-            const verdict = makeSuppliedVerdict({ probe, settings: PROBE_SETTINGS });
+            const verdict = makeSuppliedVerdict({ probe, settings: ranAt });
             clear(hosts.verdictHost);
             hosts.verdictHost.appendChild(renderSuppliedVerdict(doc, verdict));
             hosts.result.hidden = false;
             // Offered to the comparison as the reader's own row. It was measured at the settings
             // the described rulers are measured at, which is what makes it admissible there.
-            hosts.onProbed(probe);
+            hosts.onProbed(probe, ranAt);
             finish(false);
           },
           onFailed: (message: string): void => {
@@ -499,15 +668,20 @@ function bootSuppliedForm(
           },
         },
         makeSuppliedLimit({
-          limitMs: SUPPLIED_LIMIT_MS,
+          limitMs: wanted,
           terminate: (): void => {
             worker.terminate();
           },
           setAlarm: wallClockAlarm,
         }),
       );
+      builtForMs = wanted;
+      stopClient = (): void => {
+        worker.terminate();
+        client = null;
+      };
     }
-    client.start(source.value, PROBE_SETTINGS);
+    client.start(source.value, ranAt);
   });
 
   refreshButton();
@@ -517,6 +691,14 @@ function bootSuppliedForm(
 interface ComparisonRegion {
   /** Take the table down, because something it was built from has stopped being true. */
   readonly takeDown: () => void;
+  /**
+   * The table currently on screen and the settings that produced it, or nothing.
+   *
+   * Returned rather than recomputed so a download is the thing the reader is looking at. A file
+   * that disagreed with the page whenever something had changed since the run would be the same
+   * defect guardrail 10 refuses in a permalink carrying a result.
+   */
+  readonly onScreen: () => { readonly comparison: Comparison; readonly ranAt: FamilyProbeSettings } | null;
 }
 
 /**
@@ -538,7 +720,7 @@ interface ComparisonRegion {
  *
  * ## Every row at the same settings, and it is refused rather than reconciled
  *
- * `PROBE_SETTINGS` is passed to every family and is the settings the supplied form runs at too.
+ * The settings are read once per press and passed to every family, so all rows share a room count.
  * That is not a convention this file gets to bend: `makeComparison` compares each measurement's
  * rooms against the settings' own seeds and each row's drift line against its neighbours', and
  * refuses the table if either disagrees. A row measured elsewhere therefore stops the comparison
@@ -569,6 +751,7 @@ function bootComparison(
   const takeDown = (): void => {
     hosts.result.hidden = true;
     clear(hosts.host);
+    onScreen = null;
   };
 
   /**
@@ -609,6 +792,17 @@ function bootComparison(
   /** Spawned on the first press, for the reason the other two routes' workers are. */
   let client: ReturnType<typeof makeProbeClient> | null = null;
 
+  /**
+   * The settings every ruler in one comparison is measured at, fixed for the whole run.
+   *
+   * This matters more here than on the other two routes. A comparison walks four rulers one after
+   * another, so a reader who changed the room count halfway would otherwise get a table whose rows
+   * were measured on different numbers of rooms — which is a table of numbers that cannot be set
+   * beside each other. `makeComparison` refuses one, loudly and correctly, but the page should not
+   * be building a thing to be refused. Fixed at the press, and every ruler gets this one.
+   */
+  let ranAt: FamilyProbeSettings = settingsNow();
+
   const startNext = (): void => {
     const key = FAMILY_ORDER[atFamily];
     const active = client;
@@ -616,8 +810,12 @@ function bootComparison(
       return;
     }
     paintStatus(0, 0, "");
-    active.start(key, PROBE_SETTINGS);
+    active.start(key, ranAt);
   };
+
+  /** The table on screen and what produced it, for the download. Cleared by `takeDown`. */
+  let onScreen: { readonly comparison: Comparison; readonly ranAt: FamilyProbeSettings } | null =
+    null;
 
   const show = (): void => {
     let built: Comparison;
@@ -627,7 +825,7 @@ function bootComparison(
         // The reader's own row when there is one, and nothing when there is not. A comparison of
         // the described rulers alone is a whole table; a missing row of theirs is not a gap in it.
         supplied: suppliedNow(),
-        settings: PROBE_SETTINGS,
+        settings: ranAt,
       });
     } catch (error) {
       // The refusals are the point of `makeComparison`, so they are shown rather than swallowed —
@@ -640,6 +838,7 @@ function bootComparison(
     }
     clear(hosts.host);
     hosts.host.appendChild(renderComparison(doc, built));
+    onScreen = { comparison: built, ranAt };
     hosts.result.hidden = false;
     finish(false);
   };
@@ -650,6 +849,10 @@ function bootComparison(
     }
     running = true;
     runButton.disabled = true;
+    // Read once, here, and used for all four rulers. Initialising it at boot alone would have
+    // measured every comparison at whatever count the page opened with, however many times the
+    // reader changed it — a control that looked live and was not.
+    ranAt = settingsNow();
     // The table on screen belongs to the measurements that produced it. It comes down before the
     // first ruler is asked for, so nothing older is left up beside a run in progress.
     takeDown();
@@ -686,7 +889,11 @@ function bootComparison(
     startNext();
   });
 
-  return Object.freeze({ takeDown });
+  return Object.freeze({
+    takeDown,
+    onScreen: (): { readonly comparison: Comparison; readonly ranAt: FamilyProbeSettings } | null =>
+      onScreen,
+  });
 }
 
 bootMethodCard(document);

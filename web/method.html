@@ -64,6 +64,35 @@
     that nothing checks against the first, and the test that walks every answer a reader can give
     walks the table rather than this markup.
   -->
+  <!--
+    How many rooms every route on this page runs. One control, not three: a comparison whose rows
+    were measured on different numbers of rooms is a table of numbers that cannot be set beside each
+    other, and `makeComparison` refuses one rather than drawing it.
+
+    It is NOT a recommendation, and the copy is written so it cannot be read as one. No count here
+    is marked adequate or sufficient. The method card's own design document refuses to tell a reader
+    what sample size THEIR study needs — that is a claim about an experiment this bench knows nothing
+    about — and that refusal is untouched. This says how many rooms MIRN runs for its own count.
+  -->
+  <form class="method-rooms" id="rooms" aria-labelledby="rooms-title">
+    <h2 class="region-title" id="rooms-title">How many rooms to run</h2>
+    <p class="verdict-line">
+      More rooms do not change which rooms: the first eight of thirty-two are the same eight. Asking
+      for more adds to an answer rather than replacing it, and the range around every count below
+      narrows about a number that stays where it was. It costs time in proportion.
+    </p>
+    <label class="control" for="room-count">
+      <span class="control-label">Rooms behind every count on this page</span>
+      <select id="room-count"></select>
+    </label>
+    <p class="region-note">
+      A narrower range is a more precise number, not a truer one. It says how much the count would
+      move if this bench ran the same rulers on more rooms of the same invented crowd. It says
+      nothing about the two things that actually bound these numbers: the crowd is calibrated
+      against nothing, and a room is not a corridor.
+    </p>
+  </form>
+
   <form class="method-questions" id="questions" aria-labelledby="questions-title">
     <h2 class="region-title" id="questions-title">Five questions about how your number is computed</h2>
     <div id="question-list"></div>
@@ -128,6 +157,15 @@
   <section class="method-result" id="result" aria-labelledby="result-title" hidden>
     <h2 class="region-title" id="result-title">The verdict</h2>
     <div id="verdict"></div>
+    <!--
+      A number a reader cannot carry off is not a result they can cite, check later, or hand to
+      anybody. The file opens with the invented-crowd disclosure, because a file outlives the page
+      it came from, and it records the settings that produced it so it can be reproduced rather
+      than merely believed.
+    -->
+    <div class="method-run">
+      <button id="verdict-download" type="button">Download these numbers</button>
+    </div>
   </section>
 
   <!--
@@ -177,6 +215,9 @@
   <section class="method-result" id="comparison-result" aria-labelledby="comparison-result-title" hidden>
     <h2 class="region-title" id="comparison-result-title">Every ruler, on the same rooms</h2>
     <div id="comparison-verdict"></div>
+    <div class="method-run">
+      <button id="comparison-download" type="button">Download this table</button>
+    </div>
   </section>
 </main>
 

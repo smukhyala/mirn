@@ -17,7 +17,14 @@ import {
   resolveFamily,
   type MethodDraft,
 } from "../../../engine/job/questions.js";
-import { REFUSAL, makeMethodVerdict, renderMethodVerdict } from "../method.js";
+import {
+  RANGE_NOT_SOUNDNESS,
+  RATE_RANGE_CONFIDENCE,
+  REFUSAL,
+  makeMethodVerdict,
+  rateRangeFor,
+  renderMethodVerdict,
+} from "../method.js";
 import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 /**
@@ -121,6 +128,10 @@ function leaves(node: Element): readonly { readonly text: string; readonly class
   };
   walk(node);
   return found;
+}
+
+function textOf(node: Element | null): string {
+  return node?.textContent ?? "";
 }
 
 /** The elements a digit is allowed to live inside. Everything else on this page is copy. */
@@ -260,6 +271,156 @@ describe("the family that compares nothing is not scored as a detector", () => {
   });
 });
 
+/**
+ * Eight rooms, every one of them cleared: the count the range exists for.
+ *
+ * The tallies are overridden rather than measured, and that is the point of the case rather than a
+ * shortcut around it. What is under test is what the page prints for a count of all-of-n — the one
+ * shape where the textbook interval would print no width at all — and not whether some family
+ * happens to clear on all of eight rooms. Every field that has to agree is moved together, so the
+ * verdict is built from a coherent measurement: eight rooms attempted, eight read, eight cleared,
+ * and all eight truths exactly nothing and beneath the line. `interval.test.ts` owns the arithmetic
+ * this leans on; this owns what a reader is shown when it comes back.
+ */
+function allOfEight(key: FamilyKey): FamilyProbe {
+  const honest = probeOf(key);
+  const rooms = 8;
+  return {
+    ...honest,
+    nAttempted: rooms,
+    nUsed: rooms,
+    nClearedBand: rooms,
+    nTruthsExactlyZero: rooms,
+    nTruthsUnderBand: rooms,
+  };
+}
+
+function rangeValuesIn(node: Element | null): readonly string[] {
+  const found: string[] = [];
+  for (const slot of node?.querySelectorAll(".figure-range .figure-inline") ?? []) {
+    found.push(slot.textContent ?? "");
+  }
+  return found;
+}
+
+describe("a count of rooms says how loosely it pins the rate down", () => {
+  it("qualifies every branch that has a rate, and does it inside that count's own block", () => {
+    let rated = 0;
+    for (const key of FAMILY_ORDER) {
+      if (!isComparison(key)) {
+        continue;
+      }
+      const node = render(key);
+      const clearing = node.querySelector('[data-number="clearing"]');
+      const range = clearing?.querySelector(".figure-range") ?? null;
+      expect(range, `${key} prints a rate with no range`).not.toBeNull();
+      // Inside the block, not beside it. A range in a block of its own would be a second figure,
+      // and a second figure on this page would need a zero of its own for a measurement nobody
+      // made. Everything it says lives under the count it qualifies.
+      expect(node.querySelectorAll(".figure-range").length).toBe(1);
+      expect(range?.closest("[data-number]")).toBe(clearing);
+      expect(node.querySelector('[data-number="range"]')).toBeNull();
+      // One zero in that block, and it belongs to the count rather than to the range.
+      expect(clearing?.querySelectorAll(".figure-zero").length).toBe(1);
+      expect(clearing?.querySelectorAll(".figure-value").length).toBe(1);
+      rated = rated + 1;
+    }
+    expect(rated, "no rate was qualified").toBe(3);
+  });
+
+  it("says what the bounds mean, in words, and quotes no shorthand for the level", () => {
+    const said = textOf(render("pairedShared").querySelector(".figure-range"));
+    expect(said).toContain("consistent with a true rate anywhere between");
+    expect(said).toContain("a method that never clears the line");
+    expect(said).toContain("one that clears it in every room");
+    expect(said).toContain("aim to cover the true rate in");
+    // The reader has never seen a statistics course, so neither the name of the arithmetic nor its
+    // shorthand appears anywhere on the page.
+    const whole = textOf(render("pairedShared"));
+    for (const shorthand of ["Wilson", "confidence interval", "CI", "p-value", "significance"]) {
+      expect(whole, `the page says "${shorthand}" at a reader`).not.toContain(shorthand);
+    }
+  });
+
+  it("refuses to let a narrower range read as a sounder method", () => {
+    // Guardrail 2, where the reader meets the range rather than in a footnote under the page.
+    for (const key of FAMILY_ORDER) {
+      if (!isComparison(key)) {
+        continue;
+      }
+      const clearing = render(key).querySelector('[data-number="clearing"]');
+      const how = textOf(clearing?.querySelector(".figure-range-how") ?? null);
+      expect(how).toBe(RANGE_NOT_SOUNDNESS);
+      expect(how).toContain("a more precisely known number, not a truer one");
+      expect(how).toContain("whether the method is sound");
+    }
+  });
+
+  it("shows a bound well below every room when every room cleared", () => {
+    // The case the whole feature is for. Eight of eight is the count this bench produces most
+    // often, and the textbook interval has no width at all there — it would print a range from
+    // certainty to certainty on eight observations, which is a worse lie than no range.
+    const verdict = makeMethodVerdict({
+      resolution: resolveFamily(makeMethodAnswers(draftFor("forecastCounterfactual"))),
+      probe: allOfEight("forecastCounterfactual"),
+      settings: CHEAP,
+    });
+    expect(verdict.clearing.kind).toBe("falsePositiveRate");
+    if (verdict.clearing.kind !== "falsePositiveRate") {
+      return;
+    }
+    expect(verdict.clearing.nCleared).toBe(8);
+    expect(verdict.clearing.nAttempted).toBe(8);
+
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const node = renderMethodVerdict(dom.window.document, verdict);
+    const shown = rangeValuesIn(node.querySelector('[data-number="clearing"]'));
+    // The rooms, the two bounds, and the level the range was drawn at.
+    expect(shown.length).toBe(4);
+    expect(shown[0]).toBe("8");
+    const low = Number(shown[1]);
+    const high = Number(shown[2]);
+    // The assertion this case exists for: the page shows a bound well below every room, not a
+    // range of no width. The engine pins the figure; what is asserted here is that a reader sees it.
+    expect(low).toBeLessThan(1);
+    expect(low).toBeLessThan(0.75);
+    expect(low).toBeGreaterThan(0.6);
+    expect(high).toBe(1);
+    expect(high - low, "the page printed a range of no width on eight rooms").toBeGreaterThan(0.2);
+    expect(Number(shown[3])).toBe(RATE_RANGE_CONFIDENCE);
+  });
+
+  it("draws the range over the same two counts the fraction above it is printed from", () => {
+    for (const key of FAMILY_ORDER) {
+      const verdict = verdictFor(key);
+      if (verdict.clearing.kind !== "falsePositiveRate") {
+        continue;
+      }
+      const interval = verdict.clearing.range.interval;
+      expect(interval.nCleared).toBe(verdict.clearing.nCleared);
+      expect(interval.nAttempted).toBe(verdict.clearing.nAttempted);
+      expect(interval.confidence).toBe(RATE_RANGE_CONFIDENCE);
+      // It contains the count it qualifies, which is the whole of what a range is for.
+      expect(interval.low).toBeLessThanOrEqual(interval.point);
+      expect(interval.point).toBeLessThanOrEqual(interval.high);
+    }
+    expect(rateRangeFor(8, 8).interval.high).toBe(1);
+  });
+
+  it("gives the family that is not detecting anything no range at all", () => {
+    // A range says how well a count of rooms pins a RATE down. This count is not a rate — the same
+    // number comes back whether the robot moved everybody in the room or nobody — so a range on it
+    // would be a precision claim about a rate that this block exists to say is not one.
+    const verdict = verdictFor("noCounterfactual");
+    expect(verdict.clearing.kind).toBe("notADetection");
+    expect("range" in verdict.clearing, "the non-detector was given a rate's range").toBe(false);
+    const clearing = render("noCounterfactual").querySelector('[data-number="clearing"]');
+    expect(clearing?.querySelector(".figure-range")).toBeNull();
+    expect(clearing?.querySelector(".figure-range-how")).toBeNull();
+    expect(render("noCounterfactual").querySelector(".figure-range")).toBeNull();
+  });
+});
+
 describe("every number is shown beside what it would read if the answer were zero", () => {
   it("prints the reading against a zero measured on the same rooms", () => {
     for (const key of FAMILY_ORDER) {
@@ -325,7 +486,10 @@ describe("nothing on the verdict is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no copy was scanned").toBeGreaterThan(40);
+    // Above what the page scanned before the range was added to it: the three rate blocks each
+    // brought six more leaves of copy, and a guard that did not move would not notice if they
+    // stopped rendering.
+    expect(scanned, "no copy was scanned").toBeGreaterThan(140);
   });
 
   it("would notice a digit that escaped into copy", () => {
@@ -342,6 +506,34 @@ describe("nothing on the verdict is a number somebody typed", () => {
     expect(/\d/.test(found[0]?.text ?? "")).toBe(true);
   });
 
+  it("would notice a range written into a sentence instead of into slots", () => {
+    // The same meta-test aimed at the new copy. The range is the easiest thing on this page to
+    // write out longhand — it is a sentence with two numbers in it — so the scan is shown catching
+    // exactly that, in the very element the range renders into.
+    expect(isValueSlot("figure-range")).toBe(false);
+    expect(isValueSlot("figure-range-how")).toBe(false);
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const planted = dom.window.document.createElement("p");
+    planted.className = "figure-range";
+    planted.textContent =
+      "Counted over 8 rooms, that count is consistent with a true rate anywhere between 0.676 " +
+      "and 1.000.";
+    const found = leaves(planted as unknown as Element);
+    expect(found.length).toBe(1);
+    expect(isValueSlot(found[0]?.classes ?? "")).toBe(false);
+    expect(/\d/.test(found[0]?.text ?? "")).toBe(true);
+
+    // And the shipped range is the same sentence with every digit lifted out of it, so the scan
+    // above passes on the real page rather than passing because nothing renders there.
+    const real = render("pairedShared").querySelector(".figure-range");
+    const copy = leaves(real as Element).filter((leaf) => !isValueSlot(leaf.classes));
+    expect(copy.length).toBeGreaterThan(3);
+    for (const leaf of copy) {
+      expect(/\d/.test(leaf.text), `"${leaf.text.trim()}" carries a number in the range's copy`)
+        .toBe(false);
+    }
+  });
+
   it("writes no code identifier anywhere a reader can see", () => {
     let scanned = 0;
     for (const key of FAMILY_ORDER) {
@@ -350,7 +542,7 @@ describe("nothing on the verdict is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no text was scanned").toBeGreaterThan(40);
+    expect(scanned, "no text was scanned").toBeGreaterThan(210);
   });
 });
 

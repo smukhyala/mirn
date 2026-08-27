@@ -19,7 +19,7 @@ import {
 } from "../../../engine/job/suppliedProbe.js";
 import { CODE_IDENTIFIER, CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 import { makeComparison, renderComparison, type Comparison } from "../comparison.js";
-import { REFUSAL } from "../method.js";
+import { RANGE_NOT_SOUNDNESS, RATE_RANGE_CONFIDENCE, REFUSAL } from "../method.js";
 
 /**
  * The comparison: what it says, what order it says it in, and the four things it must never say.
@@ -441,6 +441,182 @@ describe("the ruler that compares nothing is not scored as a detector", () => {
   });
 });
 
+/**
+ * The same table over eight rooms, with one ruler clearing the line on every one of them.
+ *
+ * Eight of eight is the count this bench produces most often and the one shape where the textbook
+ * interval has no width at all, so it is the case that decides whether the range in a cell is worth
+ * printing. Built beside the four-room fixture rather than replacing it: the ordering tests turn on
+ * that fixture's counts, and this one exists to answer a different question.
+ */
+const EIGHT_SEEDS: readonly number[] = Object.freeze([
+  20260827, 20268746, 20276665, 20284584, 20292503, 20300422, 20308341, 20316260,
+]);
+
+const EIGHT_SETTINGS: FamilyProbeSettings = makeFamilyProbeSettings({
+  seeds: EIGHT_SEEDS,
+  bandReplicates: 2,
+});
+
+/** Every one of the eight rooms read the same thing, so what a row cleared on is decided by the
+ *  engine's own rule against the drift line rather than by a flag typed beside it. */
+function eightRoomProbe(key: FamilyKey, valueM: number): FamilyProbe {
+  const rooms: FamilyProbeSeed[] = [];
+  for (const seed of EIGHT_SEEDS) {
+    rooms.push(familyRoom(seed, valueM));
+  }
+  return aggregateProbe(FAMILIES[key], rooms);
+}
+
+const EIGHT_ROOM_READINGS: Readonly<Record<FamilyKey, number>> = Object.freeze({
+  pairedShared: 0,
+  // Above the drift line on all eight, which is the count the range exists for.
+  unpairedSeparate: 0.412,
+  forecastCounterfactual: 0,
+  noCounterfactual: 18.42,
+});
+
+function comparisonOverEight(): Comparison {
+  const families = new Map<FamilyKey, FamilyProbe>();
+  for (const key of FAMILY_ORDER) {
+    families.set(key, eightRoomProbe(key, EIGHT_ROOM_READINGS[key]));
+  }
+  return makeComparison({ families, supplied: null, settings: EIGHT_SETTINGS });
+}
+
+const ALL_EIGHT = comparisonOverEight();
+
+function rangeValuesIn(node: Element | null): readonly string[] {
+  const found: string[] = [];
+  for (const slot of node?.querySelectorAll(".figure-range .figure-inline") ?? []) {
+    found.push(slot.textContent ?? "");
+  }
+  return found;
+}
+
+describe("each count of mistakes says how loosely these rooms pin it down", () => {
+  it("qualifies every row in the order, inside that row's own cell", () => {
+    for (const entry of CASES) {
+      const node = render(entry.comparison);
+      const cells = [...node.querySelectorAll('tbody tr [data-number="clearing"]')];
+      expect(cells.length, entry.name).toBe(entry.comparison.ordered.length);
+      for (const cell of cells) {
+        const range = cell.querySelector(".figure-range");
+        expect(range, `${entry.name}: a count of mistakes with no range`).not.toBeNull();
+        // Inside the cell it qualifies, never a column of its own. A fifth column of ranges would
+        // be a second thing to run an eye down, and a reader would compare the widths.
+        expect(range?.closest("[data-number]")).toBe(cell);
+        expect(cell.querySelectorAll(".figure-range").length).toBe(1);
+        expect(cell.querySelectorAll(".figure-zero").length).toBe(1);
+      }
+      // One heading per column, and the range added none: it is a qualifier, not a measurement.
+      expect(node.querySelectorAll(".comparison-heading").length, entry.name).toBe(4);
+      expect(node.querySelectorAll(".figure-range").length).toBe(cells.length);
+    }
+  });
+
+  it("gives the ruler that is not detecting anything none at all", () => {
+    // A range says how well a count of rooms pins a RATE down. This count is not a rate — the same
+    // number comes back whether the robot moved everybody in the room or nobody — so a range on it
+    // would score it as a detector, which is the one thing this block is set apart to avoid.
+    for (const entry of CASES) {
+      const loose = render(entry.comparison).querySelector('[data-part="not-detecting"]');
+      expect(loose, entry.name).not.toBeNull();
+      expect(loose?.querySelector(".figure-range"), entry.name).toBeNull();
+      expect(loose?.querySelector(".figure-range-how"), entry.name).toBeNull();
+      for (const row of entry.comparison.notDetecting) {
+        expect(row.mistakes.kind).toBe("notADetection");
+        expect("range" in row.mistakes, "the non-detector was given a rate's range").toBe(false);
+      }
+    }
+  });
+
+  it("draws each range over the same two counts its own cell is printed from", () => {
+    for (const entry of CASES) {
+      for (const row of entry.comparison.ordered) {
+        if (row.mistakes.kind !== "falsePositiveRate") {
+          continue;
+        }
+        const interval = row.mistakes.range.interval;
+        expect(interval.nCleared, `${entry.name}: ${row.name}`).toBe(row.mistakes.nCleared);
+        expect(interval.nAttempted).toBe(row.mistakes.nAttempted);
+        expect(interval.confidence).toBe(RATE_RANGE_CONFIDENCE);
+        expect(interval.low).toBeLessThanOrEqual(interval.point);
+        expect(interval.point).toBeLessThanOrEqual(interval.high);
+      }
+    }
+  });
+
+  it("shows a bound well below every room for a ruler that cleared the line on all eight", () => {
+    const row = ALL_EIGHT.ordered[0];
+    expect(row?.source.kind === "describedFamily" && row.source.family).toBe("unpairedSeparate");
+    expect(row?.mistakes.kind).toBe("falsePositiveRate");
+    if (row?.mistakes.kind !== "falsePositiveRate") {
+      return;
+    }
+    expect(row.mistakes.nCleared).toBe(8);
+    expect(row.mistakes.nAttempted).toBe(8);
+
+    const cell = render(ALL_EIGHT).querySelector(
+      'tr[data-row="unpairedSeparate"] [data-number="clearing"]',
+    );
+    const shown = rangeValuesIn(cell);
+    expect(shown.length).toBe(4);
+    expect(shown[0]).toBe("8");
+    const low = Number(shown[1]);
+    const high = Number(shown[2]);
+    // The assertion this case exists for. The cell reads eight of eight, and beneath it the page
+    // shows a bound well under every room rather than a range of no width at all.
+    expect(cell?.querySelector(".method-rate-number")?.textContent).toBe("8");
+    expect(low).toBeLessThan(0.75);
+    expect(low).toBeGreaterThan(0.6);
+    expect(high).toBe(1);
+    expect(high - low, "the page printed a range of no width on eight rooms").toBeGreaterThan(0.2);
+    expect(Number(shown[3])).toBe(RATE_RANGE_CONFIDENCE);
+
+    // And a row that cleared on none of the eight gets the other end of the same scale, so the
+    // range is read off the count rather than printed the same everywhere.
+    const clean = render(ALL_EIGHT).querySelector(
+      'tr[data-row="pairedShared"] [data-number="clearing"]',
+    );
+    const none = rangeValuesIn(clean);
+    expect(Number(none[1])).toBe(0);
+    expect(Number(none[2])).toBeGreaterThan(0);
+    expect(Number(none[2])).toBeLessThan(0.4);
+  });
+
+  it("says what the bounds mean and refuses to let a narrow one mean a sound ruler", () => {
+    const cell = render(WITH_YOURS).querySelector('tbody tr [data-number="clearing"]');
+    const said = textOf(cell?.querySelector(".figure-range") ?? null);
+    expect(said).toContain("consistent with a true rate anywhere between");
+    expect(said).toContain("a method that never clears the line");
+    expect(said).toContain("aim to cover the true rate in");
+    // Guardrail 2, in the cell rather than in a footnote: on a page whose rows are ordered by a
+    // count, "this one's range is narrower" is the nearest wrong conclusion to hand.
+    for (const entry of CASES) {
+      for (const each of render(entry.comparison).querySelectorAll(".figure-range-how")) {
+        expect(each.textContent, entry.name).toBe(RANGE_NOT_SOUNDNESS);
+      }
+    }
+    // The reader has never seen a statistics course, so no shorthand for any of this appears.
+    const whole = textOf(render(ALL_EIGHT));
+    for (const shorthand of ["Wilson", "confidence interval", "CI", "p-value", "significance"]) {
+      expect(whole, `the page says "${shorthand}" at a reader`).not.toContain(shorthand);
+    }
+  });
+
+  it("writes none of the leaderboard words into the range's own copy either", () => {
+    // The range is a new sentence on a page whose whole risk is reading as a league table, so it
+    // goes through the same scan the rest of the page does rather than around it.
+    for (const entry of CASES) {
+      for (const range of render(entry.comparison).querySelectorAll(".figure-range")) {
+        expect(leaderboardWordsIn(range), entry.name).toEqual([]);
+      }
+    }
+    expect(leaderboardWordsIn(render(ALL_EIGHT))).toEqual([]);
+  });
+});
+
 describe("the reader's own row, with and without one", () => {
   it("adds a row of theirs when a supplied measurement is in hand", () => {
     expect(rowOrder(WITH_YOURS)).toContain("yours");
@@ -655,7 +831,10 @@ describe("nothing on the table is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no copy was scanned").toBeGreaterThan(20);
+    // Above what this page scanned before the range: every count of mistakes brought six more
+    // leaves of copy with it, and a guard that did not move would not notice if they stopped
+    // rendering.
+    expect(scanned, "no copy was scanned").toBeGreaterThan(340);
   });
 
   it("would notice a digit that escaped into copy", () => {
@@ -671,6 +850,33 @@ describe("nothing on the table is a number somebody typed", () => {
     expect(/\d/.test(found[0]?.text ?? "")).toBe(true);
   });
 
+  it("would notice a range written into a sentence instead of into slots", () => {
+    // The range is the easiest thing on this page to write out longhand — it is a sentence with
+    // two numbers in it — so the scan is shown catching exactly that, in the element the range
+    // renders into. Neither of its elements is a value slot.
+    expect(isValueSlot("figure-range")).toBe(false);
+    expect(isValueSlot("figure-range-how")).toBe(false);
+    const dom = new JSDOM("<!doctype html><body></body>");
+    const planted = dom.window.document.createElement("p");
+    planted.className = "figure-range";
+    planted.textContent = "consistent with a true rate anywhere between 0.676 and 1.000";
+    const found = leaves(planted as unknown as Element);
+    expect(found.length).toBe(1);
+    expect(isValueSlot(found[0]?.classes ?? "")).toBe(false);
+    expect(/\d/.test(found[0]?.text ?? "")).toBe(true);
+
+    // And the shipped range is that sentence with every digit lifted out of it, so the scan above
+    // passes on the real page rather than passing because nothing renders there.
+    const real = render(ALL_EIGHT).querySelector(".figure-range");
+    const copy = leaves(real as Element).filter((leaf) => !isValueSlot(leaf.classes));
+    expect(copy.length).toBeGreaterThan(3);
+    for (const leaf of copy) {
+      expect(/\d/.test(leaf.text), `"${leaf.text.trim()}" carries a number in the range`).toBe(
+        false,
+      );
+    }
+  });
+
   it("writes no code identifier anywhere a reader can see, on every case", () => {
     let scanned = 0;
     for (const entry of CASES) {
@@ -682,7 +888,7 @@ describe("nothing on the table is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no text was scanned").toBeGreaterThan(20);
+    expect(scanned, "no text was scanned").toBeGreaterThan(600);
   });
 
   it("would notice an identifier that reached the page", () => {
@@ -705,7 +911,7 @@ describe("nothing on the table is a number somebody typed", () => {
         scanned = scanned + 1;
       }
     }
-    expect(scanned, "no copy was scanned").toBeGreaterThan(20);
+    expect(scanned, "no copy was scanned").toBeGreaterThan(600);
     expect(CODE_IDENTIFIER_OR_SYNTAX.test("a phrase with a bracket ( in it")).toBe(true);
   });
 });

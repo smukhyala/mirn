@@ -20,6 +20,7 @@ import {
   type MethodDraft,
 } from "../../../engine/job/questions.js";
 import type { FromProbeWorker, ToProbeWorker } from "../../worker/probe.protocol.js";
+import { ROOM_COUNTS } from "../../../engine/job/familyProbe.js";
 import { DISCLOSURE_CLAUSES } from "../csv.js";
 import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 
@@ -185,6 +186,50 @@ function regionOf(html: string, id: string): string {
   }
   return html.slice(start, end);
 }
+
+describe("the room count is one control for the whole page", () => {
+  it("offers the counts the closed table holds, and paints none of them into the markup", () => {
+    // Painted from ROOM_COUNTS for the reason the questionnaire is painted from its own table: a
+    // hand-written copy of a closed table is a second catalogue nothing checks against the first.
+    expect(HTML).toMatch(/<select id="room-count"><\/select>|<select id="room-count">\s*<\/select>/);
+    expect(ROOM_COUNTS.length).toBeGreaterThan(1);
+  });
+
+  it("names no count as recommended, adequate or sufficient", () => {
+    // The method card's own design document refuses to tell a reader what sample size THEIR study
+    // needs. Offering counts is not that; implying one of them is enough would be.
+    const region = HTML.slice(HTML.indexOf('id="rooms"'), HTML.indexOf("</form>", HTML.indexOf('id="rooms"')));
+    expect(region.length).toBeGreaterThan(200);
+    for (const word of ["recommend", "adequate", "sufficient", "enough", "significan"]) {
+      expect(region.toLowerCase(), `the room control implies "${word}"`).not.toContain(word);
+    }
+  });
+
+  it("would catch a recommendation if one were written in", () => {
+    // The test that tests the test.
+    const planted = "we recommend thirty-two rooms for significance";
+    let caught = false;
+    for (const word of ["recommend", "adequate", "sufficient", "enough", "significan"]) {
+      if (planted.toLowerCase().includes(word)) {
+        caught = true;
+      }
+    }
+    expect(caught).toBe(true);
+  });
+
+  it("says a narrower range is not a truer number, where the control is", () => {
+    // Guardrail 2 at the one control that could be read as buying certainty.
+    const region = HTML.slice(HTML.indexOf('id="rooms"'), HTML.indexOf("</form>", HTML.indexOf('id="rooms"')));
+    expect(region).toMatch(/not a truer one/);
+    expect(region).toMatch(/calibrated\s+against nothing/);
+  });
+
+  it("follows the disclosure in document order, like every other region", () => {
+    const disclosure = HTML.indexOf('id="disclosure"');
+    expect(disclosure).toBeGreaterThan(-1);
+    expect(disclosure).toBeLessThan(HTML.indexOf('id="rooms"'));
+  });
+});
 
 describe("the method card is the page the build ships", () => {
   it("is tracked by git", () => {

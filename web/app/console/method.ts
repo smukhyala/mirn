@@ -6,6 +6,7 @@ import {
   type FamilyProbe,
   type FamilyProbeSettings,
 } from "../../engine/job/familyProbe.js";
+import { wilsonInterval, type RateInterval } from "../../engine/job/interval.js";
 import { QUESTIONS, isComparison, type FamilyResolution } from "../../engine/job/questions.js";
 import { meanOf } from "../../engine/job/stats.js";
 import { anchorFor } from "../../ui/labels.js";
@@ -67,12 +68,78 @@ export interface MethodFigure {
 }
 
 /**
+ * How well a count of rooms pins down the rate it is quoting.
+ *
+ * **It is not a second reading and it gets no zero of its own.** It qualifies a figure that already
+ * carries one, and it is rendered inside that figure's own block rather than beside it as a peer:
+ * a separate figure with a separate zero would tell a reader that a second measurement was made,
+ * and none was. Guardrail 6 is discharged by the count it hangs off, once.
+ *
+ * The arithmetic is the engine's, in `interval.ts`, and the reason it is a Wilson score rather than
+ * the textbook one is written out there: the textbook form has no width at all at none of n and at
+ * all of n, which are the two counts this bench produces most often. This module chooses only the
+ * level and the words.
+ */
+export interface RateRange {
+  readonly kind: "rateRange";
+  /** The interval itself, off the engine. Never widened, narrowed or rounded on the way here. */
+  readonly interval: RateInterval;
+  /** Guardrail 2, printed wherever the range is. A narrower range is not a sounder method. */
+  readonly notSoundness: string;
+}
+
+/**
+ * The one level every range on these three surfaces is drawn at.
+ *
+ * One constant rather than three, because three surfaces quoting ranges drawn at different levels
+ * would print numbers a reader would compare across pages and be wrong to. The engine refuses a
+ * level it does not hold, so this is checked rather than trusted.
+ */
+export const RATE_RANGE_CONFIDENCE = 0.95;
+
+/**
+ * What the range says, and — flatly — what it does not.
+ *
+ * Guardrail 2 lives in the second sentence and must survive any tidy-up of the first. A range
+ * describes how far this count would move on more rooms of this same invented crowd. It says
+ * nothing about the two things that actually bound these numbers: that the crowd is calibrated
+ * against nothing, and that a room is not a corridor.
+ */
+export const RANGE_NOT_SOUNDNESS =
+  "A narrower range is a more precisely known number, not a truer one. It says how far this count " +
+  "would move if the same measurement ran on more rooms of the same invented crowd, and nothing " +
+  "at all about whether that crowd resembles a corridor or whether the method is sound.";
+
+/** The sentence the bounds are printed into, in the order its slots are filled. */
+const RANGE_OVER = "Counted over ";
+const RANGE_ROOMS = " rooms, that count is consistent with a true rate anywhere between ";
+const RANGE_AND = " and ";
+const RANGE_SCALE =
+  ", on a scale whose bottom is a method that never clears the line and whose top is one that " +
+  "clears it in every room. Ranges drawn this way aim to cover the true rate in ";
+const RANGE_REPEATS = " of repeats, each on a fresh set of rooms.";
+
+/** The range for a count, at the one level these surfaces use. Built from the two integers that
+ *  are rendered, so the bounds and the fraction above them can never describe different counts. */
+export function rateRangeFor(nCleared: number, nAttempted: number): RateRange {
+  return Object.freeze({
+    kind: "rateRange" as const,
+    interval: wilsonInterval(nCleared, nAttempted, RATE_RANGE_CONFIDENCE),
+    notSoundness: RANGE_NOT_SOUNDNESS,
+  });
+}
+
+/**
  * How the seeds-cleared count is shown, and the two shapes are not interchangeable.
  *
  * `falsePositiveRate` is a rate: the true effect was nothing, the method said something, and the
  * count of seeds where that happened is what a reader should carry away. `notADetection` carries
  * the same two integers and refuses to call them a rate, because the family under it is not
  * making a claim that could be wrong.
+ *
+ * Only the first branch carries a range, and that is the type doing the refusing rather than a
+ * renderer remembering to. A range on the second branch would be a precision claim about a rate
+ * that block exists to say is not a rate.
  */
 export type ClearingBlock =
   | {
@@ -81,6 +148,8 @@ export type ClearingBlock =
       readonly nCleared: number;
       readonly nAttempted: number;
       readonly note: string;
+      /** How well these rooms pin that rate down. A qualifier on the count, never a figure. */
+      readonly range: RateRange;
       /** Seeds on which the TRUE effect cleared the line. Measured; it is nought, and it is the
        *  zero this count is read against. */
       readonly zeroCleared: number;
@@ -291,6 +360,9 @@ export function makeMethodVerdict(init: {
       nCleared: init.probe.nClearedBand,
       nAttempted: init.probe.nAttempted,
       note: RATE_NOTE,
+      // Off the same two integers the fraction above it is rendered from, so the range can never
+      // qualify a count other than the one on screen.
+      range: rateRangeFor(init.probe.nClearedBand, init.probe.nAttempted),
       // Measured, not asserted: the count of rooms whose TRUE effect cleared the drift line. The
       // probe records that per seed, so this is a number off the same eight rooms rather than a
       // nought somebody typed into a sentence.
@@ -368,6 +440,37 @@ function inlineQuantity(doc: Document, host: HTMLElement, value: number, unit: U
   }
 }
 
+/**
+ * The range, into the block of the count it qualifies.
+ *
+ * Exported and called by the two other surfaces that render a rate — the supplied verdict and the
+ * comparison — rather than copied into them. The rendering helpers around it are duplicated in those
+ * files by an older instruction; this one is not, because what it prints is guardrail 2's own
+ * sentence and three copies of that is three chances for one of them to soften.
+ *
+ * It appends paragraphs to the host and creates no wrapper, no heading and no `data-number` of its
+ * own. That is the whole of "not a peer figure": there is nothing here for a reader to read as a
+ * second measurement, and no slot where a second zero could go.
+ */
+export function appendRateRange(doc: Document, host: HTMLElement, range: RateRange): void {
+  const line = doc.createElement("p");
+  line.className = "figure-range";
+  line.appendChild(doc.createTextNode(RANGE_OVER));
+  // Every digit into a value slot, the same slots the sentences around this one use. The bounds are
+  // shares of the rooms rather than lengths, so they carry no unit and none is printed.
+  inlineQuantity(doc, line, range.interval.nAttempted, "count");
+  line.appendChild(doc.createTextNode(RANGE_ROOMS));
+  inlineQuantity(doc, line, range.interval.low, "none");
+  line.appendChild(doc.createTextNode(RANGE_AND));
+  inlineQuantity(doc, line, range.interval.high, "none");
+  line.appendChild(doc.createTextNode(RANGE_SCALE));
+  inlineQuantity(doc, line, range.interval.confidence, "none");
+  line.appendChild(doc.createTextNode(RANGE_REPEATS));
+  host.appendChild(line);
+
+  host.appendChild(element(doc, "p", "figure-range-how", range.notSoundness));
+}
+
 function renderFigure(doc: Document, figure: MethodFigure, name: string): HTMLElement {
   const wrap = doc.createElement("div");
   wrap.className = "method-figure";
@@ -424,6 +527,8 @@ function renderClearing(doc: Document, clearing: ClearingBlock): HTMLElement {
     );
     wrap.appendChild(value);
     wrap.appendChild(element(doc, "p", "figure-note", clearing.note));
+    // Inside this block, under the count it qualifies. Not a peer figure: see `RateRange`.
+    appendRateRange(doc, wrap, clearing.range);
 
     const zero = doc.createElement("p");
     zero.className = "figure-zero";

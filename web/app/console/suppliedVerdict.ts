@@ -4,7 +4,13 @@ import type { FamilyProbeSettings } from "../../engine/job/familyProbe.js";
 import { meanOf } from "../../engine/job/stats.js";
 import type { SuppliedProbe } from "../../engine/job/suppliedProbe.js";
 import { anchorFor } from "../../ui/labels.js";
-import { REFUSAL, type ClearingBlock, type MethodFigure } from "./method.js";
+import {
+  appendRateRange,
+  rateRangeFor,
+  REFUSAL,
+  type ClearingBlock,
+  type MethodFigure,
+} from "./method.js";
 import { formatValue, unitSuffix, type SettingStamp } from "./tile.js";
 
 /**
@@ -39,7 +45,10 @@ import { formatValue, unitSuffix, type SettingStamp } from "./tile.js";
  * ## Reuse, and what had to be written twice
  *
  * `REFUSAL`, `MethodFigure` and `ClearingBlock` come from `method.ts` because they are exported and
- * mean exactly the same thing here. Its rendering helpers — the element/section builders, the
+ * mean exactly the same thing here. So does the range on the clearing count — how loosely these
+ * rooms pin that rate down — which is built and rendered by that module's own two functions rather
+ * than copied into this one: what it prints is guardrail 2's sentence about a narrower range not
+ * meaning a sounder method, and three copies of that would be three chances for one to soften. Its rendering helpers — the element/section builders, the
  * value-slot spans, the figure and stamp renderers — are module-private there, and this file was
  * built under an instruction not to widen that module's surface, so the few that are needed are
  * duplicated below, each marked. They are candidates for hoisting into a shared module, which is a
@@ -484,6 +493,9 @@ export function makeSuppliedVerdict(init: {
     nCleared: probe.nClearedBand,
     nAttempted: probe.nAttempted,
     note: rateNoteFor(probe.nUsed, probe.nAttempted),
+    // How well these rooms pin that rate down, off the same two integers the fraction is rendered
+    // from. It qualifies the count and is not a second finding: it has no zero of its own.
+    range: rateRangeFor(probe.nClearedBand, probe.nAttempted),
     // Measured, not asserted: the count of rooms whose TRUE effect cleared the drift line, off the
     // same rooms, rather than a nought somebody typed into a sentence.
     zeroCleared: probe.nAttempted - probe.nTruthsUnderBand,
@@ -638,6 +650,9 @@ function renderClearing(doc: Document, clearing: SuppliedRateBlock): HTMLElement
   );
   wrap.appendChild(value);
   wrap.appendChild(element(doc, "p", "figure-note", clearing.note));
+  // The method card's own, called rather than copied: the sentence about a narrower range not
+  // meaning a sounder method is guardrail 2's, and one copy of it cannot drift from another.
+  appendRateRange(doc, wrap, clearing.range);
 
   const zero = doc.createElement("p");
   zero.className = "figure-zero";

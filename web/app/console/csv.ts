@@ -27,6 +27,24 @@ import type { DrillCall, HonestCall } from "./drill.js";
  * `web/app/console/state.ts` already document about themselves).
  */
 
+/**
+ * What produced the numbers in a file, as a version somebody can compare against.
+ *
+ * A measurement is only meaningful beside the arithmetic that made it. When a formula changes,
+ * every number taken before the change becomes wrong — not stale, wrong — and the file holding it
+ * says nothing at all about that. It looks exactly as it did the day it was written. So a file with
+ * no version in it is not merely undated: it is **wrong silently**, and the reader who opens it six
+ * months later has no way to find out.
+ *
+ * A version does not make an old number right. It makes an old number checkable, which is the most
+ * a file can offer once it has left the page that produced it.
+ *
+ * It lives here, in one place, and matches `package.json`'s own `version` field. Two version
+ * strings that must agree and are checked by nobody is the drift this repository has removed twice
+ * already; a second one would be the third.
+ */
+export const BENCH_VERSION = "0.1.0";
+
 export const INVENTED_CROWD_DISCLOSURE =
   "Everything in this file is simulated. The crowd is an invented model of pedestrians - invented " +
   "people obeying invented rules - and no number here is a measurement of real pedestrians. What is " +
