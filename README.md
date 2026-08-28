@@ -64,6 +64,24 @@ result you kept. The other four are the referee drill, the method card, the fit 
 working, all described below; none is a step in a sequence, and every one of them is reachable from
 every other at any time.
 
+**What the console actually lets you do.** Thirteen dials, each named for the thing it moves rather
+than for the variable behind it: how much space the robot demands, how many people are in the room,
+how stubbornly they hold their line, how fast the robot may go, how far ahead the forecaster
+guesses. Fifteen readouts behind them — seven always on screen, the rest a tick away — covering what
+the robot really did to the crowd, what a forecaster reports instead, the ordinary gap between two
+runs of the same room, the smallest effect you could tell apart from that gap, the robot's own
+crossing, and how long the crowd took to settle afterwards. Every dial is checked by the suite for
+moving the readout it claims to move, so a control that does nothing is a failing build rather than
+a disappointment.
+
+**Nothing on screen is a stored answer.** Any row of the ledger plays back in the arena: the sweep
+runs in a worker that returns numbers and never trajectories, so selecting a row re-simulates that
+exact run from its key, and a test asserts the rebuild is identical bit for bit on both arms. Any
+view exports as a file whose first line says the crowd is invented, because a file outlives the page
+it came from. The settings travel as a link, and the link carries the recipe and never the results
+— opening one re-runs the simulation at today's code instead of resurrecting a number from a formula
+that may since have changed.
+
 One press of Run executes N axis values × M seeds; a single run is the degenerate 1×1 case of the
 same mechanism. Editing a setting re-simulates a live preview in about 38 ms. A 72-run sweep takes
 about 4.8 seconds.
@@ -307,14 +325,14 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 1,160 browser tests across 85 files, of which 1,118 run without the seven that
+**The numbers.** 1,173 browser tests across 87 files, of which 1,131 run without the seven that
 re-run the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left
 out here on purpose: the last set was measured on one machine and re-measured on another that
 disagreed by 70%, so a single number would be a claim rather than a figure. CI checks the two
 languages independently, then runs a third job for the check no human remembers: that the committed
-fixtures are current and the browser still reproduces them. The built site is four HTML files (8.98,
-58.01, 7.13 and 15.24 kB), one 23.5 kB stylesheet, about 220 kB of script across six chunks, and
-three workers of 46, 47 and 51 kB.
+fixtures are current and the browser still reproduces them. The built site is five HTML files (6.08,
+7.34, 11.76, 15.67 and 58.93 kB), one 25.9 kB stylesheet, about 230 kB of script across nine
+chunks, and four workers of 20, 46, 47 and 50 kB.
 
 ---
 
@@ -375,7 +393,7 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 1160 tests, production build
+npm run check        # typecheck, 1173 tests, production build
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in
@@ -396,7 +414,8 @@ Changing one side alone is a red test, not a judgement call.
 
 ```
 web/            the product
-  index.html    the console; how.html, drill.html, method.html the other three
+  index.html    the console; how.html the working, drill.html the referee drill,
+                method.html the method card, fit.html the fit page
   engine/       sim, contracts, measurement, job — no DOM anywhere in here
   app/          the worker boundary and the console's own state
   ui/           canvas renderers and the palette
