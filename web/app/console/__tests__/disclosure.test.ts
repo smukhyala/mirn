@@ -29,12 +29,13 @@ describe("the console page is the page the build ships", () => {
     expect(run().trim()).toBe("web/index.html");
   });
 
-  it("is an entry point, alongside the working page, the drill, the method card and nothing else", () => {
+  it("is an entry point, alongside the working page, the drill, the method card, the fit page and nothing else", () => {
     const config = readFileSync("vite.config.ts", "utf8");
     expect(config).toContain('index: resolve(__dirname, "web/index.html")');
     expect(config).toContain('how: resolve(__dirname, "web/how.html")');
     expect(config).toContain('drill: resolve(__dirname, "web/drill.html")');
     expect(config).toContain('method: resolve(__dirname, "web/method.html")');
+    expect(config).toContain('fit: resolve(__dirname, "web/fit.html")');
     // Asserting the ABSENCE is still the point, and it is what this test is actually for. A
     // surviving `instrument` entry would mean the build is still emitting a page whose source an
     // earlier task deleted. Both of these outlive the count below on purpose: a count alone goes
@@ -47,13 +48,18 @@ describe("the console page is the page the build ships", () => {
     // deleted fails here rather than at deploy, which is the same defect the `instrument`
     // assertion above catches for one particular name.
     //
-    // Raised from two to three by the drill (web/drill.html), and from three to four by the method
-    // card (web/method.html). The four named `toContain`s above and this exact length together
-    // mean the map is these four pages and nothing else — which is what a `toContain` on its own
-    // would not say. Raising the number without adding the matching `toContain` above would turn
-    // this back into a bare count, which is the thing the two absence assertions exist to outlive.
+    // Raised from two to three by the drill (web/drill.html), from three to four by the method
+    // card (web/method.html), and from four to five by the fit page (web/fit.html). The five named
+    // `toContain`s above and this exact length together mean the map is these five pages and
+    // nothing else — which is what a `toContain` on its own would not say. Raising the number
+    // without adding the matching `toContain` above would turn this back into a bare count, which
+    // is the thing the two absence assertions exist to outlive.
+    //
+    // It has now caught a page three times, which is the argument for the shape rather than for
+    // the number: each of those was a real page arriving, and each time the failure was the thing
+    // that made somebody write the `toContain` beside it.
     const entries = [...config.matchAll(/(\w+): resolve\(__dirname, "([^"]+)"\)/g)];
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(5);
     for (const entry of entries) {
       const page = entry[2] as string;
       expect(existsSync(page), `${page} is an entry point with no source file`).toBe(true);

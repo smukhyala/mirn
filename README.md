@@ -58,11 +58,11 @@ robots, or which published method is wrong. Nothing here is a research result.
 
 ## What is on the page
 
-Four pages, and the console is the one you land on. A settings panel, an arena you can scrub,
+Five pages, and the console is the one you land on. A settings panel, an arena you can scrub,
 seven headline readouts with a column picker for the rest, a sweep curve, and a ledger of every
-result you kept. The other three are the referee drill, the method card and the working, all
-described below; none is a step in a sequence, and every one of them is reachable from every other
-at any time.
+result you kept. The other four are the referee drill, the method card, the fit page and the
+working, all described below; none is a step in a sequence, and every one of them is reachable from
+every other at any time.
 
 One press of Run executes N axis values × M seeds; a single run is the degenerate 1×1 case of the
 same mechanism. Editing a setting re-simulates a live preview in about 38 ms. A 72-run sweep takes
@@ -211,6 +211,51 @@ universal, and that is the only shape of claim a simulator has to offer.
 
 ---
 
+## The fit page
+
+**[Fit the crowd to a recording →](https://smukhyala.github.io/mirn/fit.html)**
+
+Every number elsewhere on this site comes from a crowd calibrated against nothing at all. The
+parameters came from a demonstration and from being measured against each other, and that is the
+largest thing standing between this bench and an instrument: it can show a measurement is
+confounded and it cannot say by how much, because the crowd it says that about was tuned to look
+plausible and fitted to no observation.
+
+So this page takes a recording of real people walking — the four-column format the public
+pedestrian datasets ship in — and asks how far the invented crowd's distribution of walking speeds
+sits from theirs, at each of a range of paces and wobbles. The file is read in your browser and
+goes nowhere. Who each person is groups the samples and is then discarded before anything is
+measured; no name from the file can reach the page and no individual's path is drawn or reported.
+
+**It says which settings your recording actually decides, and that turned out to be the interesting
+part.** A parameter counts as pinned only if moving it across its whole range changes the fit by
+more than the invented crowd differs from *itself* — the same test the console applies to every
+dial. Feed it a recording written out of the simulator at a known walking pace and the fit recovers
+that pace exactly, every time, and reports it as pinned. It reports the wobble as **not** pinned,
+because it isn't: recordings made at a wobble of 1.5 and of 2.5 both fit best near nought, and the
+grid's winner there is an artefact of where the grid was finest. A first version reported that
+winner as a fitted parameter. It was a number that looked measured and was not, which is the exact
+failure the rest of this site argues against.
+
+**It shows no disturbance number, and it cannot compute one.** That is arithmetic, not restraint.
+Every figure this bench reports is a difference between two runs of one room, once with a robot and
+once without — and a corridor cannot be filmed twice. There is no second recording in which the
+same people, on the same day, in the same mood, walked past no robot. A recording has one arm, so
+the quantity this site exists to measure is not in it, and a number claiming otherwise would be the
+confound this project teaches against wearing real data, which makes it worse rather than better.
+
+So the two kinds of number are kept apart by living on different pages, behind different workers,
+over message protocols that cannot carry each other's payloads. A test asserts it over the page's
+source rather than its output, so the guarantee survives whatever the page later renders.
+
+Three sentences sit above every figure there, and the third is the one that matters: a close fit is
+not permission to read this bench's disturbance numbers as measurements of anybody. The whole
+hazard of calibration is that it makes a toy feel like an instrument, and the reader who has just
+been shown that the invented crowd walks like a real one is precisely the reader most likely to
+believe the next number they see.
+
+---
+
 ## How it is kept honest
 
 **Two implementations, one oracle.** Python in `src/mirn/` is the reference for every formula the
@@ -262,7 +307,7 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 1,103 browser tests across 79 files, of which 1,067 run without the six that
+**The numbers.** 1,160 browser tests across 85 files, of which 1,118 run without the seven that
 re-run the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left
 out here on purpose: the last set was measured on one machine and re-measured on another that
 disagreed by 70%, so a single number would be a claim rather than a figure. CI checks the two
@@ -330,7 +375,7 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 1103 tests, production build
+npm run check        # typecheck, 1160 tests, production build
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in
@@ -377,9 +422,11 @@ the method's shape and never about anyone's robot. The moment the *rooms* came f
 this would be a benchmark and the numbers would be about somebody's hardware. The CSV is still an
 export and still never an input format.
 
-**Not a robotics platform.** No ROS, no planner, no dataset loader, no trained model, no physics
-engine. Every request to widen it answers one question: which readout does this move, and what does
-that readout say when the answer is zero?
+**Not a robotics platform.** No ROS, no planner, no trained model, no physics engine. It does now
+read a dataset, which that list used to refuse — and the refusal was narrowed rather than dropped:
+a recording may fit the crowd and check the fit, and may never produce a disturbance number,
+because a corridor cannot be filmed twice. Every request to widen it still answers one question:
+which readout does this move, and what does that readout say when the answer is zero?
 
 ---
 

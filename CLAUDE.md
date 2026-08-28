@@ -5,10 +5,16 @@ contract, and it is the only one — `docs/teaching/authoring.md` governed the n
 pages, and there is no ordering left to govern.
 
 Where this file says "there are no pages", it means the seventeen-page fixed reading order, which
-is gone. Four HTML documents ship: `web/index.html` (the console), `web/how.html` (the arithmetic,
-in sentences), `web/drill.html` (the referee drill) and `web/method.html` (the method card). None of
-them is a step in a sequence — each is reachable at any time from any of the others, and none has to
-be read before the console shows a number.
+is gone. Five HTML documents ship: `web/index.html` (the console), `web/how.html` (the arithmetic,
+in sentences), `web/drill.html` (the referee drill), `web/method.html` (the method card) and
+`web/fit.html` (the fit page). None of them is a step in a sequence — each is reachable at any time
+from any of the others, and none has to be read before the console shows a number.
+
+**`web/fit.html` is apart from the other four in one way that matters.** Every other page shows
+numbers about an invented crowd. That one puts a real recording of real people on one side of a
+comparison, so guardrail 1's second kind of number lives there and only there. It renders no
+disturbance figure and cannot compute one — `fit-dom.test.ts` asserts that over its source, not its
+DOM, because the guarantee has to survive whatever the page later renders.
 
 That last promise is now a test rather than a sentence. It was a sentence for three pages and one
 feature was enough to make it false: the method card shipped linked from the console and to the
@@ -63,14 +69,16 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
 
    **There is now a second kind of number, and this guardrail is about keeping the two apart.**
    Guardrail 11 was amended on 2026-08-27 to let a real pedestrian recording be read in, for fitting
-   the crowd and for checking the fit. A reading off the simulator is still a number about an
+   the crowd and for checking the fit, and `web/fit.html` is where that was built. A reading off the simulator is still a number about an
    invented crowd and still carries the sentence above. A goodness-of-fit figure is not: it has real
    people on one side of it, and reusing the invented-crowd disclosure over it would be false in the
    one direction that matters — it would understate what the number touches.
 
    A surface showing a fit says three things instead: the recording is real, the crowd being
    compared against it is still invented, and a close fit is not permission to read this bench's
-   disturbance numbers as measurements of anybody. The third clause is the load-bearing one. The
+   disturbance numbers as measurements of anybody. Those three are `FIT_DISCLOSURE` in
+   `web/app/console/fitVerdict.ts`, rendered above every figure on that page, and
+   `fitVerdict.test.ts` asserts each clause by its content rather than counting three paragraphs. The third clause is the load-bearing one. The
    whole hazard of calibration is that it makes a toy feel like an instrument, and a reader who has
    just been shown that the invented crowd walks like a real one is exactly the reader most likely
    to believe the next number they see.
@@ -459,8 +467,8 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build
-npm run test                             # 1103 tests across 79 files
-npx vitest run --exclude '**/*.slow.test.ts'   # 1062 of them
+npm run test                             # 1160 tests across 85 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 1118 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -499,14 +507,15 @@ here was never worth trusting.
 **There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
 project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
 project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
-is what the third line above does. The six it drops are `axes.slow.test.ts` (guardrail 3's
+is what the third line above does. The seven it drops are `axes.slow.test.ts` (guardrail 3's
 every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's eight cards
 actually does, measured), `drill-verdict.slow.test.ts` (the whole drill driven card by card),
 `familyProbe.slow.test.ts` (what each method family reads on a world whose answer is exactly
 nothing), `method-run.slow.test.ts` (the method card driven end to end at the shipped settings) and
 `powerCurve.slow.test.ts` (the same families read on six worlds instead of one, which is why it
-alone is most of a minute). All six re-run the simulator many times over, which is why they cost
-what they cost and why none of them can be made fast. So it is a working loop and not the gate.
+alone is most of a minute) and `search.slow.test.ts` (the crowd fitted to a recording, forty-two
+candidates at a time). All seven re-run the simulator many times over, which is why they cost what
+they cost and why none of them can be made fast. So it is a working loop and not the gate.
 
 **The value of the cut has now moved three times, in both directions, and the third move happened
 between two commits on one afternoon.** It once dropped 19 tests to save 9 seconds of 22. On the
@@ -536,9 +545,9 @@ any single number is a floor and not an expectation. Full `npm run check` plus
 
 ## Content
 
-**Four reader-facing surfaces, and what governs each.** This section used to open "there is no
+**Five reader-facing surfaces, and what governs each.** This section used to open "there is no
 prose file", which was true of the console alone and stopped being true the moment a second page
-shipped. The rule it was protecting survives whole; what changed is that it now has to be said four
+shipped. The rule it was protecting survives whole; what changed is that it now has to be said five
 times.
 
 | Surface | Who writes the words | What holds them honest |
@@ -548,7 +557,9 @@ times.
 | The drill's own strings in `web/drill.ts` — `CALL_CLAUSE`, `HONEST_CLAUSE`, `WITHHELD_ZERO_HOW`, the reveal's sentences and `verdictLines` | Hand-written, because they describe a reader's call rather than a measurement, and no catalogue entry has anywhere to put them | `drill-dom.test.ts` runs the identifier regex over the booted page and over every branch of `verdictLines`; the reveal quotes no number the tiles above it are not also showing; `COUNT_WORDS` means no sentence carries a digit for something the catalogue decides |
 | The method card's own strings in `web/app/console/method.ts` — `REFUSAL`, `READING_LABEL`, `READING_ZERO_HOW`, `BAND_LABEL`, `BAND_ZERO_HOW`, `RATE_LABEL`, `RATE_NOTE`, `RATE_ZERO_HOW`, `NON_DETECTION_LABEL`, `NON_DETECTION_NOTE` — plus `suppliedVerdict.ts`'s and `powerVerdict.ts`'s own sets, and the hand-written prose in `web/method.html` | Hand-written, and for the drill's reason: they describe a question somebody arrived with rather than a measurement, so no catalogue entry has anywhere to put them | One scan per surface, and the surfaces have grown to five. `questions.test.ts` runs the identifier regex over the closed question table. `method.test.ts` runs it, and the numeric-literal scan, over every leaf of every family's rendered verdict, with a count guard and a meta-test each. `suppliedVerdict.test.ts` runs both over every branch a reader's own method can end in, including the two constant ones. `powerVerdict.test.ts` runs the identifier regex over both shapes of swept curve, with a count guard. `method-dom.test.ts` runs it over `web/method.html`'s own prose, the way `how.test.ts` does for the working page |
 
-Everything below applies to all four. A hand-written surface is not a licence to write a number
+| The fit page's own strings in `web/app/console/fitVerdict.ts` — `FIT_DISCLOSURE`, `FIT_REFUSAL`, the two notes saying whether a recording decides a setting — plus the hand-written prose in `web/fit.html` | Hand-written, and this is the surface where that matters most: it is the only one with real people on one side of its number, so guardrail 1's ordinary disclosure is not merely absent from it, it would be **wrong** on it | `fitVerdict.test.ts` asserts each of the three required clauses by its content, asserts they render above every figure in document order, and runs the identifier regex over both shapes of verdict with a count guard. `fit-dom.test.ts` runs it over `web/fit.html`'s prose, and asserts over the page's SOURCE that it imports nothing that could compute a disturbance number |
+
+Everything below applies to all five. A hand-written surface is not a licence to write a number
 into a sentence, to name a variable at a reader, or to say something that has not been measured.
 
 **No numeric literal appears in console copy.** Every zero line, band figure and caption renders

@@ -1303,3 +1303,63 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   border-left: 3px solid var(--mirn-ink);
   padding-left: 1rem;
 }
+
+/* --------------------------------------------------------------------------------------------
+ * The fit page: the one surface with real people on one side of its number.
+ *
+ * The disclosure is styled to be read rather than skimmed past — it is the three sentences
+ * guardrail 1 requires above every figure here, and it is never collapsible.
+ * ------------------------------------------------------------------------------------------ */
+
+.fit-disclosure {
+  border-left: 3px solid var(--mirn-ink);
+  padding-left: 1rem;
+  margin-block: 0.9rem;
+  max-width: 42rem;
+}
+
+.fit-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6rem;
+  margin-block: 1.4rem;
+}
+
+.fit-controls .control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mirn-ink-faint);
+}
+
+.fit-controls input {
+  font: inherit;
+  font-size: 0.85rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--mirn-ink);
+  background: var(--mirn-paper);
+  border: 1px solid var(--mirn-rule);
+  padding: 0.4rem 0.5rem;
+}
+
+.fit-parameter {
+  border-top: 1px solid var(--mirn-rule);
+  padding-block: 1rem;
+  max-width: 42rem;
+}
+
+/* A parameter the recording does not decide. Marked so the eye finds it, because the number beside
+   it is the one a reader is most likely to quote and least entitled to. */
+.fit-parameter.fit-unpinned {
+  border-left: 3px solid var(--mirn-ink-faint);
+  padding-left: 1rem;
+}
+
+.fit-parameter .figure-note {
+  max-width: 40rem;
+}

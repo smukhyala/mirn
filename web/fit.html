@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Does the invented crowd walk like this one? — MIRN</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./console.css">
+</head>
+<body class="console">
+<header class="console-masthead">
+  <p class="eyebrow">A bench for one question</p>
+  <h1>Does the invented crowd walk like this one?</h1>
+  <p class="standfirst" id="disclosure">
+    Every other page here shows numbers about an invented crowd, and says so above them. This page
+    is the exception, and it is the only one: it puts a real recording of real people on one side of
+    a comparison. So it says three different things instead, and it says them before any number.
+  </p>
+  <p class="how-backlink"><a href="./how.html">How every number here is worked out</a></p>
+</header>
+
+<main class="console-main">
+  <section class="method-region" aria-labelledby="what-title">
+    <h2 class="region-title" id="what-title">What this does</h2>
+    <p class="verdict-line">
+      Both crowds this bench runs were calibrated against nothing at all. Their parameters came from
+      a demonstration and from being measured against each other, and that is the single largest
+      thing standing between this bench and an instrument: it can show that a measurement is
+      confounded, and it cannot say by how much, because the crowd it says that about was tuned to
+      look plausible and fitted to no observation.
+    </p>
+    <p class="verdict-line">
+      So: hand it a recording of people walking. It runs the invented crowd at each of a range of
+      walking paces and wobbles, and reports how far the crowd's distribution of walking speeds sits
+      from the recording's — and, for each of those two settings, whether your recording actually
+      decides it or merely fails to rule anything out.
+    </p>
+    <p class="verdict-line">
+      <strong>What it will never do is produce a disturbance number.</strong> That is arithmetic
+      rather than caution. Every figure this site reports is a difference between two runs of one
+      room, once with a robot and once without, from the same starting positions and the same
+      wobble. A corridor cannot be filmed twice. There is no second recording in which the same
+      people, on the same day, in the same mood, walked past no robot — so the quantity this whole
+      site exists to measure is not in your file, and a number claiming otherwise would be the
+      confound this project teaches against, wearing real data.
+    </p>
+  </section>
+
+  <section class="method-region" aria-labelledby="file-title">
+    <h2 class="region-title" id="file-title">Your recording</h2>
+    <p class="verdict-line">
+      A text file, one sample per line, four values separated by spaces or commas: the frame number,
+      who it is, and where they were in metres across and metres up. Lines beginning with a hash are
+      ignored, so a file with a header block reads as it stands. This is the shape the public
+      pedestrian datasets are distributed in.
+    </p>
+    <p class="verdict-line">
+      It is read in this browser and goes nowhere. There is no server here to send it to, nothing is
+      saved, and it never enters a link. Who each person is, is used to group the samples and then
+      thrown away before anything is measured — no name from your file can reach this page, and no
+      single person's path is drawn or reported.
+    </p>
+    <div class="fit-controls">
+      <label class="control" for="recording-file">The recording
+        <input id="recording-file" type="file" accept=".txt,.csv,.tsv,text/plain,text/csv">
+      </label>
+      <label class="control" for="frames-per-second">Frames per second it was annotated at
+        <input id="frames-per-second" type="number" min="0.1" max="240" step="0.1" value="2.5">
+      </label>
+    </div>
+    <p class="region-note">
+      Frames are not seconds and nothing here can work out the difference for you. A file annotated
+      at 2.5 frames per second and read as 25 describes a crowd walking at a tenth of its speed,
+      and every fitted number after it is wrong by the same factor without anything looking wrong.
+    </p>
+    <div class="method-run">
+      <button id="fit-run" type="button" disabled>Fit the crowd to this recording</button>
+    </div>
+    <p class="method-status" id="fit-status"></p>
+  </section>
+
+  <!--
+    Empty until a fit has finished. web/fit.ts builds the whole verdict into it, three-clause
+    disclosure first, and takes it down again the moment the file or the frame rate changes.
+  -->
+  <section class="method-result" id="fit-result" aria-labelledby="fit-result-title" hidden>
+    <h2 class="region-title" id="fit-result-title">The fit</h2>
+    <div id="fit-verdict"></div>
+  </section>
+
+  <section class="method-region" aria-labelledby="elsewhere-title">
+    <h2 class="region-title" id="elsewhere-title">The rest of the bench</h2>
+    <p class="verdict-line">
+      Nothing on this page is a disturbance number, and nothing that is one lives here. Those are on
+      <a href="./index.html">the console</a>, where an invented crowd is run twice and the
+      difference between a person's two paths is the robot's effect on them;
+      <a href="./drill.html">the referee drill</a> asks you to call one of those before the second
+      run is shown; <a href="./method.html">the method card</a> measures what a metric of a given
+      shape reads on a world where the answer is exactly nothing; and
+      <a href="./how.html">the working</a> sets out the arithmetic for all of it.
+    </p>
+  </section>
+</main>
+
+<script type="module" src="./fit.ts"></script>
+</body>
+</html>
