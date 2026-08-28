@@ -13,10 +13,10 @@ ruler on the page can be scored against it. The second crowd is there so a findi
 whether it survives one — a result that holds under only one set of invented rules is a fact about
 those rules.
 
-**[Open the console →](https://smukhyala.github.io/mirn/)**
+**Run it locally:** `npm ci && npm run dev`, then open the address it prints. There is no hosted
+copy — the whole site is static files, so a build also opens straight from `dist/`.
 
 [![CI](https://github.com/smukhyala/mirn/actions/workflows/ci.yml/badge.svg)](https://github.com/smukhyala/mirn/actions/workflows/ci.yml)
-[![Deploy](https://github.com/smukhyala/mirn/actions/workflows/pages.yml/badge.svg)](https://github.com/smukhyala/mirn/actions/workflows/pages.yml)
 
 ![Three views: the room being simulated with each person's two paths drawn against each other, the
 readouts each carrying the zero it would read if the answer were nothing, and every ruler measured
@@ -87,7 +87,7 @@ reason stated, because they need a run-to-run band a preview does not buy.
 
 ## The referee drill
 
-**[Try the drill →](https://smukhyala.github.io/mirn/drill.html)**
+**`drill.html`**
 
 A second page, built from the same formulas and computing nothing new: one room, run once, with
 the second run withheld, and a question — did the robot disturb this crowd by more than the
@@ -117,7 +117,7 @@ robot is a toy; the shape of the argument is not specific to either.
 
 ## The method card
 
-**[Score a method →](https://smukhyala.github.io/mirn/method.html)**
+**`method.html`**
 
 The drill scores a reader. This scores a *method*. If you have written a disturbance metric, or are
 about to, answer five closed questions about how it is computed and press one button. You leave with
@@ -213,7 +213,7 @@ universal, and that is the only shape of claim a simulator has to offer.
 
 ## The fit page
 
-**[Fit the crowd to a recording →](https://smukhyala.github.io/mirn/fit.html)**
+**`fit.html`**
 
 Every number elsewhere on this site comes from a crowd calibrated against nothing at all. The
 parameters came from a demonstration and from being measured against each other, and that is the

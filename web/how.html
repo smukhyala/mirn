@@ -118,21 +118,21 @@
   <nav class="how-contents" aria-labelledby="contents-title">
     <h2 class="region-title" id="contents-title">The measurements</h2>
     <ol>
-      <li><a href="#m-true-effect">How far the crowd was moved</a></li>
+      <li><a href="#m-true-effect">How far the robot pushed the crowd</a></li>
       <li><a href="#m-worst-moment">Worst moment</a></li>
-      <li><a href="#m-forecast-report">What a forecaster would report</a></li>
-      <li><a href="#m-forecast-zero">What the forecaster reports when the answer is zero</a></li>
-      <li><a href="#m-band">Ordinary difference between two runs</a></li>
-      <li><a href="#m-band-peak">Widest ordinary difference between two runs</a></li>
-      <li><a href="#m-floor">Smallest effect this crowd could resolve</a></li>
+      <li><a href="#m-forecast-report">What the forecaster reports</a></li>
+      <li><a href="#m-forecast-zero">What the forecaster reports when nothing happened</a></li>
+      <li><a href="#m-band">Normal gap between two runs</a></li>
+      <li><a href="#m-band-peak">Widest normal gap</a></li>
+      <li><a href="#m-floor">Smallest effect you could spot</a></li>
       <li><a href="#m-robot-path">How far the robot travelled</a></li>
-      <li><a href="#m-robot-arrival">How long the robot took to arrive</a></li>
-      <li><a href="#m-extra-path">Extra distance the robot walked because of the treatment</a></li>
+      <li><a href="#m-robot-arrival">How long the robot took</a></li>
+      <li><a href="#m-extra-path">Extra distance the robot walked</a></li>
       <li><a href="#m-time-lost">How much longer people took to settle</a></li>
       <li><a href="#m-clearance">Closest the robot came to anybody</a></li>
-      <li><a href="#m-near-miss">Separate occasions it came closer than the near-miss line</a></li>
-      <li><a href="#m-recovery">How long until the crowd was back inside tolerance</a></li>
-      <li><a href="#m-frechet">Shortest leash between a person's two paths</a></li>
+      <li><a href="#m-near-miss">Near misses</a></li>
+      <li><a href="#m-recovery">How long the crowd took to recover</a></li>
+      <li><a href="#m-frechet">Shortest leash between the two paths</a></li>
     </ol>
   </nav>
 
@@ -146,7 +146,7 @@
     </p>
 
     <article class="how-measure" id="m-true-effect">
-      <h3>How far the crowd was moved</h3>
+      <h3>How far the robot pushed the crowd</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         It reads exactly zero, to the last digit — not nearly zero. Switch off the setting that
@@ -245,7 +245,7 @@
     </p>
 
     <article class="how-measure" id="m-forecast-report">
-      <h3>What a forecaster would report</h3>
+      <h3>What the forecaster reports</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         It does not read zero. On a run where nobody reacts to the robot at all — where the honest
@@ -338,7 +338,7 @@
     </article>
 
     <article class="how-measure" id="m-forecast-zero">
-      <h3>What the forecaster reports when the answer is zero</h3>
+      <h3>What the forecaster reports when nothing happened</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         This readout <em>is</em> that case. It is the same forecaster, run at the same settings, on
@@ -404,7 +404,7 @@
     </p>
 
     <article class="how-measure" id="m-band">
-      <h3>Ordinary difference between two runs</h3>
+      <h3>Normal gap between two runs</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         This is not a reading judged against a zero. It is a zero line itself. Nothing was done to
@@ -463,7 +463,7 @@
     </article>
 
     <article class="how-measure" id="m-band-peak">
-      <h3>Widest ordinary difference between two runs</h3>
+      <h3>Widest normal gap</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         A zero line again, not a reading. It is the same set of robot-free runs as the measurement
@@ -503,7 +503,7 @@
     </article>
 
     <article class="how-measure" id="m-floor">
-      <h3>Smallest effect this crowd could resolve</h3>
+      <h3>Smallest effect you could spot</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         Everything behind this number comes from a single robot-free crowd split in half, so there
@@ -661,7 +661,7 @@
     </article>
 
     <article class="how-measure" id="m-robot-arrival">
-      <h3>How long the robot took to arrive</h3>
+      <h3>How long the robot took</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         Again not a comparison, and again a floor from the geometry: the shortest crossing that
@@ -696,7 +696,7 @@
     </article>
 
     <article class="how-measure" id="m-extra-path">
-      <h3>Extra distance the robot walked because of the treatment</h3>
+      <h3>Extra distance the robot walked</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         Exactly zero. A treatment that changed nothing about the robot's route leaves its two
@@ -831,7 +831,7 @@
     </article>
 
     <article class="how-measure" id="m-near-miss">
-      <h3>Separate occasions it came closer than the near-miss line</h3>
+      <h3>Near misses</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         Exactly zero occasions. A robot that never came closer to anybody than the near-miss line
@@ -875,7 +875,7 @@
     <h2 class="how-group-title" id="group-recovery">Coming back</h2>
 
     <article class="how-measure" id="m-recovery">
-      <h3>How long until the crowd was back inside tolerance</h3>
+      <h3>How long the crowd took to recover</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         Exactly zero. With nothing to recover from, the curve is flat at nought, the tolerance is
@@ -930,7 +930,7 @@
     <h2 class="how-group-title" id="group-other">A different ruler</h2>
 
     <article class="how-measure" id="m-frechet">
-      <h3>Shortest leash between a person's two paths</h3>
+      <h3>Shortest leash between the two paths</h3>
       <p class="how-zero">
         <span class="how-kicker">When the true effect is exactly zero</span>
         Exactly zero. Two identical paths need no leash at all.

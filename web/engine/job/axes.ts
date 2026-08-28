@@ -78,7 +78,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 3,
     step: 0.25,
     defaultValue: 1,
-    note: "At zero the robot is socially invisible: people walk as if it were not there, and the effect on them is exactly nothing.",
+    note: "At zero, people walk as if the robot were not there, so its effect is exactly nothing.",
     writes: Object.freeze(["robot.repulsionScale"]),
     movesColumns: Object.freeze(["trueEffectM", "worstMomentM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -96,7 +96,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 44,
     step: 1,
     defaultValue: 18,
-    note: "A fuller room gives the robot more to push against, and it also makes two runs of the same room differ more, so both the reading and the floor it is judged against move together.",
+    note: "A fuller room gives the robot more to push against, and also makes two runs of the same room differ more. Both move together.",
     writes: Object.freeze(["crowd.nPedestrians"]),
     movesColumns: Object.freeze(["trueEffectM", "forecastReportM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -114,7 +114,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 1.5,
     step: 0.05,
     defaultValue: 0.5,
-    note: "How long a person takes to get back to the speed and direction they wanted. Larger values mean they give way more slowly and recover more slowly.",
+    note: "How long someone takes to get back to the speed and direction they wanted. Higher means they give way more slowly.",
     writes: Object.freeze(["crowd.relaxationTimeS"]),
     movesColumns: Object.freeze(["trueEffectM", "worstMomentM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -132,7 +132,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 3,
     step: 0.1,
     defaultValue: 1.1,
-    note: "How much people wander for no reason at all. It barely touches what the robot actually did, and it moves what a forecaster reports, which is the point.",
+    note: "How much people wander for no reason. It barely changes what the robot did, but it moves what the forecaster reports. That is the point.",
     writes: Object.freeze(["crowd.noiseAmplitude"]),
     movesColumns: Object.freeze(["forecastReportM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -156,7 +156,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     // `axes.slow.test.ts` now asserts every axis's default, minimum and maximum sit on its grid.
     step: 0.01,
     defaultValue: 1.34,
-    note: "In metres per second. It is not monotone: the effect peaks around a strolling pace, so a sentence claiming faster always means more would be false at one end of this dial.",
+    note: "In metres per second. Faster does not always mean more: the effect peaks around a strolling pace, then falls.",
     writes: Object.freeze(["crowd.desiredSpeed"]),
     movesColumns: Object.freeze(["trueEffectM", "forecastReportM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -174,7 +174,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 1.8,
     step: 0.05,
     defaultValue: 1.1,
-    note: "In metres per second. A slow robot barely gets across the room in the time available, which is why the distance it covers moves far more than the effect it has.",
+    note: "In metres per second. A slow robot barely crosses the room in time, so the distance it covers moves far more than its effect.",
     writes: Object.freeze(["robot.maxSpeed"]),
     movesColumns: Object.freeze(["robotPathM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -192,7 +192,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 1,
     step: 0.05,
     defaultValue: 0.15,
-    note: "A sluggish robot commits to a heading and carries it further, which lengthens its route and brings it closer to people. It leaves the crowd's overall displacement almost untouched.",
+    note: "A slow-turning robot holds a heading longer, which lengthens its route and brings it closer to people. The crowd barely moves.",
     writes: Object.freeze(["robot.reactionTimeS"]),
     movesColumns: Object.freeze(["robotPathM", "minClearanceM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -210,7 +210,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 6,
     step: 0.25,
     defaultValue: 0,
-    note: "It buys a longer route, and at the top of this dial the robot may wander so much that it never reaches its goal at all, which is reported as not having arrived rather than as a time.",
+    note: "It buys a longer route. At the top of this dial the robot may wander so much it never arrives at all.",
     writes: Object.freeze(["robot.deflectionWeight"]),
     movesColumns: Object.freeze(["robotPathM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -228,7 +228,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 0.8,
     step: 0.05,
     defaultValue: 0,
-    note: "Error here does not make the robot bump into anyone. It makes it swerve away from people who are not there, which brings it closer to the ones who are.",
+    note: "This does not make the robot bump into anyone. It makes it swerve away from people who are not there, and closer to the ones who are.",
     writes: Object.freeze(["perception.positionSigmaM"]),
     movesColumns: Object.freeze(["minClearanceM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -246,7 +246,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 3,
     step: 0.25,
     defaultValue: 0,
-    note: "How far off the middle of the room the robot's whole crossing is shifted. It moves the start and the goal together, because exposing four raw coordinates is the fastest way to put a goal outside the wall.",
+    note: "How far off the middle of the room the robot's whole crossing is shifted. Start and goal move together, so the goal cannot land outside a wall.",
     writes: Object.freeze(["robot.goalXY", "robot.startXY"]),
     movesColumns: Object.freeze(["worstMomentM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => ({
@@ -268,7 +268,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 80,
     step: 5,
     defaultValue: 40,
-    note: "A short episode ends before the robot has crossed the room. It is also the fastest way to make a worst-moment reading look smaller without changing the physics at all.",
+    note: "A short episode ends before the robot has crossed the room. It is the easiest way to shrink a worst-moment reading without changing the physics.",
     writes: Object.freeze(["nTicks"]),
     movesColumns: Object.freeze(["robotPathM"] as ColumnKey[]),
     apply: (base: RunConfigOverrides, value: number): RunConfigOverrides => {
@@ -286,7 +286,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 3,
     step: 0.1,
     defaultValue: 3,
-    note: "This changes only how the ruler is applied to a run that already happened. The robot has not changed, and re-running the room for it would be wrong as well as slow.",
+    note: "This changes only how the ruler is read against a run that already happened. The robot itself has not changed.",
     writes: Object.freeze(["forecastHorizonSteps"]),
     movesColumns: Object.freeze(["forecastReportM"] as ColumnKey[]),
     apply: (params: MeasurementParams, value: number): MeasurementParams => ({
@@ -304,7 +304,7 @@ export const AXES: Readonly<Record<AxisKey, AxisEntry>> = Object.freeze({
     max: 40,
     step: 0.5,
     defaultValue: 10,
-    note: "Late in the episode everyone has arrived and stopped, and a guess that a stationary person carries straight on is exactly right, so the forecaster reads almost nothing however bad it is. It does not fall smoothly on the way there, because the whole reading rests on one instant: one notch can halve it or grow it by half.",
+    note: "Late on, everyone has arrived and stopped, and guessing that a stopped person keeps still is easy, so the forecaster looks good however bad it is. The whole reading rests on one instant, so one notch can halve it.",
     writes: Object.freeze(["forecastEndStep"]),
     movesColumns: Object.freeze(["forecastReportM"] as ColumnKey[]),
     apply: (params: MeasurementParams, value: number): MeasurementParams => ({
