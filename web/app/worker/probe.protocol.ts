@@ -1,5 +1,6 @@
 import type { FamilyKey } from "../../engine/job/families.js";
 import type { FamilyProbe, FamilyProbeSettings } from "../../engine/job/familyProbe.js";
+import type { PowerCurve } from "../../engine/job/powerCurve.js";
 
 /**
  * The two message unions the method card's worker sends and receives, and nothing else.
@@ -17,13 +18,26 @@ import type { FamilyProbe, FamilyProbeSettings } from "../../engine/job/familyPr
  *
  * `phase` is a sentence a reader sees, so it is written in plain English by `probe.pump.ts` and
  * never carries a code identifier.
+ *
+ * TWO JOBS SHARE THIS WORKER, and the second is here rather than in a worker of its own because it
+ * is the same SHAPE of job: one family, one answer, a few seconds, no ledger and no cancellation
+ * window worth a state machine. The console's axis sweep is genuinely different — a stream of rows
+ * into a ledger — which is why `sweep.worker.ts` stays separate. Nothing here is called a sweep,
+ * for that reason: the word is taken.
  */
 
-export type ToProbeWorker = {
-  readonly kind: "probe";
-  readonly family: FamilyKey;
-  readonly settings: FamilyProbeSettings;
-};
+export type ToProbeWorker =
+  | {
+      readonly kind: "probe";
+      readonly family: FamilyKey;
+      readonly settings: FamilyProbeSettings;
+    }
+  | {
+      /** The same family, read on worlds from nothing up to the console's own maximum push. */
+      readonly kind: "curve";
+      readonly family: FamilyKey;
+      readonly settings: FamilyProbeSettings;
+    };
 
 export type FromProbeWorker =
   | {
@@ -33,4 +47,5 @@ export type FromProbeWorker =
       readonly phase: string;
     }
   | { readonly kind: "probed"; readonly probe: FamilyProbe }
+  | { readonly kind: "curved"; readonly curve: PowerCurve }
   | { readonly kind: "failed"; readonly message: string };

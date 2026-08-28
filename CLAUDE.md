@@ -459,8 +459,8 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build
-npm run test                             # 1060 tests across 75 files
-npx vitest run --exclude '**/*.slow.test.ts'   # 1029 of them
+npm run test                             # 1090 tests across 78 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 1054 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -475,16 +475,20 @@ sentence claiming otherwise. Read them as shape, not as a target to hit:
 
 | | Measured | Where |
 |---|---|---|
-| `npm run test`, 1060 tests | 45.5 s and 45.0 s | cloud container, 2026-08-27 |
-| the `.slow.test.ts` cut, 1029 tests | 27.2 s and 27.3 s | same |
+| `npm run test`, 1090 tests | 92.3 s | cloud container, 2026-08-27, after the sweep landed |
+| the `.slow.test.ts` cut, 1054 tests | 28.4 s | same |
+| `npm run test`, 1060 tests | 45.5 s and 45.0 s | same day, before the sweep |
+| the cut, 1029 tests | 27.2 s and 27.3 s | same |
 | `npm run test`, back when it was 773 tests | 42.8 s | cloud container, 2026-08-26 |
 | the cut, back when it was 742 tests | 35.1 s | same |
 | `pytest -q -m "not slow"`, 275 tests | 35.0 s | same |
 | `npm run test`, back when it was 652 tests | 22 s | the author's own machine |
 
-Two samples are recorded for each of the current rows rather than one, because a single number here
-has twice been the thing that went stale quietly. They agree to within half a second, which is worth
-knowing given the paragraph below says these figures once varied by 70% between repeats.
+The pre-sweep rows carry two samples each, taken back to back, and they agree to within half a
+second — which is worth knowing given the paragraph below says these figures once varied by 70%
+between repeats on one machine. The rows above them are single samples taken the same way. Every
+row is kept rather than replaced, because the whole use of this table is watching a number that
+several commits in a row were confident about turn out to be temporary.
 
 Two of the original figures used to be wrong by a plausible-looking margin, which is the failure
 mode this paragraph exists to name: a timing nobody re-ran is a claim, and the whole point of a
@@ -495,24 +499,25 @@ here was never worth trusting.
 **There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
 project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
 project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
-is what the third line above does. The five it drops are `axes.slow.test.ts` (guardrail 3's
+is what the third line above does. The six it drops are `axes.slow.test.ts` (guardrail 3's
 every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's eight cards
 actually does, measured), `drill-verdict.slow.test.ts` (the whole drill driven card by card),
 `familyProbe.slow.test.ts` (what each method family reads on a world whose answer is exactly
-nothing) and `method-run.slow.test.ts` (the method card driven end to end at the shipped settings).
-All five re-run the simulator many times over, which is why they cost what they cost and why none
-of them can be made fast. So it is a working loop and not the gate.
+nothing), `method-run.slow.test.ts` (the method card driven end to end at the shipped settings) and
+`powerCurve.slow.test.ts` (the same families read on six worlds instead of one, which is why it
+alone is most of a minute). All six re-run the simulator many times over, which is why they cost
+what they cost and why none of them can be made fast. So it is a working loop and not the gate.
 
-**The value of the cut has now moved twice, in both directions, which is the point of re-measuring
-it rather than reasoning about it.** It once dropped 19 tests to save 9 seconds of 22. On the method
-card's commit it dropped 31 to save about 8 of 43, and this file said so and predicted the next
-feature would shrink it further. That prediction was wrong. It now drops the same 31 tests to save
-about 18 seconds of 45 — back to roughly the 40% it started at — because the features that landed
-since added 287 fast tests and not one slow file.
+**The value of the cut has now moved three times, in both directions, and the third move happened
+between two commits on one afternoon.** It once dropped 19 tests to save 9 seconds of 22. On the
+method card's commit it dropped 31 to save about 8 of 43, and this file said so and predicted the
+next feature would shrink it further. That prediction was wrong: it went back up to about 18 of 45.
+Then the sweep landed one slow file, and the cut now drops 36 tests to save about 64 seconds of 92 —
+the largest saving it has ever been, because that single file is most of a minute on its own.
 
-So the line to take from this is not a number about the cut. It is that a documented saving is a
-measurement with a shelf life, and the only reliable thing about the three figures above is that
-each of them was true when it was taken and none of them stayed true. Re-run it before quoting it.
+So the line to take is not any number about the cut. It is that a documented saving is a measurement
+with a shelf life, that the shelf life can be one commit, and that a prediction about it written
+into this file has already been wrong once. Re-run it before quoting it.
 
 The fast pytest loop is real: the tests that dominate the runtime carry `@pytest.mark.slow`, and
 `pyproject.toml` records the measurement the cut-off came from. It skips the divergence property
@@ -541,7 +546,7 @@ times.
 | The console's tiles, columns and controls | The catalogues alone — a `label`, a `zero`, an `assumption` or a `note` on an entry in `web/engine/job/columns.ts` or `web/engine/job/axes.ts`. Both are closed | `columns.test.ts` and `axes.slow.test.ts` run the identifier regex over the catalogue itself, so a column nobody ticked is covered too. `tile.test.ts` renders every column and fails on a numeric literal |
 | `web/how.html` | Hand-written prose, ~1,000 lines of it, the one place the arithmetic is set out in sentences | `web/app/how.test.ts`: the identifier regex over its visible text, and a scan that fails on any measured value in the file. It states formulas and never results, so nothing in it can go stale against a physics change |
 | The drill's own strings in `web/drill.ts` — `CALL_CLAUSE`, `HONEST_CLAUSE`, `WITHHELD_ZERO_HOW`, the reveal's sentences and `verdictLines` | Hand-written, because they describe a reader's call rather than a measurement, and no catalogue entry has anywhere to put them | `drill-dom.test.ts` runs the identifier regex over the booted page and over every branch of `verdictLines`; the reveal quotes no number the tiles above it are not also showing; `COUNT_WORDS` means no sentence carries a digit for something the catalogue decides |
-| The method card's own strings in `web/app/console/method.ts` — `REFUSAL`, `READING_LABEL`, `READING_ZERO_HOW`, `BAND_LABEL`, `BAND_ZERO_HOW`, `RATE_LABEL`, `RATE_NOTE`, `RATE_ZERO_HOW`, `NON_DETECTION_LABEL`, `NON_DETECTION_NOTE` — plus the hand-written prose in `web/method.html` | Hand-written, and for the drill's reason: they describe a question somebody arrived with rather than a measurement, so no catalogue entry has anywhere to put them | Three scans, one per surface. `questions.test.ts` runs the identifier regex over the closed question table. `method.test.ts` runs it, and the numeric-literal scan, over every leaf of every family's rendered verdict, with a count guard and a meta-test each. `method-dom.test.ts` runs it over `web/method.html`'s own prose, the way `how.test.ts` does for the working page |
+| The method card's own strings in `web/app/console/method.ts` — `REFUSAL`, `READING_LABEL`, `READING_ZERO_HOW`, `BAND_LABEL`, `BAND_ZERO_HOW`, `RATE_LABEL`, `RATE_NOTE`, `RATE_ZERO_HOW`, `NON_DETECTION_LABEL`, `NON_DETECTION_NOTE` — plus `suppliedVerdict.ts`'s and `powerVerdict.ts`'s own sets, and the hand-written prose in `web/method.html` | Hand-written, and for the drill's reason: they describe a question somebody arrived with rather than a measurement, so no catalogue entry has anywhere to put them | One scan per surface, and the surfaces have grown to five. `questions.test.ts` runs the identifier regex over the closed question table. `method.test.ts` runs it, and the numeric-literal scan, over every leaf of every family's rendered verdict, with a count guard and a meta-test each. `suppliedVerdict.test.ts` runs both over every branch a reader's own method can end in, including the two constant ones. `powerVerdict.test.ts` runs the identifier regex over both shapes of swept curve, with a count guard. `method-dom.test.ts` runs it over `web/method.html`'s own prose, the way `how.test.ts` does for the working page |
 
 Everything below applies to all four. A hand-written surface is not a licence to write a number
 into a sentence, to name a variable at a reader, or to say something that has not been measured.

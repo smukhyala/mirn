@@ -1,4 +1,4 @@
-import { pumpProbe } from "./probe.pump.js";
+import { pumpCurve, pumpProbe } from "./probe.pump.js";
 import type { FromProbeWorker, ToProbeWorker } from "./probe.protocol.js";
 
 /**
@@ -28,10 +28,15 @@ scope.addEventListener("message", (event: MessageEvent<ToProbeWorker>) => {
     return;
   }
   running = true;
-  pumpProbe(event.data.family, event.data.settings, {
+  const port = {
     postMessage: (out: FromProbeWorker): void => {
       scope.postMessage(out);
     },
-  });
+  };
+  if (event.data.kind === "curve") {
+    pumpCurve(event.data.family, event.data.settings, port);
+  } else {
+    pumpProbe(event.data.family, event.data.settings, port);
+  }
   running = false;
 });

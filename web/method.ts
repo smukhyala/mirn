@@ -32,6 +32,8 @@ import { downloadCsv } from "./app/console/table.js";
 import { makeMethodVerdict, renderMethodVerdict } from "./app/console/method.js";
 import { decodeMethod, encodeMethod } from "./app/console/permalink.js";
 import { makeProbeClient, probePortFor, spawnProbeWorker } from "./app/worker/probe.client.js";
+import { makePowerVerdict, renderPowerVerdict } from "./app/console/powerVerdict.js";
+import type { PowerCurve } from "./engine/job/powerCurve.js";
 
 /**
  * The method card: five closed questions, one button, and what a method of that shape reads on a
@@ -263,6 +265,8 @@ export function bootMethodCard(doc: Document): void {
   const verdictHost = el<HTMLDivElement>(doc, "verdict");
   const comparisonResult = el<HTMLElement>(doc, "comparison-result");
   const comparisonHost = el<HTMLDivElement>(doc, "comparison-verdict");
+  const curveResult = el<HTMLElement>(doc, "curve-result");
+  const curveHost = el<HTMLDivElement>(doc, "curve-verdict");
 
   /**
    * The reader's own row, if they have run their own metric on this visit.
@@ -403,6 +407,16 @@ export function bootMethodCard(doc: Document): void {
           show(probe, asked, askedSettings);
           finish(false);
         },
+        // This route never asks for a sweep, so a sweep coming back means the worker answered a
+        // question nobody put to it. Said out loud rather than dropped: a verdict quietly built
+        // from the wrong measurement is the failure this page exists to teach against.
+        onCurved: (): void => {
+          clear(status);
+          status.textContent =
+            "The measurement came back as a sweep across settings, which is not what this route " +
+            "asked for, so nothing is shown rather than a verdict built from the wrong run.";
+          finish(true);
+        },
         onFailed: (message: string): void => {
           clear(status);
           status.textContent = `The measurement stopped: ${message}`;
@@ -438,6 +452,8 @@ export function bootMethodCard(doc: Document): void {
     { result: comparisonResult, host: comparisonHost },
     (): SuppliedProbe | null => supplied,
   );
+
+  bootPowerCurve(doc, { result: curveResult, host: curveHost });
 
   /**
    * The file is built from what produced the numbers on screen, never from a fresh call.
@@ -879,6 +895,15 @@ function bootComparison(
           }
           show();
         },
+        // As on the questionnaire route: this one asks for counts on one world and a sweep would
+        // be an answer to a different question.
+        onCurved: (): void => {
+          clear(status);
+          status.textContent =
+            "The measurement came back as a sweep across settings, which is not what the " +
+            "comparison asked for, so no table is shown rather than one built from the wrong run.";
+          finish(true);
+        },
         onFailed: (message: string): void => {
           clear(status);
           status.textContent = `The measurement stopped: ${message}`;
@@ -893,6 +918,91 @@ function bootComparison(
     takeDown,
     onScreen: (): { readonly comparison: Comparison; readonly ranAt: FamilyProbeSettings } | null =>
       onScreen,
+  });
+}
+
+/**
+ * The sweep region: one ruler, read on worlds from nothing up to the console's own maximum push.
+ *
+ * A region of its own rather than a fourth branch of the comparison, because it answers a different
+ * question and costs a different amount. The comparison runs four rulers on one world; this runs
+ * one ruler on six, so it is the same rooms over again at each setting and the page has to say so
+ * before a reader presses it.
+ *
+ * Which ruler it sweeps is the paired construction, always, and that is not a placeholder. The
+ * point of the table is what a curve looks like when a ruler works, set against the flat one a
+ * reader has just seen their own family produce; sweeping whichever family the questionnaire
+ * resolved to would leave a reader whose method is confounded with two flat tables and nothing to
+ * read either against.
+ */
+function bootPowerCurve(
+  doc: Document,
+  hosts: { readonly result: HTMLElement; readonly host: HTMLDivElement },
+): void {
+  const runButton = el<HTMLButtonElement>(doc, "curve-run");
+  const status = el<HTMLParagraphElement>(doc, "curve-status");
+
+  let running = false;
+  let client: ReturnType<typeof makeProbeClient> | null = null;
+
+  const takeDown = (): void => {
+    hosts.result.hidden = true;
+    clear(hosts.host);
+  };
+
+  const finish = (keepStatus: boolean): void => {
+    running = false;
+    runButton.disabled = false;
+    if (!keepStatus) {
+      clear(status);
+    }
+  };
+
+  runButton.addEventListener("click", () => {
+    if (running) {
+      return;
+    }
+    running = true;
+    runButton.disabled = true;
+    // The table on screen belongs to the run that produced it, so it comes down before the next
+    // one starts rather than sitting above a measurement in progress.
+    takeDown();
+    // Read at the press, like every other route here: a count captured at boot would measure every
+    // sweep at whatever the page opened with, however often the reader changed it.
+    const ranAt = settingsNow();
+
+    if (client === null) {
+      client = makeProbeClient(probePortFor(spawnProbeWorker()), {
+        onProgress: (roomsDone: number, roomsTotal: number, phase: string): void => {
+          clear(status);
+          status.appendChild(element(doc, "span", "status-count", String(roomsDone)));
+          status.appendChild(element(doc, "span", "status-of", " of "));
+          status.appendChild(element(doc, "span", "status-count", String(roomsTotal)));
+          status.appendChild(element(doc, "span", "status-phase", ` rooms done — ${phase}`));
+        },
+        // This route asks only for a sweep, so a single-world count coming back is the same kind
+        // of mismatch the other two routes refuse, in the other direction.
+        onProbed: (): void => {
+          clear(status);
+          status.textContent =
+            "The measurement came back as a count on one world rather than a sweep across " +
+            "settings, so no table is shown rather than one built from the wrong run.";
+          finish(true);
+        },
+        onCurved: (curve: PowerCurve): void => {
+          clear(hosts.host);
+          hosts.host.appendChild(renderPowerVerdict(doc, makePowerVerdict(curve)));
+          hosts.result.hidden = false;
+          finish(false);
+        },
+        onFailed: (message: string): void => {
+          clear(status);
+          status.textContent = `The sweep stopped: ${message}`;
+          finish(true);
+        },
+      });
+    }
+    client.startCurve("pairedShared", ranAt);
   });
 }
 
