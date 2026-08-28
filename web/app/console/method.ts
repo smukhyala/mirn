@@ -11,6 +11,14 @@ import { QUESTIONS, isComparison, type FamilyResolution } from "../../engine/job
 import { meanOf } from "../../engine/job/stats.js";
 import { anchorFor } from "../../ui/labels.js";
 import { formatValue, unitSuffix, type SettingStamp } from "./tile.js";
+import {
+  element,
+  inlineQuantity,
+  part,
+  quantity,
+  renderFigure,
+  renderStamps,
+} from "./verdictParts.js";
 
 /**
  * The method card's verdict: what the reader leaves with, and what they are refused.
@@ -396,50 +404,6 @@ export function makeMethodVerdict(init: {
   });
 }
 
-function element(doc: Document, tag: string, className: string, content: string): HTMLElement {
-  const node = doc.createElement(tag);
-  node.className = className;
-  if (content.length > 0) {
-    node.textContent = content;
-  }
-  return node;
-}
-
-function part(doc: Document, name: string, heading: string): HTMLElement {
-  const section = doc.createElement("section");
-  section.className = "verdict-part";
-  section.setAttribute("data-part", name);
-  if (heading.length > 0) {
-    section.appendChild(element(doc, "h3", "verdict-part-title", heading));
-  }
-  return section;
-}
-
-/**
- * A value and its unit, in their own spans.
- *
- * Every digit a reader sees on this page lives inside one of these, and `method-dom.test.ts` scans
- * the rendered verdict for a digit anywhere else. That is the mechanical half of "no numeric
- * literal appears in console copy": a caption that quoted a figure into its own sentence would
- * fail rather than sit there outliving the settings that produced it.
- */
-function quantity(doc: Document, host: HTMLElement, value: number, unit: UnitKey): void {
-  host.appendChild(element(doc, "span", "figure-number", formatValue(value, unit)));
-  const suffix = unitSuffix(unit);
-  if (suffix.length > 0) {
-    host.appendChild(element(doc, "span", "figure-unit", suffix));
-  }
-}
-
-/** The same value and unit, at reading size rather than headline size, for use inside a sentence. */
-function inlineQuantity(doc: Document, host: HTMLElement, value: number, unit: UnitKey): void {
-  host.appendChild(element(doc, "span", "figure-inline", formatValue(value, unit)));
-  const suffix = unitSuffix(unit);
-  if (suffix.length > 0) {
-    host.appendChild(element(doc, "span", "figure-unit", suffix));
-  }
-}
-
 /**
  * The range, into the block of the count it qualifies.
  *
@@ -469,33 +433,6 @@ export function appendRateRange(doc: Document, host: HTMLElement, range: RateRan
   host.appendChild(line);
 
   host.appendChild(element(doc, "p", "figure-range-how", range.notSoundness));
-}
-
-function renderFigure(doc: Document, figure: MethodFigure, name: string): HTMLElement {
-  const wrap = doc.createElement("div");
-  wrap.className = "method-figure";
-  wrap.setAttribute("data-number", name);
-  wrap.appendChild(element(doc, "p", "figure-label", figure.label));
-
-  const value = doc.createElement("p");
-  value.className = "figure-value";
-  quantity(doc, value, figure.value, figure.unit);
-  wrap.appendChild(value);
-
-  if (figure.anchor !== null) {
-    wrap.appendChild(element(doc, "p", "figure-anchor", figure.anchor));
-  }
-
-  const zero = doc.createElement("p");
-  zero.className = "figure-zero";
-  zero.appendChild(element(doc, "span", "figure-zero-value", formatValue(figure.zeroValue, figure.unit)));
-  const suffix = unitSuffix(figure.unit);
-  if (suffix.length > 0) {
-    zero.appendChild(element(doc, "span", "figure-zero-unit", suffix));
-  }
-  zero.appendChild(element(doc, "span", "figure-zero-how", figure.zeroHow));
-  wrap.appendChild(zero);
-  return wrap;
 }
 
 /**
@@ -556,23 +493,6 @@ function renderClearing(doc: Document, clearing: ClearingBlock): HTMLElement {
   wrap.appendChild(plain);
   wrap.appendChild(element(doc, "p", "figure-note", clearing.note));
   return wrap;
-}
-
-function renderStamps(doc: Document, stamps: readonly SettingStamp[]): HTMLElement {
-  const row = doc.createElement("p");
-  row.className = "method-stamps";
-  for (const entry of stamps) {
-    const wrap = doc.createElement("span");
-    wrap.className = "stamp";
-    wrap.appendChild(element(doc, "span", "stamp-label", entry.label));
-    wrap.appendChild(element(doc, "span", "stamp-value", formatValue(entry.value, entry.unit)));
-    const suffix = unitSuffix(entry.unit);
-    if (suffix.length > 0) {
-      wrap.appendChild(element(doc, "span", "stamp-unit", suffix));
-    }
-    row.appendChild(wrap);
-  }
-  return row;
 }
 
 export function renderMethodVerdict(doc: Document, verdict: MethodVerdict): HTMLElement {

@@ -459,7 +459,7 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build
-npm run test                             # 1098 tests across 78 files
+npm run test                             # 1103 tests across 79 files
 npx vitest run --exclude '**/*.slow.test.ts'   # 1062 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls

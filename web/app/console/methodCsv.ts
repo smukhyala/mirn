@@ -10,6 +10,7 @@ import type { PowerCurve, PowerSeed } from "../../engine/job/powerCurve.js";
 import type { SuppliedProbe, SuppliedProbeSeed } from "../../engine/job/suppliedProbe.js";
 import type { Comparison, ComparisonRow } from "./comparison.js";
 import { BENCH_VERSION, INVENTED_CROWD_DISCLOSURE, crowdModelLine } from "./csv.js";
+import { csvField, formatValue, unitSuffix } from "./csvFormat.js";
 
 /**
  * The method card's and the comparison's exports, and nothing else.
@@ -54,48 +55,11 @@ import { BENCH_VERSION, INVENTED_CROWD_DISCLOSURE, crowdModelLine } from "./csv.
 /* --------------------------------------------------------------------------------------------
  * Formatting.
  *
- * `csvField`, `formatValue` and `unitSuffix` are the shape of `csv.ts`'s own, which are
- * module-private there. They are duplicated rather than exported from it, because this file was
- * built under an instruction not to restructure that module. The duplication is deliberate and
- * marked: if they are ever hoisted into a shared module, both call sites move together or neither
- * does. The rules themselves — three places for a metre, two for a second, a count that lets its
- * own value decide — are not re-decided here; they are copied, so the two exports round a number
- * the same way.
+ * `csvField`, `formatValue` and `unitSuffix` were duplicated here from `csv.ts` and now come from
+ * `csvFormat.ts`, which both files import. The rounding rules are decided there once, so the two
+ * exports cannot come to round a number differently — which they had already started to, in the
+ * comments if not yet in the code.
  * ------------------------------------------------------------------------------------------ */
-
-function csvField(text: string): string {
-  if (text.includes(",") || text.includes('"') || text.includes("\n")) {
-    return `"${text.replaceAll('"', '""')}"`;
-  }
-  return text;
-}
-
-/** An unmeasured value is an empty cell. Never the three letters, and never a zero. */
-function formatValue(unit: UnitKey, value: number): string {
-  if (!Number.isFinite(value)) {
-    return "";
-  }
-  if (unit === "metres") {
-    return value.toFixed(3);
-  }
-  if (unit === "seconds") {
-    return value.toFixed(2);
-  }
-  if (unit === "count" || unit === "people") {
-    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
-  }
-  if (unit === "ratio") {
-    return value.toFixed(3);
-  }
-  return String(value);
-}
-
-function unitSuffix(unit: UnitKey): string {
-  if (unit === "none") {
-    return "";
-  }
-  return ` (${unit})`;
-}
 
 /** A seed is an integer that names a room, not a measurement, so it is written out whole. */
 function seedField(seed: number): string {

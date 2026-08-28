@@ -4,6 +4,7 @@ import type { PowerCurve, PowerLevel } from "../../engine/job/powerCurve.js";
 import type { UnitKey } from "../../engine/job/columns.js";
 import { anchorFor } from "../../ui/labels.js";
 import { formatValue, unitSuffix } from "./tile.js";
+import { element } from "./verdictParts.js";
 
 /**
  * The sweep, rendered: what the robot really did at each setting, and whether the ruler noticed.
@@ -139,13 +140,6 @@ export function makePowerVerdict(curve: PowerCurve): PowerVerdict {
  * Rendering. The helpers below are the shape of `method.ts`'s own, which are module-private there;
  * see the note in `suppliedVerdict.ts`. If they are ever hoisted, all three call sites move.
  * ------------------------------------------------------------------------------------------- */
-
-function element(doc: Document, tag: string, className: string, content: string): HTMLElement {
-  const node = doc.createElement(tag);
-  node.className = className;
-  node.textContent = content;
-  return node;
-}
 
 /** A value and its unit in their own spans, so a scan for numbers in copy can tell them apart. */
 function cellValue(doc: Document, host: HTMLElement, value: number, unit: UnitKey): void {
