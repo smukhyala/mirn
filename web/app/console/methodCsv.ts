@@ -6,6 +6,7 @@ import type {
   FamilyProbeSeed,
   FamilyProbeSettings,
 } from "../../engine/job/familyProbe.js";
+import type { PowerCurve, PowerSeed } from "../../engine/job/powerCurve.js";
 import type { SuppliedProbe, SuppliedProbeSeed } from "../../engine/job/suppliedProbe.js";
 import type { Comparison, ComparisonRow } from "./comparison.js";
 import { BENCH_VERSION, INVENTED_CROWD_DISCLOSURE, crowdModelLine } from "./csv.js";
@@ -13,7 +14,7 @@ import { BENCH_VERSION, INVENTED_CROWD_DISCLOSURE, crowdModelLine } from "./csv.
 /**
  * The method card's and the comparison's exports, and nothing else.
  *
- * This is `csv.ts` pointed at three other measurements. It is a pure module on purpose: every
+ * This is `csv.ts` pointed at four other measurements. It is a pure module on purpose: every
  * function here takes data and returns a string, there is no `Document` in it, no `Blob`, no
  * anchor and no download. The page owns handing a file to a reader; this file owns what is in the
  * file, and the two are separable because one of them is worth testing on its own.
@@ -25,7 +26,7 @@ import { BENCH_VERSION, INVENTED_CROWD_DISCLOSURE, crowdModelLine } from "./csv.
  * above the table rather than beneath it. A spreadsheet has none of that. It gets opened six months
  * later by somebody who never saw the page, on a machine that has never run this bench, so each of
  * those obligations has to be met in the file's own first lines. In order, and in every one of the
- * three exports:
+ * four exports:
  *
  *   1. the invented-crowd disclosure, on line one, reused from `csv.ts` and never rewritten here
  *      (guardrail 1: a file outlives the page it came from);
@@ -408,6 +409,126 @@ export function comparisonCsv(comparison: Comparison, settings: FamilyProbeSetti
   // a reader cannot see, which is the failure `makeComparison` refuses on the page.
   for (const row of comparison.notDetecting) {
     rows.push([...comparisonRowFields(row)]);
+  }
+
+  return assemble(head, header, rows);
+}
+
+
+/* --------------------------------------------------------------------------------------------
+ * The sweep.
+ *
+ * One row per room per dial position — the raw rooms, not the six aggregated levels. A file of
+ * aggregates is a file somebody has to trust; a file of rooms is one they can re-count. Every
+ * figure on the page is recoverable from these rows, and the room-by-room fact the page turns three
+ * counts on — whether THIS room had anything in it to find — is a column here rather than something
+ * a reader has to infer from a mean.
+ * ------------------------------------------------------------------------------------------ */
+
+const CURVE_ROWS_NOTE =
+  "one row per room per setting of the robot's push, in the order they were run. The counts on the " +
+  "page are these rows grouped by setting, so they can be recomputed from this file rather than " +
+  "taken on trust";
+
+const PUSH_HEADING = "How much space the robot demands, against its usual";
+
+const SOMETHING_HEADING = "There was something to find in that room";
+
+const OUTCOME_HEADING = "What the ruler did about it";
+
+/**
+ * The zero row's note, and the reason this export needs one the other three do not.
+ *
+ * The other exports are taken on a single world and say so once. This one holds six, and the whole
+ * table is read against the rows where the push is nought — which are the same rooms the method
+ * card's false-positive count is taken on, bitwise, not merely rooms like them. A reader opening
+ * this file months later has no page to tell them that.
+ */
+const CURVE_ZERO_NOTE =
+  "the rows where the push is 0 are the world the method card's false-positive count is taken on: " +
+  "the robot demands no space, nobody is moved, and the true effect in every one of those rooms is " +
+  "exactly nothing. Every other row is read against them";
+
+const CURVE_COUNTS_NOTE =
+  "a room only offered something to find when the robot moved that crowd by more than two runs of " +
+  "that room differ on their own, which is decided room by room and not by the setting. So a " +
+  "cleared line in a room with nothing in it is a false alarm however hard the robot was pushing, " +
+  "and pooling the two would report a ruler that fires constantly as a good detector";
+
+const OUTCOME_FOUND = "found it";
+const OUTCOME_MISSED = "missed it";
+const OUTCOME_FALSE_ALARM = "called an empty room";
+const OUTCOME_CORRECT_PASS = "correctly said nothing";
+
+/**
+ * Which of the four things happened in one room, in words.
+ *
+ * Four outcomes and no fifth, and the pair a rate would have merged — "found it" and "called an
+ * empty room" — are named apart here for the reason the page keeps them in separate columns. A
+ * room the ruler could not measure gets an empty cell rather than a fifth word: it is not an
+ * outcome of the ruler, and the reason column beside it says what happened instead.
+ */
+function outcomeField(room: PowerSeed): string {
+  if (room.reading.availability.kind !== "measured") {
+    return "";
+  }
+  if (room.truthOverBand) {
+    return room.clearedBand ? OUTCOME_FOUND : OUTCOME_MISSED;
+  }
+  return room.clearedBand ? OUTCOME_FALSE_ALARM : OUTCOME_CORRECT_PASS;
+}
+
+/** What the ruler could not read on one room of the sweep, in the same words the probe uses. */
+function curveReasonOf(room: PowerSeed): string {
+  const availability = room.reading.availability;
+  if (availability.kind === "censored") {
+    return `censored: ${availability.why}`;
+  }
+  if (availability.kind === "notApplicable") {
+    return `not applicable: ${availability.why}`;
+  }
+  return "";
+}
+
+export function powerCurveCsv(curve: PowerCurve, settings: FamilyProbeSettings): string {
+  const family = FAMILIES[curve.familyKey];
+  const head: string[] = [...preamble(settings, CURVE_ROWS_NOTE)];
+  head.push(`# the ruler: ${family.name}`);
+  head.push(`# what it does: ${family.whatItIs}`);
+  head.push(`# ${CURVE_ZERO_NOTE}`);
+  head.push(`# ${CURVE_COUNTS_NOTE}`);
+
+  const suffix = unitSuffix(curve.unit);
+  const header: string[] = [
+    csvField(PUSH_HEADING),
+    csvField(ROOM_SEED_HEADING),
+    csvField(`${TRUTH_HEADING}${unitSuffix("metres")}`),
+    csvField(`What the ruler read${suffix}`),
+    csvField(`${DRIFT_HEADING}${unitSuffix("metres")}`),
+    csvField(SOMETHING_HEADING),
+    csvField(CLEARED_HEADING),
+    csvField(OUTCOME_HEADING),
+    csvField(WHY_HEADING),
+  ];
+
+  const rows: string[][] = [];
+  for (const level of curve.levels) {
+    for (const room of level.perSeed) {
+      const measured = room.reading.availability.kind === "measured";
+      rows.push([
+        formatValue("ratio", level.pushStrength),
+        seedField(room.seed),
+        formatValue("metres", room.truthM),
+        measured ? formatValue(curve.unit, room.reading.value) : "",
+        formatValue("metres", room.bandM),
+        // Not run through `clearedField`: whether there was anything to find is a fact about the
+        // ROOM, known whether or not the ruler managed to answer, so it is never left empty.
+        room.truthOverBand ? CLEARED_YES : CLEARED_NO,
+        clearedField(measured, room.clearedBand),
+        csvField(outcomeField(room)),
+        csvField(curveReasonOf(room)),
+      ]);
+    }
   }
 
   return assemble(head, header, rows);

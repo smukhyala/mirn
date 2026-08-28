@@ -459,8 +459,8 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build
-npm run test                             # 1090 tests across 78 files
-npx vitest run --exclude '**/*.slow.test.ts'   # 1054 of them
+npm run test                             # 1098 tests across 78 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 1062 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -475,8 +475,8 @@ sentence claiming otherwise. Read them as shape, not as a target to hit:
 
 | | Measured | Where |
 |---|---|---|
-| `npm run test`, 1090 tests | 92.3 s | cloud container, 2026-08-27, after the sweep landed |
-| the `.slow.test.ts` cut, 1054 tests | 28.4 s | same |
+| `npm run test`, 1098 tests | 92.3 s at 1090 tests | cloud container, 2026-08-27, after the sweep landed |
+| the `.slow.test.ts` cut, 1062 tests | 28.4 s at 1054 tests | same |
 | `npm run test`, 1060 tests | 45.5 s and 45.0 s | same day, before the sweep |
 | the cut, 1029 tests | 27.2 s and 27.3 s | same |
 | `npm run test`, back when it was 773 tests | 42.8 s | cloud container, 2026-08-26 |

@@ -180,7 +180,9 @@ information.
 Hits, misses and false alarms are three counts and never one rate. Whether a room had anything to
 find is decided room by room rather than by the setting, so pooling them would let a ruler that
 calls every room look like a perfect detector at exactly the settings where most rooms happen to
-contain something.
+contain something. The export is one row per room per setting rather than the six aggregated
+levels, so every count on the page can be re-derived from the file instead of taken on trust, and
+each row names which of the four things happened in that room in words.
 
 **How well the rate is known, and what it cost to know it better.** Run 8, 16 or 32 rooms — the
 first 8 of 32 are the same 8, so the count buys precision rather than a different measurement — and
@@ -260,7 +262,7 @@ have is named in plain English above the panel rather than silently rounded off.
 source for `localStorage`, `IndexedDB`, cookies, `fetch` and `WebSocket`, and carries a canary and
 a meta-test so the guard cannot rot.
 
-**The numbers.** 1,090 browser tests across 78 files, of which 1,054 run without the six that
+**The numbers.** 1,098 browser tests across 78 files, of which 1,062 run without the six that
 re-run the simulator. 298 Python tests, of which 275 run without the heavy nulls. Timings are left
 out here on purpose: the last set was measured on one machine and re-measured on another that
 disagreed by 70%, so a single number would be a claim rather than a figure. CI checks the two
@@ -328,7 +330,7 @@ way: break the code on purpose and check whether the suite notices.
 ```bash
 npm install
 npm run dev          # open the address it prints
-npm run check        # typecheck, 1090 tests, production build
+npm run check        # typecheck, 1098 tests, production build
 ```
 
 The oracle lives in a virtualenv and nothing from it is on PATH, so its commands are spelled out in

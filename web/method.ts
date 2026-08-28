@@ -26,6 +26,7 @@ import { makeComparison, renderComparison, type Comparison } from "./app/console
 import {
   comparisonCsv,
   familyProbeCsv,
+  powerCurveCsv,
   suppliedProbeCsv,
 } from "./app/console/methodCsv.js";
 import { downloadCsv } from "./app/console/table.js";
@@ -453,7 +454,15 @@ export function bootMethodCard(doc: Document): void {
     (): SuppliedProbe | null => supplied,
   );
 
-  bootPowerCurve(doc, { result: curveResult, host: curveHost });
+  const curve = bootPowerCurve(doc, { result: curveResult, host: curveHost });
+
+  el<HTMLButtonElement>(doc, "curve-download").addEventListener("click", () => {
+    const built = curve.onScreen();
+    if (built === null) {
+      return;
+    }
+    downloadCsv(doc, "mirn-sweep.csv", powerCurveCsv(built.curve, built.ranAt));
+  });
 
   /**
    * The file is built from what produced the numbers on screen, never from a fresh call.
@@ -491,6 +500,9 @@ export function bootMethodCard(doc: Document): void {
     clear(verdictHost);
     onScreen = null;
     comparison.takeDown();
+    // And the sweep, for the same reason and with the same force: every row of it was measured at
+    // the old count, and its first row is the one the counts above are read against.
+    curve.takeDown();
     // The reader's own row is dropped too, and this is the subtle one. It was measured at the old
     // count, so offering it to a comparison run at the new one would put a row of a different
     // denominator beside the rest — `makeComparison` refuses exactly that, and the page should not
@@ -935,19 +947,32 @@ function bootComparison(
  * resolved to would leave a reader whose method is confounded with two flat tables and nothing to
  * read either against.
  */
+interface CurveRegion {
+  readonly takeDown: () => void;
+  readonly onScreen: () => {
+    readonly curve: PowerCurve;
+    readonly ranAt: FamilyProbeSettings;
+  } | null;
+}
+
 function bootPowerCurve(
   doc: Document,
   hosts: { readonly result: HTMLElement; readonly host: HTMLDivElement },
-): void {
+): CurveRegion {
   const runButton = el<HTMLButtonElement>(doc, "curve-run");
   const status = el<HTMLParagraphElement>(doc, "curve-status");
 
   let running = false;
   let client: ReturnType<typeof makeProbeClient> | null = null;
+  // The file is built from what produced the table on screen, never from a fresh call, so a reader
+  // who changes a control between running and downloading gets the run they are looking at.
+  let onScreen: { readonly curve: PowerCurve; readonly ranAt: FamilyProbeSettings } | null = null;
+  let askedAt: FamilyProbeSettings = settingsNow();
 
   const takeDown = (): void => {
     hosts.result.hidden = true;
     clear(hosts.host);
+    onScreen = null;
   };
 
   const finish = (keepStatus: boolean): void => {
@@ -968,8 +993,9 @@ function bootPowerCurve(
     // one starts rather than sitting above a measurement in progress.
     takeDown();
     // Read at the press, like every other route here: a count captured at boot would measure every
-    // sweep at whatever the page opened with, however often the reader changed it.
-    const ranAt = settingsNow();
+    // sweep at whatever the page opened with, however often the reader changed it. Held outside
+    // the press, because the handler that files it away runs long after this listener returns.
+    askedAt = settingsNow();
 
     if (client === null) {
       client = makeProbeClient(probePortFor(spawnProbeWorker()), {
@@ -992,6 +1018,7 @@ function bootPowerCurve(
         onCurved: (curve: PowerCurve): void => {
           clear(hosts.host);
           hosts.host.appendChild(renderPowerVerdict(doc, makePowerVerdict(curve)));
+          onScreen = { curve, ranAt: askedAt };
           hosts.result.hidden = false;
           finish(false);
         },
@@ -1002,7 +1029,13 @@ function bootPowerCurve(
         },
       });
     }
-    client.startCurve("pairedShared", ranAt);
+    client.startCurve("pairedShared", askedAt);
+  });
+
+  return Object.freeze({
+    takeDown,
+    onScreen: (): { readonly curve: PowerCurve; readonly ranAt: FamilyProbeSettings } | null =>
+      onScreen,
   });
 }
 
