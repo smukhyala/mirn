@@ -6,6 +6,7 @@ import { COLUMNS, type ColumnKey, type UnitKey } from "../../engine/job/columns.
 import { accumulate } from "../../engine/job/runner.js";
 import type { Aggregate, AggregateReason, RunRow } from "../../engine/job/stats.js";
 import { seedFor, type SweepJob } from "../../engine/job/spec.js";
+import { csvField, formatValue, unitSuffix } from "./csvFormat.js";
 import type { DrillCall, HonestCall } from "./drill.js";
 
 /**
@@ -111,39 +112,6 @@ export function makeCsvOptions(init: {
 
 const NO_RUNS = "no runs";
 const NO_SPREAD = "spread not defined below two runs";
-
-function csvField(text: string): string {
-  if (text.includes(",") || text.includes('"') || text.includes("\n")) {
-    return `"${text.replaceAll('"', '""')}"`;
-  }
-  return text;
-}
-
-function formatValue(unit: UnitKey, value: number): string {
-  if (!Number.isFinite(value)) {
-    return "";
-  }
-  if (unit === "metres") {
-    // Three places, matching the precision used everywhere else a metre reaches a reader
-    // (web/app/console/tile.ts's DECIMALS) — a fourth digit here would be a precision this file
-    // invented rather than one the rest of the console agrees on.
-    return value.toFixed(3);
-  }
-  if (unit === "seconds") {
-    return value.toFixed(2);
-  }
-  if (unit === "count" || unit === "people") {
-    // A count of a single run is a whole number, but a MEAN of counts across seeds is not, and
-    // rounding it to a whole number overstates precision the data never had — the same failure
-    // class as a mean with no denominator. The rule is the same one the research era's own
-    // formatter settled on for a count column: let the value decide.
-    return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
-  }
-  if (unit === "ratio") {
-    return value.toFixed(3);
-  }
-  return String(value);
-}
 
 function formatSpread(unit: UnitKey, sd: number): string {
   if (Number.isFinite(sd)) {
@@ -341,13 +309,6 @@ function provenance(job: SweepJob, rows: readonly RunRow[], options: CsvOptions)
   lines.push(`# marker "${NO_RUNS}": no run in this cell reported this column at all`);
   lines.push(`# marker "${NO_SPREAD}": fewer than two runs survived, so a spread would be invented`);
   return lines;
-}
-
-function unitSuffix(unit: UnitKey): string {
-  if (unit === "none") {
-    return "";
-  }
-  return ` (${unit})`;
 }
 
 function cellRows(job: SweepJob, rows: readonly RunRow[]): readonly string[] {

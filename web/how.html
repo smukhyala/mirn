@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The working — MIRN</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./console.css">
 </head>
 <!--
@@ -1020,8 +1021,27 @@
       If you have written a disturbance metric of your own, or are about to,
       <a href="./method.html">the method card</a> asks five closed questions about how it is
       computed and runs the nearest thing this bench can run on a world where the robot's true
-      effect on every person is exactly nothing. Nothing of yours is read in — no code, no file, no
-      data — and every formula it uses is one of the ones set out above.
+      effect on every person is exactly nothing. Every formula it uses is one of the ones set out
+      above. You can also hand it the metric itself, as a function, and it will run yours on the
+      same rooms rather than the nearest one it recognises.
+    </p>
+  </section>
+
+  <section class="how-fit" aria-labelledby="fit-title">
+    <h2 class="region-title" id="fit-title">Fitting the crowd to a real recording</h2>
+    <p>
+      Every formula above is applied to a crowd that was calibrated against nothing.
+      <a href="./fit.html">The fit page</a> is where that is addressed, and it is the only page here
+      that puts real people on one side of a comparison: it reads a pedestrian recording in and asks
+      how far the invented crowd's distribution of walking speeds sits from theirs, at each of a
+      range of paces and wobbles.
+    </p>
+    <p>
+      It computes no disturbance number and cannot. Every quantity set out above is a difference
+      between two runs of one room, and a corridor cannot be filmed twice — a recording has one arm,
+      so the quantity these formulas measure is not in it. What a fit can say is whether the crowd
+      walks like the one that was filmed, in the one respect that was fitted, and the page is at
+      pains to say that a close fit licenses nothing above.
     </p>
   </section>
 

@@ -20,7 +20,8 @@ import {
 import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 import { makeComparison, type Comparison } from "../comparison.js";
 import { BENCH_VERSION, DISCLOSURE_CLAUSES, crowdModelLine } from "../csv.js";
-import { comparisonCsv, familyProbeCsv, suppliedProbeCsv } from "../methodCsv.js";
+import { aggregatePowerLevel, type PowerCurve, type PowerLevel, type PowerSeed } from "../../../engine/job/powerCurve.js";
+import { comparisonCsv, familyProbeCsv, powerCurveCsv, suppliedProbeCsv } from "../methodCsv.js";
 
 /**
  * What the method card's and the comparison's files have to say before they say a number.
@@ -689,5 +690,134 @@ describe("a supplied method whose answer never moved", () => {
     // it appears, which requires that it not appear when it is not true.
     expect(SUPPLIED_PROBE.nDistinctReadings).toBeGreaterThan(1);
     expect(suppliedProbeCsv(SUPPLIED_PROBE, SETTINGS)).not.toContain("not reading the rooms");
+  });
+});
+
+
+/**
+ * The sweep's export.
+ *
+ * One row per room per setting, not six aggregated levels, because a file of aggregates is a file
+ * somebody has to trust and a file of rooms is one they can re-count. What is under test is that
+ * every figure the page prints is recoverable from these rows, and that the two obligations the
+ * page discharges by being a page — its zero row, and the difference between a false alarm and a
+ * miss — are written into the file in words.
+ */
+describe("the sweep's export", () => {
+  const CURVE_BAND_M = 0.29;
+
+  function curveRoom(seed: number, push: number, truthM: number, readingM: number | null): PowerSeed {
+    const reading =
+      readingM === null
+        ? makeReading(Number.NaN, { kind: "censored", why: "the episode ended first" })
+        : makeReading(readingM, { kind: "measured" });
+    return Object.freeze({
+      kind: "powerSeed" as const,
+      seed,
+      pushStrength: push,
+      reading,
+      bandM: CURVE_BAND_M,
+      peakBandM: 0.44,
+      truthM,
+      truthOverBand: truthM > CURVE_BAND_M,
+      clearedBand: readingM === null ? false : readingM > CURVE_BAND_M,
+    });
+  }
+
+  /** Two settings: an empty world, and one holding every outcome the table can report. */
+  const ZERO_LEVEL: PowerLevel = aggregatePowerLevel(0, [
+    curveRoom(SEEDS[0] ?? 0, 0, 0, 0.02),
+    curveRoom(SEEDS[1] ?? 0, 0, 0, 0.51),
+  ]);
+  const BUSY_LEVEL: PowerLevel = aggregatePowerLevel(1, [
+    curveRoom(SEEDS[0] ?? 0, 1, 0.4, 0.5), // found it
+    curveRoom(SEEDS[1] ?? 0, 1, 0.4, 0.1), // missed it
+    curveRoom(SEEDS[2] ?? 0, 1, 0.1, 0.5), // called an empty room
+    curveRoom(SEEDS[3] ?? 0, 1, 0.1, null), // nothing read at all
+  ]);
+  const CURVE: PowerCurve = Object.freeze({
+    kind: "powerCurve" as const,
+    familyKey: "pairedShared" as const,
+    unit: "metres" as const,
+    levels: Object.freeze([ZERO_LEVEL, BUSY_LEVEL]),
+  });
+
+  it("opens with the invented-crowd sentence, as every export here does", () => {
+    // Guardrail 1: a file outlives the page it came from, and this one will be opened by somebody
+    // who never saw the disclosure above the arena.
+    const first = powerCurveCsv(CURVE, SETTINGS).split("\n")[0] ?? "";
+    expect(first.startsWith("#")).toBe(true);
+    expect(first.toLowerCase()).toContain("simulated");
+  });
+
+  it("says in the file which rows the rest are read against", () => {
+    // The other three exports are taken on one world and say so once. This one holds six, and the
+    // whole table is read against the rows where the push is nought.
+    const text = powerCurveCsv(CURVE, SETTINGS);
+    expect(text).toContain("the rows where the push is 0");
+    expect(text).toContain("exactly nothing");
+  });
+
+  it("writes one row per room per setting, and no aggregate rows", () => {
+    const rows = dataRowsOf(powerCurveCsv(CURVE, SETTINGS));
+    // Two rooms at the empty setting, four at the busy one. Not two rows of six averaged numbers.
+    expect(rows.length).toBe(6);
+  });
+
+  it("names all four outcomes, so a false alarm is never pooled with a detection", () => {
+    const rows = dataRowsOf(powerCurveCsv(CURVE, SETTINGS));
+    const outcomes = rows.map((r) => r[7]);
+    expect(outcomes).toContain("found it");
+    expect(outcomes).toContain("missed it");
+    expect(outcomes).toContain("called an empty room");
+    expect(outcomes).toContain("correctly said nothing");
+  });
+
+  it("leaves the outcome empty where nothing was read, and says why beside it", () => {
+    // A ruler that was never asked did not miss anything. An outcome word there would be a finding
+    // about the ruler where what happened was an absence of one.
+    const rows = dataRowsOf(powerCurveCsv(CURVE, SETTINGS));
+    const unread = rows.filter((r) => r[3] === "");
+    expect(unread.length).toBe(1);
+    expect(unread[0]?.[7]).toBe("");
+    expect(unread[0]?.[8] ?? "").toContain("censored");
+    // And never the three letters, which a spreadsheet reads as a label.
+    expect(powerCurveCsv(CURVE, SETTINGS)).not.toContain("NaN");
+  });
+
+  it("still says whether that room had anything to find, because that is a fact about the room", () => {
+    // Known whether or not the ruler managed to answer, so unlike the cleared column it is never
+    // left blank. The room the ruler could not read had a truth of 0.1 against a line of 0.29.
+    const rows = dataRowsOf(powerCurveCsv(CURVE, SETTINGS));
+    const unread = rows.filter((r) => r[3] === "")[0];
+    expect(unread?.[5]).toBe("no");
+    expect(unread?.[6]).toBe("");
+  });
+
+  it("lets every count on the page be recomputed from the rows", () => {
+    // The claim the whole file shape rests on. Nothing here is taken on trust from an aggregate.
+    const rows = dataRowsOf(powerCurveCsv(CURVE, SETTINGS)).filter((r) => r[0] === "1.000");
+    expect(rows.length).toBe(BUSY_LEVEL.nAttempted);
+    expect(rows.filter((r) => r[7] === "found it").length).toBe(BUSY_LEVEL.nHit);
+    expect(rows.filter((r) => r[7] === "missed it").length).toBe(BUSY_LEVEL.nMissed);
+    expect(rows.filter((r) => r[7] === "called an empty room").length).toBe(
+      BUSY_LEVEL.nFalseAlarm,
+    );
+    expect(rows.filter((r) => r[5] === "yes").length).toBe(BUSY_LEVEL.nTruthOverBand);
+  });
+
+  it("writes the dial position as itself rather than rounded", () => {
+    // The bug the rendered table had: `count` rounds, so 0.25 and 0.5 became 0 and 1. The export
+    // must not repeat it, and a quarter-strength row is what would show it.
+    const withQuarter: PowerCurve = Object.freeze({
+      ...CURVE,
+      levels: Object.freeze([
+        ZERO_LEVEL,
+        aggregatePowerLevel(0.25, [curveRoom(SEEDS[0] ?? 0, 0.25, 0.18, 0.18)]),
+      ]),
+    });
+    const pushes = dataRowsOf(powerCurveCsv(withQuarter, SETTINGS)).map((r) => r[0]);
+    expect(pushes).toContain("0.250");
+    expect(new Set(pushes).size).toBe(2);
   });
 });

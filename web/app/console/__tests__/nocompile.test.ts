@@ -39,13 +39,16 @@ const COMPILERS: readonly { readonly name: string; readonly pattern: RegExp }[] 
  *
  * What actually makes an object URL dangerous is running one: a Worker built from a string is a
  * compilation site wearing a different name. So the pair below is left alone and the construction
- * is pinned instead — a new `Worker` may only be built in the two client modules that already
- * exist, whose exact source lines `client.test.ts` and `probe.test.ts` assert verbatim.
+ * is pinned instead — a new `Worker` may only be built in the client modules listed below, and each
+ * of those has a test asserting its exact construction line verbatim, so an entry here without one
+ * is an exemption rather than a pin. `client.test.ts`, `probe.test.ts`, `supplied-worker.test.ts`
+ * and `fit-client.test.ts` are those tests.
  */
 const WORKER_BUILDERS: readonly string[] = [
   join(WEB_DIR, "app", "worker", "client.ts"),
   join(WEB_DIR, "app", "worker", "probe.client.ts"),
   join(WEB_DIR, "app", "worker", "supplied.client.ts"),
+  join(WEB_DIR, "app", "worker", "fit.client.ts"),
 ];
 
 /** Comments are stripped first: the rule has to be statable in this repo's own voice. */

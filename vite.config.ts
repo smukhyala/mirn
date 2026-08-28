@@ -11,7 +11,10 @@ import { resolve } from "node:path";
  * `index` is the console. `how` is the page explaining what every readout on it computes. `drill`
  * is the referee drill's card, which shows a room with the run without the robot withheld.
  * `method` is the method card, which takes five closed answers describing a disturbance metric and
- * measures what a method of that shape reads where the answer is exactly nothing. A name here
+ * measures what a method of that shape reads where the answer is exactly nothing. `fit` is the one
+ * page that puts real people on one side of a comparison: it reads a pedestrian recording in and
+ * asks whether the invented crowd walks like it. It shows no disturbance number and cannot compute
+ * one, which is how guardrail 1's two kinds of number are kept apart — by page, not by care. A name here
  * without a hand-written file behind it is a build emitting a page whose source is gone, which is
  * what `web/app/console/__tests__/disclosure.test.ts` checks this map for.
  */
@@ -33,6 +36,7 @@ export default defineConfig({
         how: resolve(__dirname, "web/how.html"),
         drill: resolve(__dirname, "web/drill.html"),
         method: resolve(__dirname, "web/method.html"),
+        fit: resolve(__dirname, "web/fit.html"),
       },
     },
   },

@@ -59,9 +59,14 @@ function pageHrefs(): readonly string[] {
 }
 
 describe("the ways in", () => {
-  it("offers four presets and two page links", () => {
+  it("offers four presets and three page links", () => {
+    // Four query-string presets, which the tests below decode exactly as the page does, and three
+    // links to other pages, which are a different kind of thing and are checked separately.
+    // Raised from two to three by the fit page, which is a way in rather than a preset: it reads
+    // nothing out of this page's address, and a query string on it would be a link promising to
+    // carry settings that nothing over there reads.
     expect(presetHrefs()).toHaveLength(4);
-    expect(pageHrefs()).toHaveLength(2);
+    expect(pageHrefs()).toHaveLength(3);
   });
 
   it("names what to watch without quoting a number", () => {
