@@ -12,14 +12,56 @@
   <p class="eyebrow">A bench for one question</p>
   <h1>How much did the robot move the crowd?</h1>
   <p class="standfirst" id="disclosure">
-    Everything on this page is simulated. The crowd is an invented model of pedestrians — invented people
-    obeying invented rules — and no number here is a measurement of real pedestrians. What is
-    real is the ruler: the same room is run twice, once with a robot and once without, from the
-    same starting positions and the same random wobble, and the difference between a person's
-    two paths is the robot's effect on them.
+    All simulated. The crowd is an invented model of pedestrians, invented people obeying
+    invented rules, so no number here is a measurement of real pedestrians. The ruler is real.
+  </p>
+</header>
+
+<!--
+  What a stranger reads before they touch anything.
+
+  This sits below the disclosure and above everything else, and both halves of that are checked by
+  web/app/console/__tests__/orientation.test.ts. Below, because guardrail 1 says the invented-crowd
+  sentence reaches a beginner first and a friendly welcome box is exactly the thing that gets moved
+  above it. Above the arena, because a strip below the fold explains nothing to somebody who has
+  already started pressing buttons.
+
+  It is static markup with no state. Guardrail 10 rules out remembering that a reader has dismissed
+  it, so it is not dismissable — a control that forgets what it was told is worse than no control.
+
+  No sentence here quotes a measurement. The strip ships in the file, so any number written into it
+  would be one a reader meets before pressing Run and before the settings that produced it exist.
+-->
+<section class="orientation" aria-labelledby="orientation-title">
+  <h2 class="region-title" id="orientation-title">What this is</h2>
+  <p class="orientation-lede">
+    A robot walks through a fake crowd. Different rulers disagree about how much it disturbed
+    them. This page is where you find out which ruler is lying.
+  </p>
+  <ol class="orientation-steps">
+    <li>
+      <span class="step-name">Set up the crowd</span>
+      <span class="step-detail">Sliders in Settings: how many people, how pushy the robot is, how
+      fast everyone walks.</span>
+    </li>
+    <li>
+      <span class="step-name">Press Run</span>
+      <span class="step-detail">The same room plays twice: once with the robot in it, once without.
+      Same starting spots, same random wobble.</span>
+    </li>
+    <li>
+      <span class="step-name">Compare the tiles</span>
+      <span class="step-detail">Each tile is one way of measuring what the robot did. They will
+      not agree, and that disagreement is the point.</span>
+    </li>
+  </ol>
+  <p class="orientation-why">
+    <strong>Why twice?</strong> The only way to know what the robot did to somebody is to see the
+    same person walk without it. A real corridor never gives you that second run. This one does,
+    which is why a made-up crowd can teach something a real one cannot.
   </p>
   <p class="how-backlink"><a href="./how.html">How every number here is worked out</a></p>
-</header>
+</section>
 
 <!--
   Five ways in, for a reader who has not met the controls yet.
@@ -44,40 +86,38 @@
   <ul>
     <li>
       <a href="?people=18&amp;hold_line=0.5&amp;pace=1.34&amp;fidget=1.1&amp;space=1&amp;robot_speed=1.1&amp;reaction=0.15&amp;berth=0&amp;mis_sees=0&amp;offset=0&amp;episode=40&amp;horizon=3&amp;window_end=10&amp;notice=0&amp;near_miss=0.5&amp;recovery_tol=0.1&amp;recovery_dwell=20&amp;seeds=1&amp;band=8&amp;floor=0&amp;frechet=0&amp;zero=1">A robot nobody notices</a>
-      <span>Nobody here reacts to the robot, so the honest answer is exactly zero. Watch what the
-      forecaster reports beside it.</span>
+      <span>Nobody here reacts to the robot, so the true answer is zero. Watch what the forecaster
+      says anyway. It is the ruler that only ever gets to see one run.</span>
     </li>
     <li>
       <a href="?people=4&amp;hold_line=0.5&amp;pace=1.34&amp;fidget=1.1&amp;space=1&amp;robot_speed=1.1&amp;reaction=0.15&amp;berth=0&amp;mis_sees=0&amp;offset=0&amp;episode=40&amp;horizon=3&amp;window_end=10&amp;notice=1&amp;near_miss=0.5&amp;recovery_tol=0.1&amp;recovery_dwell=20&amp;vary=people&amp;values=4,14,24,34,44&amp;seeds=1&amp;band=8&amp;floor=0&amp;frechet=0&amp;zero=1">Four people, then forty-four</a>
-      <span>Press Run. Watch the reading and the ordinary difference between two runs of the same
-      room grow together as the room fills.</span>
+      <span>Press Run. As the room fills, watch the reading and the normal gap between two runs
+      grow together.</span>
     </li>
     <li>
       <a href="?people=18&amp;hold_line=0.5&amp;pace=1.34&amp;fidget=1.1&amp;space=0&amp;robot_speed=1.1&amp;reaction=0.15&amp;berth=0&amp;mis_sees=0&amp;offset=0&amp;episode=40&amp;horizon=3&amp;window_end=10&amp;notice=1&amp;near_miss=0.5&amp;recovery_tol=0.1&amp;recovery_dwell=20&amp;vary=space&amp;values=0,0.75,1.5,2.25,3&amp;seeds=1&amp;band=8&amp;floor=0&amp;frechet=0&amp;zero=1">A robot that leans harder</a>
-      <span>Press Run. Only how much space the robot demands is changing. Watch the crowd's real
-      displacement climb, and watch the forecaster's line not follow it.</span>
+      <span>Press Run. Only the robot's pushiness changes. The real effect climbs; the forecaster's
+      line does not follow.</span>
     </li>
     <li>
       <a href="?people=18&amp;hold_line=0.5&amp;pace=1.34&amp;fidget=0&amp;space=1&amp;robot_speed=1.1&amp;reaction=0.15&amp;berth=0&amp;mis_sees=0&amp;offset=0&amp;episode=40&amp;horizon=3&amp;window_end=10&amp;notice=0&amp;near_miss=0.5&amp;recovery_tol=0.1&amp;recovery_dwell=20&amp;vary=fidget&amp;values=0,0.75,1.5,2.25,3&amp;seeds=1&amp;band=8&amp;floor=0&amp;frechet=0&amp;zero=1">A crowd that fidgets</a>
-      <span>Press Run. Only the crowd's aimless wobble is changing, and nobody here reacts to the
-      robot, so its real effect stays flat at nothing. The forecaster keeps reporting one.</span>
+      <span>Press Run. Only the crowd's wobble changes. Nobody reacts to the robot, so the real
+      effect stays at nothing. The forecaster keeps reporting one.</span>
     </li>
     <li>
       <a href="./drill.html">The referee drill</a>
-      <span>A different way in: call whether the robot disturbed an invented crowd before the
-      second run is shown, then see what the room actually did.</span>
+      <span>Call whether the robot disturbed the crowd before you are shown the second run, then
+      see what the room actually did.</span>
     </li>
     <li>
       <a href="./fit.html">Does this crowd walk like a real one?</a>
-      <span>The one page here that puts real people on one side of a comparison: hand it a
-      recording of pedestrians and it fits the invented crowd's walking to theirs. It shows no
-      disturbance number and cannot compute one.</span>
+      <span>The one page with real people on it. Hand it a recording and it tunes the fake crowd to
+      walk like them. It shows no disturbance number and cannot work one out.</span>
     </li>
     <li>
       <a href="./method.html">The method card</a>
-      <span>Bring a disturbance metric of your own. Describe how it is computed in five
-      questions, or hand over the metric itself, and see what it reads on a world where the
-      answer is exactly nothing.</span>
+      <span>Bring your own way of measuring disturbance. Answer five questions about it, then see
+      what it reads on a world where the true answer is nothing.</span>
     </li>
   </ul>
 </nav>
@@ -85,7 +125,9 @@
 <main class="console-main">
   <section class="stage" aria-labelledby="stage-title">
     <h2 class="region-title" id="stage-title">Stage</h2>
-    <p class="region-note">Simulated crowd. Every number below comes from a model.</p>
+    <p class="region-note">Both runs at once. Filled dots are the crowd with the robot; hollow dots
+      are the same people without it. Every number below comes from this model, not from real
+      people.</p>
     <canvas id="arena" aria-label="Two crowds, one with a robot and one without"></canvas>
     <!--
       What is on the canvas.
@@ -107,17 +149,19 @@
       <li><span class="key-mark key-path-control"></span>The same path, walked without it</li>
     </ul>
     <p class="region-note key-note">
-      Switch off the setting that lets people notice the robot and every pair lands on top of
-      itself, because then the robot changes nothing and there is no distance left to draw.
+      Switch off "People notice the robot" and every pair lands on top of itself: the robot
+      changes nothing, so there is no distance left to draw.
     </p>
     <div class="transport" id="transport"></div>
-    <div class="readouts" id="readouts"></div>
     <p class="region-note" id="readouts-note">
-      Two of the seven measurements below need the run-to-run band. This live preview does not
-      measure it, so those two are left out here rather than shown with no zero to judge them
-      against. Each tile opens on the assumption behind its number;
-      <a href="./how.html">the working</a> sets out the arithmetic for all of them.
+      One tile, one ruler. Open any tile to see what it assumes and what it would read if the robot
+      had done nothing at all. The forecaster is the ruler that guesses where each person was headed
+      and measures how far off they ended up. It never sees the run without the robot, which is why
+      it can be fooled. Two measurements stay blank until you press Run, because they need repeat
+      runs this live preview does not do.
+      <a href="./how.html">The working</a> sets out the arithmetic for all of them.
     </p>
+    <div class="readouts" id="readouts"></div>
     <section class="sweep" id="sweep-block" aria-labelledby="sweep-title" hidden>
       <h2 class="region-title" id="sweep-title">Sweep curve</h2>
       <canvas id="sweep" role="img" aria-label="Each measurement against the setting being varied"></canvas>
@@ -128,6 +172,8 @@
 
 <aside class="settings-region" id="settings" aria-labelledby="settings-title">
   <h2 class="region-title" id="settings-title">Settings</h2>
+  <p class="region-note">Build the room here, then press Run. Every slider says which reading it
+    moves.</p>
 </aside>
 
 <div class="progress-rule" id="progress-rule" role="progressbar"
@@ -135,14 +181,15 @@
 
 <section class="ledger-region" aria-labelledby="ledger-title">
   <h2 class="region-title" id="ledger-title">Kept results</h2>
+  <p class="region-note">Park a run here to compare it against the next one.</p>
   <div class="ledger-bar" id="ledger-bar">
     <button id="columns-toggle" type="button">Columns</button>
     <button id="export-csv" type="button">Export CSV</button>
     <button id="copy-link" type="button">Copy link</button>
     <button id="clear-kept" type="button">Clear</button>
   </div>
-  <p class="region-note">The link carries the settings, not the results. Pressing Run reproduces
-    them exactly.</p>
+  <p class="region-note">A copied link carries the settings, never the results. Whoever opens it
+    presses Run and gets the same numbers back.</p>
   <div id="columns-panel" hidden></div>
   <div id="ledger"><p class="kept-empty" id="kept-empty">No results kept yet.</p></div>
 </section>

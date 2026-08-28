@@ -24,6 +24,26 @@
 
 * { box-sizing: border-box; }
 
+/*
+ * The page measure, in one place.
+ *
+ * These two were eight separate numbers typed into eight rules: the masthead at 52rem, the stage
+ * under it at 76rem, .method-region at nothing at all. A reader scrolling one page crossed three
+ * different left edges. They are one token now, and measure.test.ts fails any page-level container
+ * that goes back to typing a number.
+ *
+ * This is a WIDTH, not a prose measure. Running text stays far narrower (.how-main p caps at
+ * 40rem) because 76rem of prose is unreadable. What the token fixes is where a block's left edge
+ * lands, not how wide its sentences may run.
+ *
+ * Not a colour, so it belongs here rather than in web/ui/theme.ts. The file header's ban is on
+ * colour literals, and the runtime :root block theme.ts injects merges with this one.
+ */
+:root {
+  --mirn-page: 76rem;
+  --mirn-gutter: 2rem;
+}
+
 body {
   margin: 0;
   padding: 0 0 4rem;
@@ -125,12 +145,37 @@ button:hover { background: var(--mirn-surface); }
    children could join a single outer grid is the only way to get there, which is exactly the kind
    of landmark-stripping trick guardrail-quality CSS in this file has otherwise avoided. Three
    independent grids read the same and stay simple. */
-.panel { display: flex; flex-direction: column; gap: 2rem; }
+.panel { display: flex; flex-direction: column; gap: 0; }
+
+/*
+ * Separation, at two scales, because "settings" run together at both.
+ *
+ * BETWEEN GROUPS: the three categories were 2rem of whitespace and a 0.66rem grey heading, which
+ * on a wide viewport is a single row of controls' worth of gap and reads as one continuous field
+ * of sliders. Each group now opens on a rule and carries real padding, so "the room and the robot"
+ * visibly ends before "the ruler" begins.
+ *
+ * BETWEEN CONTROLS: a knob is a name, a value, a slider, a note and a "Moves:" line — five lines
+ * that look much like the next knob's five. The hairline above each one is the same device
+ * .ways-in already uses on its list, and it turns a wall into a grid you can count.
+ *
+ * Both are --mirn-rule, the non-text grey. No accent: the perturbation colour means a perturbation
+ * everywhere else on this page, and a divider is not one.
+ */
 .panel-group {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 1.3rem 1.6rem;
+  gap: 1.5rem 1.8rem;
   align-items: start;
+  padding: 1.8rem 0 0.4rem;
+  border-top: 1px solid var(--mirn-rule);
+}
+.panel-group:first-child { border-top: 0; padding-top: 0.4rem; }
+.panel-group .panel-title { margin-bottom: 0.3rem; }
+.panel-group > .control,
+.panel-group > .toggle {
+  border-top: 1px solid var(--mirn-grid);
+  padding-top: 0.7rem;
 }
 
 /* Set as prose, not as another control: it is a sentence about the preview, not a knob. Spans
@@ -185,16 +230,16 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
  * to itself; the settings live below it, in .settings-region, as their own full-width section.
  */
 .console-main {
-  max-width: 76rem;
+  max-width: var(--mirn-page);
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 var(--mirn-gutter);
 }
-.console-masthead { max-width: 52rem; margin: 0 auto; padding: 3rem 2rem 1.5rem; }
+.console-masthead { max-width: var(--mirn-page); margin: 0 auto; padding: 3rem var(--mirn-gutter) 1.5rem; }
 
 /* Same box as .ledger-region below it: same max-width, same side padding, same rhythm of a
    region-title before its content. The settings sit between the stage and the ledger, and now
    read as a third full-width section rather than a rail squeezed beside the first one. */
-.settings-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
+.settings-region { max-width: var(--mirn-page); margin: 2.5rem auto 0; padding: 0 var(--mirn-gutter); }
 
 .region-title {
   margin: 0 0 0.35rem;
@@ -244,7 +289,7 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   margin: 1.4rem 0;
 }
 
-.ledger-region { max-width: 76rem; margin: 2.5rem auto 0; padding: 0 2rem; }
+.ledger-region { max-width: var(--mirn-page); margin: 2.5rem auto 0; padding: 0 var(--mirn-gutter); }
 .ledger-region > .ledger-bar { display: flex; gap: 0.8rem; align-items: baseline; }
 
 /* ---------------------------------------------------------------- the kept-results ledger */
@@ -353,7 +398,7 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
  * chrome (`.run`, a few rules above, already declines it for the identical reason). Task 27
  * introduced this rule on the accent; fixed here in the same commit that made the identical fix to
  * `.ledger-row.is-selected`, in the file already open for it. */
-.progress-rule { height: 1px; background: var(--mirn-grid); max-width: 76rem; margin: 1.6rem auto; padding: 0 2rem; }
+.progress-rule { height: 1px; background: var(--mirn-grid); max-width: var(--mirn-page); margin: 1.6rem auto; padding: 0 var(--mirn-gutter); }
 .progress-rule > span {
   display: block;
   height: 1px;
@@ -372,9 +417,9 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
  * The accent stays where it belongs. These are links, not perturbations, so they are ink.
  */
 .ways-in {
-  max-width: 52rem;
+  max-width: var(--mirn-page);
   margin: 0 auto;
-  padding: 0 2rem 1.6rem;
+  padding: 0 var(--mirn-gutter) 1.6rem;
 }
 .ways-in ul {
   list-style: none;
@@ -406,6 +451,102 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
   color: var(--mirn-ink-muted);
 }
 
+/* ---------------------------------------------------------------- page sections */
+
+/*
+ * The fit page and the method card stack these, and until now the class had no rule in this file
+ * at all: nothing marked where one section ended and the next began.
+ *
+ * It sets NO width and NO horizontal padding, and that is the point. It is nested inside
+ * .console-main, which is the page container and already owns the edge; giving this one the page
+ * token as well indented every section on those two pages by a second gutter, putting their left
+ * edge 2rem inside every other page's. That is why it is absent from PAGE_CONTAINERS in
+ * measure.test.ts: a section inside a container is not a container.
+ *
+ * The rule above each one is the same separator the settings groups use. One idea per band, and
+ * the eye is told where a band ends rather than having to infer it from a gap.
+ */
+.method-region {
+  margin: 2.2rem 0 0;
+  padding: 1.6rem 0 0;
+  border-top: 1px solid var(--mirn-rule);
+}
+.method-region:first-of-type { border-top: 0; margin-top: 1rem; padding-top: 0; }
+
+/* ---------------------------------------------------------------- orientation strip */
+
+/*
+ * The block that tells a stranger what the page is for before they meet a control.
+ *
+ * It borrows .ways-in's measure (52rem) and gutters rather than inventing its own, so the masthead,
+ * this strip and the ways-in list all hang off one left edge down the page. The only new shape is
+ * the numbered list, and it is the reason this is not just another .region-note: three steps read
+ * as three steps when they are numbered and stacked, and as a wall when they are a paragraph.
+ *
+ * The step numbers come from the `ol` itself via a counter, not from digits typed into the markup.
+ * That keeps orientation.test.ts's "quotes no measurement" scan looking at prose only, and means
+ * deleting a step cannot leave the remaining ones misnumbered.
+ *
+ * No accent. The perturbation colour means a perturbation everywhere else on this page, and a
+ * welcome box is not one.
+ */
+.orientation {
+  max-width: var(--mirn-page);
+  margin: 0 auto;
+  padding: 0 var(--mirn-gutter) 1.4rem;
+}
+.orientation .region-title { margin-bottom: 0.5rem; }
+.orientation-lede {
+  margin: 0 0 1rem;
+  max-width: 38rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--mirn-ink);
+}
+.orientation-steps {
+  list-style: none;
+  counter-reset: orientation-step;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 1.6rem;
+}
+.orientation-steps li {
+  counter-increment: orientation-step;
+  border-top: 1px solid var(--mirn-rule);
+  padding-top: 0.5rem;
+}
+.orientation-steps li::before {
+  content: counter(orientation-step);
+  display: block;
+  font-family: var(--mirn-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--mirn-ink-faint);
+  margin-bottom: 0.3rem;
+}
+.step-name {
+  display: block;
+  font-weight: 500;
+  color: var(--mirn-ink);
+  margin-bottom: 0.2rem;
+}
+.step-detail {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--mirn-ink-muted);
+}
+.orientation-why {
+  margin: 0 0 0.9rem;
+  max-width: 42rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--mirn-ink-muted);
+}
+.orientation-why strong { color: var(--mirn-ink); font-weight: 500; }
+
 /* ---------------------------------------------------------------- the working page */
 
 /*
@@ -426,9 +567,9 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
  */
 
 .how-main {
-  max-width: 52rem;
+  max-width: var(--mirn-page);
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 var(--mirn-gutter);
 }
 
 /* Used on both pages, so it is not scoped to .how. Set as a mono line with an underline that
@@ -1213,18 +1354,19 @@ input[type="checkbox"] { accent-color: var(--mirn-ink); }
 /* A tile carries a 1.6rem value, an anchor sentence, a gauge, a zero row and a stamp row. Two of
    them across a phone is about 150px each, which is not enough for any of it. */
 @media (max-width: 45rem) {
-  .console-main { padding: 0 1.2rem; }
-  .console-masthead { padding: 2rem 1.2rem 1.2rem; }
-  .settings-region { padding: 0 1.2rem; }
-  .ledger-region { padding: 0 1.2rem; }
+  /* Seven rules used to retype 1.2rem here, which is the same trap the page token was introduced
+     to close: a narrow gutter changed in one of them and not the other six drifts silently. The
+     token is narrowed once and every container that takes it follows, .method-region included —
+     which the old list had simply left out. */
+  :root { --mirn-gutter: 1.2rem; }
+  .console-masthead { padding-top: 2rem; padding-bottom: 1.2rem; }
   .readouts { grid-template-columns: minmax(0, 1fr); }
-  .ways-in { padding: 0 1.2rem 1.2rem; }
   .ways-in ul { grid-template-columns: minmax(0, 1fr); }
+  .orientation-steps { grid-template-columns: minmax(0, 1fr); gap: 0.55rem 0; }
   /* The working page rides in the existing block rather than opening a new one, because every
      breakpoint in this file is written widest first and a new @media below this would have to be
      narrower than 45rem to keep that order. Its two-column contents list and its formulas are the
      only things on it that do not reflow on their own. */
-  .how-main { padding: 0 1.2rem; }
   .how-contents ol { grid-template-columns: minmax(0, 1fr); }
   .how-zero { padding: 0.7rem 0.9rem; }
   /* The method card rides in this block for the same reason the working page does:
