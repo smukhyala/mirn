@@ -3,6 +3,7 @@ import { makeRunConfig } from "../../contracts/config.js";
 import { runPair, type RunResult } from "../../sim/run.js";
 import { COLUMNS, COLUMN_ORDER, type ColumnKey, type Reading } from "../columns.js";
 import { buildContext, runReport, type MeasurementParams } from "../report.js";
+import { contextInitFromConfig } from "../simContext.js";
 
 /**
  * A withheld card may show only numbers a real corridor could have produced.
@@ -69,7 +70,7 @@ function readingsWith(controlFrom: typeof CONFIG): ReadonlyMap<ColumnKey, Readin
   const decoy = runPair(controlFrom, () => 0);
   const swapped = swapControl(real, decoy);
   const ctx = buildContext({
-    config: CONFIG,
+    ...contextInitFromConfig(CONFIG),
     params: PARAMS,
     run: swapped,
     band: null,

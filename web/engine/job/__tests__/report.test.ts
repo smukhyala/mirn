@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { makeRunConfig } from "../../contracts/config.js";
+import { DEFAULT_CONFIG, makeRunConfig, SIM_CONSTANTS } from "../../contracts/config.js";
 import { pairedAgents } from "../../contracts/pairedRun.js";
 import { frechet } from "../../measure/divergence/index.js";
 import { replicateBand } from "../../measure/null/band.js";
@@ -10,6 +10,26 @@ import { seededPermutations, splitHalfNull } from "../../measure/null/splitHalf.
 import { runPair, type RunResult } from "../../sim/run.js";
 import { COLUMN_ORDER, type ColumnKey } from "../columns.js";
 import { buildContext, runReport, type MeasurementParams } from "../report.js";
+import { contextInitFromConfig } from "../simContext.js";
+
+describe("the report layer consumes data, not the simulator", () => {
+  it("carries the body sizes the clearance columns measure with", () => {
+    const init = contextInitFromConfig(DEFAULT_CONFIG);
+    expect(init.bodies.robotRadiusM).toBe(SIM_CONSTANTS.robotRadiusM);
+    expect(init.bodies.pedRadiusM).toBe(SIM_CONSTANTS.pedRadiusM);
+  });
+
+  it("carries the time step without carrying the whole configuration", () => {
+    const init = contextInitFromConfig(DEFAULT_CONFIG);
+    expect(init.dt).toBe(DEFAULT_CONFIG.dt);
+  });
+
+  it("reduces the room's geometry to the shortest crossing that counts as arriving", () => {
+    const init = contextInitFromConfig(DEFAULT_CONFIG);
+    // 18.00 m apart, minus the 1.1 m goal radius the robot stops inside.
+    expect(init.straightLineM).toBeCloseTo(16.9, 10);
+  });
+});
 
 const PARAMS: MeasurementParams = Object.freeze({
   kind: "measurementParams" as const,
@@ -25,7 +45,7 @@ function defaultContext() {
   const run = runPair(config);
   const zeroConfig = makeRunConfig({ pedestriansSeeRobot: false });
   return buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params: PARAMS,
     run,
     band: null,
@@ -131,7 +151,7 @@ function fullContext() {
   const band = replicateBand(config, 8);
   const floor = splitHalfNull(run.control.positions, 20, seededPermutations(0));
   return buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params: PARAMS,
     run,
     band,

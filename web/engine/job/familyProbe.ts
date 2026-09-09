@@ -10,6 +10,7 @@ import { runPair, type RunResult } from "../sim/run.js";
 import { COLUMNS, makeReading, type Reading, type UnitKey } from "./columns.js";
 import { FAMILIES, FAMILY_ORDER, type FamilyKey, type MethodFamily } from "./families.js";
 import { buildContext, type MeasurementParams } from "./report.js";
+import { contextInitFromConfig } from "./simContext.js";
 import { BASE_SEED, SEED_STRIDE, makeMeasurementParams } from "./spec.js";
 import { finiteCount, meanOf, sdOf } from "./stats.js";
 
@@ -291,7 +292,7 @@ export function readFamily(
     return makeReading(cvmResidual(run.pair, ruler.horizonSteps, ruler.endStep).value, MEASURED);
   }
   const context = buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params: settings.params,
     run,
     band: null,

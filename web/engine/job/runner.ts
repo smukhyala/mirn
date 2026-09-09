@@ -7,6 +7,7 @@ import { runPair, type RunResult } from "../sim/run.js";
 import type { ColumnKey, Reading } from "./columns.js";
 import { planSweep } from "./plan.js";
 import { buildContext, runReport } from "./report.js";
+import { contextInitFromConfig } from "./simContext.js";
 import { configForCell, paramsForCell, type SweepJob } from "./spec.js";
 import { aggregate, type Aggregate, type RunRow } from "./stats.js";
 
@@ -77,7 +78,7 @@ export function* sweepUnits(job: SweepJob): Generator<UnitOutput, void, undefine
     }
 
     const context = buildContext({
-      config,
+      ...contextInitFromConfig(config),
       params,
       run,
       band,

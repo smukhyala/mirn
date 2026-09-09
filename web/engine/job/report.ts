@@ -1,11 +1,10 @@
-import { SIM_CONSTANTS, type RunConfig } from "../contracts/config.js";
 import type { PairedRun } from "../contracts/pairedRun.js";
 import { pairedAgents } from "../contracts/pairedRun.js";
 import { fail } from "../core/errors.js";
 import { deviation, type Deviation } from "../measure/metrics.js";
 import type { RunToRunBand } from "../measure/null/band.js";
 import type { SplitHalfNull } from "../measure/null/splitHalf.js";
-import type { ArmResult, RunResult } from "../sim/run.js";
+import type { ArmResult } from "../sim/run.js";
 import { COLUMNS, type ColumnKey, type Reading } from "./columns.js";
 
 /**
@@ -64,7 +63,7 @@ export interface PedestrianTimeLost {
  *
  * A person who never settles in either arm is dropped and counted, never averaged as a zero.
  */
-export function pedestrianTimeLost(r: RunResult, dt: number): PedestrianTimeLost {
+export function pedestrianTimeLost(r: MeasuredRun, dt: number): PedestrianTimeLost {
   const nAgents = r.treated.positions.length;
   let nUsed = 0;
   let total = 0;
@@ -267,16 +266,37 @@ export function arrivalSecondsOf(arm: ArmResult, dt: number): number {
   return (arm.arrivedTick + 1) * dt;
 }
 
+/** How big the bodies are that a clearance is measured between, surface to surface. */
+export interface Bodies {
+  readonly kind: "bodies";
+  readonly robotRadiusM: number;
+  readonly pedRadiusM: number;
+}
+
+/**
+ * A run that has been measured, whoever produced it.
+ *
+ * `RunResult` is structurally assignable to this, so `runPair`'s output needs no conversion. What
+ * this leaves out is the point: no `RunConfig`, so nothing downstream can read a setting that only
+ * MIRN's own simulator has.
+ */
+export interface MeasuredRun {
+  readonly pair: PairedRun;
+  readonly treated: ArmResult;
+  readonly control: ArmResult;
+}
+
 /** Everything a column extractor is allowed to look at. Built once per run, never per column. */
 export interface ReportContext {
   readonly kind: "reportContext";
-  readonly config: RunConfig;
+  readonly dt: number;
+  readonly bodies: Bodies;
   readonly params: MeasurementParams;
-  readonly run: RunResult;
+  readonly run: MeasuredRun;
   readonly deviation: Deviation;
   readonly band: RunToRunBand | null;
   readonly floor: SplitHalfNull | null;
-  readonly zeroRun: RunResult | null;
+  readonly zeroRun: MeasuredRun | null;
   readonly frechetMeanM: number | null;
   /**
    * The shortest crossing that counts as arriving: straight-line start-to-goal minus the goal
@@ -284,33 +304,28 @@ export interface ReportContext {
    * 18.00 m apart and the robot stops within 1.1 m. It is a bound, and the tile says so.
    */
   readonly straightLineM: number;
+  /** `straightLineM` walked flat out at the robot's own speed limit. See `SimContextInit`. */
+  readonly straightLineArrivalS: number;
 }
 
 export interface BuildContextInit {
-  readonly config: RunConfig;
+  readonly dt: number;
+  readonly bodies: Bodies;
+  readonly straightLineM: number;
+  readonly straightLineArrivalS: number;
   readonly params: MeasurementParams;
-  readonly run: RunResult;
+  readonly run: MeasuredRun;
   readonly band: RunToRunBand | null;
   readonly floor: SplitHalfNull | null;
-  readonly zeroRun: RunResult | null;
+  readonly zeroRun: MeasuredRun | null;
   readonly frechetMeanM: number | null;
 }
 
 export function buildContext(init: BuildContextInit): ReportContext {
-  const startX = init.config.robot.startXY[0];
-  const startY = init.config.robot.startXY[1];
-  const goalX = init.config.robot.goalXY[0];
-  const goalY = init.config.robot.goalXY[1];
-  const dx = goalX - startX;
-  const dy = goalY - startY;
-  const straightLine = Math.sqrt(dx * dx + dy * dy) - SIM_CONSTANTS.goalReachedM;
-  let straightLineM = straightLine;
-  if (straightLine < 0) {
-    straightLineM = 0;
-  }
   return Object.freeze({
     kind: "reportContext" as const,
-    config: init.config,
+    dt: init.dt,
+    bodies: init.bodies,
     params: init.params,
     run: init.run,
     deviation: deviation(init.run.pair),
@@ -318,7 +333,8 @@ export function buildContext(init: BuildContextInit): ReportContext {
     floor: init.floor,
     zeroRun: init.zeroRun,
     frechetMeanM: init.frechetMeanM,
-    straightLineM,
+    straightLineM: init.straightLineM,
+    straightLineArrivalS: init.straightLineArrivalS,
   });
 }
 

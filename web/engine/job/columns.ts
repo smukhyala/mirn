@@ -1,4 +1,3 @@
-import { SIM_CONSTANTS } from "../contracts/config.js";
 import { fail } from "../core/errors.js";
 import { cvmResidual, paired } from "../measure/estimator/index.js";
 import { pathLength } from "../measure/kernels.js";
@@ -154,14 +153,14 @@ const NEVER_BOTH_LEFT_START =
  * at all, so quoting "differ only in whether the robot is there" would be false on screen.
  */
 function pairedAssumption(ctx: ReportContext): string {
-  if (ctx.config.treatment.kind === "robot-presence") {
+  if (ctx.run.pair.treatment.kind === "robot-presence") {
     return (
       "Both runs share a seed, a starting state and the same random wobble, and differ only in " +
       "whether the robot is there. Because nothing else can differ, the gap between a person's " +
       "two paths is the robot's effect on them and nothing is estimated."
     );
   }
-  if (ctx.config.treatment.kind === "disturbance") {
+  if (ctx.run.pair.treatment.kind === "disturbance") {
     return (
       "Both runs share a seed, a starting state and the same random wobble, and the robot is in " +
       "both of them. They differ only in whether one scheduled shove happened, so the gap " +
@@ -399,7 +398,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
       if (ctx.run.treated.robotPositions === null) {
         return notApplicable(NO_ROBOT);
       }
-      const seconds = arrivalSecondsOf(ctx.run.treated, ctx.config.dt);
+      const seconds = arrivalSecondsOf(ctx.run.treated, ctx.dt);
       if (Number.isNaN(seconds)) {
         return censored(
           "The robot never came inside its goal radius before the episode ended, so all that can " +
@@ -468,7 +467,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
       "Each person is compared with themselves in the other run, and anyone who never settled " +
       "in one of the two runs is dropped and counted rather than averaged in as a zero.",
     extract: (ctx: ReportContext): Reading => {
-      const lost = pedestrianTimeLost(ctx.run, ctx.config.dt);
+      const lost = pedestrianTimeLost(ctx.run, ctx.dt);
       if (lost.nUsed === 0) {
         return censored(
           "Nobody in this run settled in both versions of the room, so there is nothing to " +
@@ -507,8 +506,8 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
       const gated = clearanceAfterBothMove(
         path,
         ctx.run.treated.positions,
-        SIM_CONSTANTS.robotRadiusM,
-        SIM_CONSTANTS.pedRadiusM,
+        ctx.bodies.robotRadiusM,
+        ctx.bodies.pedRadiusM,
         ctx.params.nearMissThresholdM,
       );
       if (Number.isNaN(gated.minM)) {
@@ -549,8 +548,8 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
       const gated = clearanceAfterBothMove(
         path,
         ctx.run.treated.positions,
-        SIM_CONSTANTS.robotRadiusM,
-        SIM_CONSTANTS.pedRadiusM,
+        ctx.bodies.robotRadiusM,
+        ctx.bodies.pedRadiusM,
         ctx.params.nearMissThresholdM,
       );
       // A finite zero is the dangerous answer here: it averages happily and reads like a
@@ -585,7 +584,7 @@ export const COLUMNS: Readonly<Record<ColumnKey, ColumnDescriptor>> = Object.fre
       const result = recovery(
         ctx.deviation.series,
         ctx.deviation.maxAtStep,
-        ctx.config.dt,
+        ctx.dt,
         tolerance,
         ctx.params.recoveryDwellSteps,
       );

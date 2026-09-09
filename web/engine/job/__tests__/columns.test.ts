@@ -4,6 +4,7 @@ import type { TreatmentSpec } from "../../contracts/pairedRun.js";
 import { runPair } from "../../sim/run.js";
 import { COLUMNS, COLUMN_ORDER, HEADLINE_COLUMNS, type ColumnKey } from "../columns.js";
 import { buildContext, type MeasurementParams, type ReportContext } from "../report.js";
+import { contextInitFromConfig } from "../simContext.js";
 import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 const PARAMS: MeasurementParams = Object.freeze({
@@ -21,7 +22,7 @@ function contextWith(treatment: TreatmentSpec): ReportContext {
 
 function contextForConfig(config: ReturnType<typeof makeRunConfig>): ReportContext {
   return buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params: PARAMS,
     run: runPair(config),
     band: null,
