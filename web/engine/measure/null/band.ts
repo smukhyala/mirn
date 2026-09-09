@@ -75,6 +75,24 @@ export function replicateBand(config: RunConfig, nReplicates = 8): RunToRunBand 
     runs.push(runPair(replicateConfig).control.positions);
   }
 
+  return bandFrom(runs);
+}
+
+/**
+ * The band's arithmetic, over runs that already exist.
+ *
+ * Split out of `replicateBand` so a set of robot-absent runs produced elsewhere can be turned into
+ * the same floor. Nothing here re-runs anything, and nothing here knows what produced its input —
+ * which is the only reason a run set read off a file can have a floor at all.
+ */
+export function bandFrom(
+  runs: readonly (readonly Float64Array[])[],
+  quantile = 0.95,
+): RunToRunBand {
+  if (runs.length < 2) {
+    throw new Error(`a band needs at least 2 runs to differ from one another, got ${runs.length}`);
+  }
+
   const meanValues: number[] = [];
   const peakValues: number[] = [];
   for (let i = 0; i < runs.length; i++) {
@@ -94,12 +112,12 @@ export function replicateBand(config: RunConfig, nReplicates = 8): RunToRunBand 
   const peakSorted = Float64Array.from(peakValues).sort();
   return {
     kind: "runToRunBand",
-    nReplicates,
+    nReplicates: runs.length,
     nPairs: meanValues.length,
-    quantile: 0.95,
-    value: quantileLinear(sorted, 0.95),
+    quantile,
+    value: quantileLinear(sorted, quantile),
     samples,
-    peakValue: quantileLinear(peakSorted, 0.95),
+    peakValue: quantileLinear(peakSorted, quantile),
     peakSamples,
   };
 }
