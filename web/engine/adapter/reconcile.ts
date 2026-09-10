@@ -1,4 +1,4 @@
-import { fail } from "../core/errors.js";
+import { fail, requireFinite } from "../core/errors.js";
 
 /**
  * Where a third party's arithmetic is met, so that the contracts never have to bend.
@@ -40,6 +40,27 @@ export interface Reconciliation {
   readonly snapped: boolean;
 }
 
+/**
+ * Reads one coordinate of a person's first sample, refusing anything that would let a degenerate
+ * path masquerade as agreement.
+ *
+ * `noUncheckedIndexedAccess` already types `path[index]` as `number | undefined`, and the bug this
+ * guards against is exactly what a bare `as number` cast throws away: index it on a zero-length
+ * path and you get `undefined`, `undefined - undefined` is `NaN`, and `NaN > tolerance` is `false`
+ * — so a path with no first sample at all would have compared as PERFECT AGREEMENT, which is the
+ * one outcome this whole module exists to rule out. Checking for `undefined` and then handing the
+ * rest to `requireFinite` closes both the missing-sample case and the non-finite-value case (a
+ * `NaN` or `Infinity` written by whatever produced the file) with the same two lines.
+ */
+function readCoordinate(path: Float64Array, index: 0 | 1, whose: string): number {
+  const value = path[index];
+  if (value === undefined) {
+    fail(`${whose} has no first sample recorded, so there is nothing here to compare`);
+  }
+  requireFinite(value, whose);
+  return value;
+}
+
 export function reconcileInitial(
   treatedPaths: readonly Float64Array[],
   controlPaths: readonly Float64Array[],
@@ -55,14 +76,21 @@ export function reconcileInitial(
   for (let i = 0; i < treatedPaths.length; i++) {
     const treated = treatedPaths[i] as Float64Array;
     const control = controlPaths[i] as Float64Array;
-    const dx = (treated[0] as number) - (control[0] as number);
-    const dy = (treated[1] as number) - (control[1] as number);
+    const treatedX = readCoordinate(treated, 0, `the across-the-room start of person ${i} in the treated run`);
+    const treatedY = readCoordinate(treated, 1, `the up-the-room start of person ${i} in the treated run`);
+    const controlX = readCoordinate(control, 0, `the across-the-room start of person ${i} in the other run`);
+    const controlY = readCoordinate(control, 1, `the up-the-room start of person ${i} in the other run`);
+    const dx = treatedX - controlX;
+    const dy = treatedY - controlY;
     const gap = Math.sqrt(dx * dx + dy * dy);
     if (gap > maxDisagreementM) {
       maxDisagreementM = gap;
     }
   }
 
+  // Deliberately '>', not '>=': a gap exactly at the bound passes and snaps. This matches
+  // `src/mirn/contracts.py`'s own '> 1e-9', so the browser mirrors its oracle rather than being
+  // stricter at the one place they would otherwise disagree about a third party's file.
   if (maxDisagreementM > INITIAL_TOLERANCE_M) {
     fail(
       `the two runs started in different places: the person who moved furthest between them ` +
@@ -76,8 +104,8 @@ export function reconcileInitial(
     for (let i = 0; i < treatedPaths.length; i++) {
       const treated = treatedPaths[i] as Float64Array;
       const control = controlPaths[i] as Float64Array;
-      control[0] = treated[0] as number;
-      control[1] = treated[1] as number;
+      control[0] = readCoordinate(treated, 0, `the across-the-room start of person ${i} in the treated run`);
+      control[1] = readCoordinate(treated, 1, `the up-the-room start of person ${i} in the treated run`);
     }
     snapped = true;
   }
