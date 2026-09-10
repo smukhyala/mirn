@@ -27,6 +27,25 @@ export const RUN_ROLES: readonly RunRole[] = Object.freeze([
   "treated", "control", "zeroTreated", "zeroControl", "replicate",
 ]);
 
+/**
+ * Plain-English phrases for each role, closed like `RUN_ROLES` and in the same order.
+ *
+ * Guardrail 12 bans a bare code identifier on any surface a reader sees, and the parser's "which
+ * role did you mean" message is exactly such a surface: it is read by somebody holding a file
+ * another team produced, and printing the wire word `zeroTreated` at them is the leak the
+ * guardrail exists to stop. The wire values in `RUN_ROLES` are the file format and are unaffected
+ * by this table — it only supplies what a human reads when one of them is wrong. `zeroTreated`
+ * and `zeroControl` share a phrase because they are never discussed apart: see the note on
+ * `RunRole` above, which already describes them only as a pair.
+ */
+export const ROLE_DESCRIPTIONS: Readonly<Record<RunRole, string>> = Object.freeze({
+  treated: "the treated run",
+  control: "the control run",
+  zeroTreated: "the pair in which nobody responds to the robot",
+  zeroControl: "the pair in which nobody responds to the robot",
+  replicate: "a repeat run, differing only in exogenous noise",
+});
+
 export interface Scenario {
   readonly kind: "scenario";
   readonly scenarioId: string;

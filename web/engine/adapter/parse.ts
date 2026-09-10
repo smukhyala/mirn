@@ -1,6 +1,6 @@
 import { fail } from "../core/errors.js";
 import {
-  FORMAT_VERSION, RUN_ROLES,
+  FORMAT_VERSION, ROLE_DESCRIPTIONS, RUN_ROLES,
   type Completion, type Provenance, type RunRecord, type RunRole, type RunSet,
   type Scenario, type SuppliedAgent, type SuppliedBodies, type SuppliedPathRecord,
 } from "./schema.js";
@@ -42,6 +42,47 @@ function asFlag(value: unknown, whose: string): boolean {
     fail(`${whose} must be true or false, and it is ${JSON.stringify(value)}`);
   }
   return value;
+}
+
+/**
+ * The roles, named in prose, deduplicated and joined into one clause an error can quote.
+ *
+ * Built from `ROLE_DESCRIPTIONS` rather than `RUN_ROLES` itself so the reader is never shown a
+ * wire value — see the comment on that table in `schema.ts`. Two roles share a phrase there, and
+ * this collapses the resulting duplicate rather than saying the same clause twice.
+ */
+function describeRoles(): string {
+  const phrases: string[] = [];
+  for (const role of RUN_ROLES) {
+    const phrase = ROLE_DESCRIPTIONS[role];
+    if (!phrases.includes(phrase)) {
+      phrases.push(phrase);
+    }
+  }
+  if (phrases.length === 1) {
+    return phrases[0]!;
+  }
+  const last = phrases[phrases.length - 1]!;
+  const allButLast = phrases.slice(0, phrases.length - 1);
+  return `${allButLast.join(", ")}, or ${last}`;
+}
+
+/**
+ * A run's own path lengths must agree with each other and with the scenario, or downstream code
+ * finds out the hard way. Left unchecked, a 3-sample scenario carrying a 500-sample agent path
+ * parses cleanly here and fails later as a `ContractError` from deep inside `makePairedRun`, with
+ * a message about arrays it never occurred to the reader to connect back to this file. Checking
+ * every path against `scenario.nSteps` catches both shapes of the mistake at once: two paths in
+ * one run disagreeing with each other must also disagree with the scenario, since they cannot
+ * both equal the same number and differ from one another.
+ */
+function checkPathLength(path: SuppliedPathRecord, whose: string, expectedNSteps: number): void {
+  if (path.nSteps !== expectedNSteps) {
+    fail(
+      `${whose} runs for ${path.nSteps} samples, and the scenario says this room runs for ` +
+        `${expectedNSteps} samples`,
+    );
+  }
 }
 
 function readPath(value: unknown, whose: string): SuppliedPathRecord {
@@ -89,7 +130,7 @@ function readCompletion(value: unknown, whose: string): Completion | null {
   });
 }
 
-function readRun(value: unknown, index: number): RunRecord {
+function readRun(value: unknown, index: number, expectedNSteps: number): RunRecord {
   const whose = `the run at position ${index}`;
   const holder = asRecord(value, whose);
   const runId = asText(holder["runId"], `the name of ${whose}`);
@@ -103,8 +144,8 @@ function readRun(value: unknown, index: number): RunRecord {
   }
   if (role === null) {
     fail(
-      `${whose} says it plays the part '${roleText}', which is not one this bench knows; the ` +
-        `parts are ${RUN_ROLES.join(", ")}`,
+      `${whose} says it plays the part '${roleText}', which is not a part this bench knows; a ` +
+        `run can be ${describeRoles()}`,
     );
   }
 
@@ -125,6 +166,9 @@ function readRun(value: unknown, index: number): RunRecord {
   if (!robotPresent && robot !== null) {
     fail(`${whose} says no robot is in it and carries a path for one`);
   }
+  if (robot !== null) {
+    checkPathLength(robot, `the robot's path in ${whose}`, expectedNSteps);
+  }
 
   const agentsValue = holder["agents"];
   if (!Array.isArray(agentsValue)) {
@@ -143,11 +187,13 @@ function readRun(value: unknown, index: number): RunRecord {
       fail(`${whose} names the person '${id}' twice, so its names do not name one person each`);
     }
     seen.add(id);
+    const path = readPath(agentHolder, `the path of the person '${id}' in ${whose}`);
+    checkPathLength(path, `the path of the person '${id}' in ${whose}`, expectedNSteps);
     agents.push(
       Object.freeze({
         kind: "suppliedAgent" as const,
         id,
-        path: readPath(agentHolder, `the path of the person '${id}' in ${whose}`),
+        path,
       }),
     );
   }
@@ -235,7 +281,7 @@ export function parseRunSet(text: string): RunSet {
   }
   const runs: RunRecord[] = [];
   for (let i = 0; i < runsList.length; i++) {
-    runs.push(readRun(runsList[i], i));
+    runs.push(readRun(runsList[i], i, nSteps));
   }
 
   return Object.freeze({
