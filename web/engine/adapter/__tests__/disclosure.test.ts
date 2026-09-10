@@ -38,6 +38,32 @@ describe("what a reading off somebody else's simulator has to say", () => {
     // the DOM-free engine project, and reaching into the console layer from here would couple the
     // two. The clause below is the one the invented-crowd sentence carries and this one must not.
     expect(EXTERNAL_CROWD_DISCLOSURE).not.toContain("invented model of pedestrians");
+    // A relabelled copy of the invented-crowd sentence's OWN closing clause is the more dangerous
+    // near-miss, and the one a first draft of this file actually made: it claims the two arms are
+    // known to share their exogenous noise, which is exactly what an adapted run set cannot
+    // establish (there is no tape and no seed this bench controls to check it against). Guard
+    // against both halves of that borrowed ending sailing back in under different words.
+    expect(EXTERNAL_CROWD_DISCLOSURE).not.toContain("the same random wobble");
+    expect(EXTERNAL_CROWD_DISCLOSURE).not.toContain("is the robot's effect on them");
+  });
+
+  it("says what it checked between the two runs, concretely", () => {
+    const lower = EXTERNAL_CROWD_DISCLOSURE.toLowerCase();
+    expect(lower).toContain("name the same people");
+    expect(lower).toContain("share a clock and a length");
+    expect(lower).toContain("within a whisker");
+    expect(lower).toContain("exact agreement");
+  });
+
+  it("says what it did not check, and does not claim the runs shared their randomness", () => {
+    const lower = EXTERNAL_CROWD_DISCLOSURE.toLowerCase();
+    expect(lower).toContain("did not check");
+    expect(lower).toContain("shared the same underlying randomness");
+  });
+
+  it("attributes the no-other-difference claim to the file, not to a finding of its own", () => {
+    expect(EXTERNAL_CROWD_DISCLOSURE).toContain("is the file's claim, not a finding of this bench's");
+    expect(EXTERNAL_CROWD_DISCLOSURE).toContain("only as good as that claim");
   });
 
   it("names the producer without naming a variable at anybody", () => {
