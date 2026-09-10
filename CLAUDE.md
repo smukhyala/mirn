@@ -464,6 +464,7 @@ entirely — Python-only estimators are not a parity question until something po
 | `identification`, `estimatorName`, `divergenceName` | The browser's wording is written for a reader and Python's for a paper, so the strings differ on purpose. Each suite asserts its own instead: that the paired estimator's is substantial, and that the constant-velocity residual's opens with `UNMET` |
 | `sinkhorn_w2` | Every step is `exp`/`log`, neither bit-portable, and a tolerance-based stopping rule halts at different iteration counts — ~1.2e-3 relative between adjacent stopping points. Python-only; the browser uses ADE, which is what the demo used anyway |
 | `replicateBand` | Not a two-implementation item at all: it re-runs the simulator, which is TypeScript-only by rule. It is also a *different* null from `split_half_null` — see the naming note in `null/band.ts` — and the two are never divided by one another |
+| `bandFrom` | The same exemption as `replicateBand`, and it gets its own row rather than inheriting one silently. It is `replicateBand`'s arithmetic, split out so a set of robot-absent runs produced elsewhere — an adapted run set's `replicate` runs — can be turned into the same floor without re-running anything. Splitting it did not move it across the line: it is still the run-to-run null, still a *different* null from `split_half_null`, and Python has no counterpart to compare it against because Python never had one |
 
 ---
 

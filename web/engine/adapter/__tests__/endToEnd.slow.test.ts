@@ -66,6 +66,7 @@ describe("a run set read back in measures what it measured before", () => {
   it("reports through the ordinary column machinery, with the producer's bodies", () => {
     const context = buildContext({
       dt: built.dt,
+      pairingOrigin: built.pairingOrigin,
       bodies: built.bodies,
       straightLineM: built.straightLineM,
       straightLineArrivalS: built.straightLineArrivalS,
@@ -93,7 +94,8 @@ describe("a run set read back in measures what it measured before", () => {
 
   it("says the run-to-run band was not measured rather than inventing a floor", () => {
     const context = buildContext({
-      dt: built.dt, bodies: built.bodies, straightLineM: built.straightLineM,
+      dt: built.dt, pairingOrigin: built.pairingOrigin, bodies: built.bodies,
+      straightLineM: built.straightLineM,
       straightLineArrivalS: built.straightLineArrivalS,
       params: PARAMS, run: built.run, band: null, floor: null,
       zeroRun: built.zeroRun, frechetMeanM: null,
@@ -111,7 +113,8 @@ describe("a run set read back in measures what it measured before", () => {
     expect(built.replicates.length).toBeGreaterThanOrEqual(2);
     const band = bandFrom(built.replicates);
     const context = buildContext({
-      dt: built.dt, bodies: built.bodies, straightLineM: built.straightLineM,
+      dt: built.dt, pairingOrigin: built.pairingOrigin, bodies: built.bodies,
+      straightLineM: built.straightLineM,
       straightLineArrivalS: built.straightLineArrivalS,
       params: PARAMS, run: built.run, band, floor: null,
       zeroRun: built.zeroRun, frechetMeanM: null,
@@ -126,7 +129,8 @@ describe("a run set read back in measures what it measured before", () => {
   it("agrees with the simulator about how far the robot travelled", () => {
     const direct = runPair(config);
     const context = buildContext({
-      dt: built.dt, bodies: built.bodies, straightLineM: built.straightLineM,
+      dt: built.dt, pairingOrigin: built.pairingOrigin, bodies: built.bodies,
+      straightLineM: built.straightLineM,
       straightLineArrivalS: built.straightLineArrivalS,
       params: PARAMS, run: built.run, band: null, floor: null,
       zeroRun: built.zeroRun, frechetMeanM: null,

@@ -128,13 +128,20 @@ data it describes, which is the failure mode of shipping loose per-run CSVs.
   "runs": [
     {
       "runId": "...", "role": "treated", "seed": 20260816, "robotPresent": true,
-      "completion": { "kind": "reachedGoal", "atStep": 512 },
+      "completion": { "outcome": "reachedGoal", "atSample": 512 },
       "robot":  { "positions": [2.0, 6.5, 2.05, 6.5, "..."] },
       "agents": [ { "id": "ped-0", "positions": [1.1, 3.4, "..."] } ]
     }
   ]
 }
 ```
+
+`completion.atSample` is a **sample index** — a position in the run's own recorded arrays — and not
+a tick. The two are off by one: MIRN's simulator sets a tick after moving the robot on it, and the
+position that motion produced lands in the *next* sample, so `arrivedTick = atSample - 1`. A
+producer writes the index it has (where in its recorded path the robot is first at its goal) and the
+adapter does the conversion, once, in `build.ts`. `completion` may be `null`, or omitted, for a run
+that did not finish. `completion.outcome` is free text and nothing branches on it.
 
 `positions` is flat `[x0,y0,x1,y1,…]`, matching `Trajectory.positions` exactly and halving the
 document against a nested form. A row-oriented variant (`agent_id, frame, x, y`) is a second parser
@@ -187,7 +194,8 @@ Truncating to the shorter would move every maximum-style metric — `worstMoment
 `nearMissEpisodes` — by an amount nobody could see. A real simulator will hit this, and when it does
 the fix belongs in the scenario or in an agreed truncation policy, not in a quiet default.
 
-**Completion.** `completion.atStep` becomes `ArmResult.arrivedTick`; absent or non-arriving becomes
+**Completion.** `completion.atSample`, minus one, becomes `ArmResult.arrivedTick`; absent or
+non-arriving becomes
 `-1`, which `arrivalSecondsOf` already turns into `NaN` and `robotArrivalS` already renders as
 `censored`. No new machinery: the honest rendering for "this run did not finish" already exists.
 

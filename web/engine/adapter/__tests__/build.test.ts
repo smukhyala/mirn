@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
 import { pedestrianById } from "../../contracts/scene.js";
 import { paired } from "../../measure/estimator/index.js";
+import { COLUMNS } from "../../job/columns.js";
+import { buildContext, type MeasurementParams, type ReportContext } from "../../job/report.js";
 import { buildAdapted } from "../build.js";
+import { EXTERNAL_CROWD_DISCLOSURE } from "../disclosure.js";
 import { identityFor } from "../identity.js";
 import { parseRunSet } from "../parse.js";
 
@@ -223,7 +226,12 @@ describe("building a paired run from a run set", () => {
       for (const person of people) {
         const trajectory = pedestrianById(reordered.run.pair.treated, identity.agentIdOf(person.id));
         const lastY = trajectory.positions[trajectory.positions.length - 1];
-        expect(lastY).toBeCloseTo(person.baseY + person.nudgeM, 9);
+        // `toBe`, never `toBeCloseTo`: every value here is written into the document by
+        // `JSON.stringify` and read back by `JSON.parse`, both of which round-trip a double
+        // exactly, and nothing between them does arithmetic on it. So the exactness is
+        // available, and this project's rule is that where it is available, inexactness means
+        // something drifted and the assertion should say so rather than tolerate it.
+        expect(lastY).toBe(person.baseY + person.nudgeM);
       }
     });
   });
@@ -377,6 +385,89 @@ describe("building a paired run from a run set", () => {
         const message = messageOf(testCase.run);
         expect(CODE_IDENTIFIER.test(message)).toBe(false);
       });
+    }
+  });
+});
+
+/**
+ * The finding this whole field was added for, tested where it would actually have bitten.
+ *
+ * `endToEnd.slow.test.ts` already asserts that "how far the robot pushed the crowd" and "worst
+ * moment" come back MEASURED on an adapted run set, which means the tile beneath them renders, which
+ * means `pairedAssumption` runs on adapted data. Before this change it rendered the sentence that
+ * says the two runs "share a seed, a starting state and the same random wobble" and that "nothing
+ * else can differ" — a claim `EXTERNAL_CROWD_DISCLOSURE` refuses in as many words, and one this
+ * bench has no way to check for a pair it did not build.
+ *
+ * These go through the real adapter rather than a hand-set flag, because the failure being guarded
+ * against is a wiring one: a correct sentence that an adapted run never reaches is no fix at all.
+ * The branch itself, on all three treatment kinds, is covered in `web/engine/job/__tests__/
+ * columns.test.ts`; what this file proves is that a file read off disc arrives at it.
+ */
+describe("a pairing this bench was handed rather than built", () => {
+  const PARAMS: MeasurementParams = Object.freeze({
+    kind: "measurementParams" as const,
+    forecastHorizonSteps: 1,
+    forecastEndStep: 2,
+    nearMissThresholdM: 0.5,
+    recoveryToleranceFraction: 0.25,
+    recoveryDwellSteps: 1,
+  });
+
+  function adaptedContext(): ReportContext {
+    const built = buildAdapted(parseRunSet(text(0.25)));
+    return buildContext({
+      dt: built.dt,
+      pairingOrigin: built.pairingOrigin,
+      bodies: built.bodies,
+      straightLineM: built.straightLineM,
+      straightLineArrivalS: built.straightLineArrivalS,
+      params: PARAMS,
+      run: built.run,
+      band: null,
+      floor: null,
+      zeroRun: built.zeroRun,
+      frechetMeanM: null,
+    });
+  }
+
+  it("says so on the record it hands back, so a caller cannot forget to", () => {
+    // Carried on `AdaptedRunSet` rather than typed as a literal at each call site. A run this bench
+    // produced gets its origin from `contextInitFromConfig`, which every simulator caller already
+    // spreads; an adapted run builds its init field by field, and a literal typed field by field is
+    // a literal somebody eventually types wrongly.
+    expect(buildAdapted(parseRunSet(text(0.25))).pairingOrigin).toBe("asserted");
+  });
+
+  it("never tells a reader the two runs shared their randomness", () => {
+    const context = adaptedContext();
+    for (const key of ["trueEffectM", "worstMomentM"] as const) {
+      const assumption = COLUMNS[key].assumption(context);
+      expect(assumption).not.toContain("share a seed");
+      expect(assumption).not.toContain("the same random wobble");
+      expect(assumption).not.toContain("nothing else can differ");
+    }
+  });
+
+  it("tells them whose claim it is instead, in the disclosure's own words", () => {
+    // Checked clause by clause against `EXTERNAL_CROWD_DISCLOSURE` rather than as one string: a
+    // reader can meet both on the same screen, and the failure worth catching is the two of them
+    // drifting into saying different things about what was checked.
+    const assumption = COLUMNS.trueEffectM.assumption(adaptedContext());
+    expect(assumption).toContain("name the same people, share a clock and a length");
+    expect(EXTERNAL_CROWD_DISCLOSURE).toContain("name the same people, share a clock and a length");
+    expect(assumption).toContain("the file's claim, not a finding of this bench's");
+    expect(EXTERNAL_CROWD_DISCLOSURE).toContain("is the file's claim, not a finding of this bench's");
+    expect(assumption).toContain("share the same underlying randomness");
+    expect(EXTERNAL_CROWD_DISCLOSURE).toContain("shared the same underlying randomness");
+  });
+
+  it("writes it in English, not in code, and puts no figure in it", () => {
+    const context = adaptedContext();
+    for (const key of ["trueEffectM", "worstMomentM"] as const) {
+      const assumption = COLUMNS[key].assumption(context);
+      expect(assumption).not.toMatch(CODE_IDENTIFIER);
+      expect(assumption).not.toMatch(/[0-9]/);
     }
   });
 });

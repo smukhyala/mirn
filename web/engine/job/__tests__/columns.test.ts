@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { makeRunConfig } from "../../contracts/config.js";
+import { makeRunConfig, type DisturbanceSpec } from "../../contracts/config.js";
 import type { TreatmentSpec } from "../../contracts/pairedRun.js";
 import { runPair } from "../../sim/run.js";
 import { COLUMNS, COLUMN_ORDER, HEADLINE_COLUMNS, type ColumnKey } from "../columns.js";
-import { buildContext, type MeasurementParams, type ReportContext } from "../report.js";
+import {
+  buildContext,
+  type MeasurementParams,
+  type PairingOrigin,
+  type ReportContext,
+} from "../report.js";
 import { contextInitFromConfig } from "../simContext.js";
 import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
@@ -242,5 +247,141 @@ describe("the headline column set", () => {
 
   it("is frozen and immutable", () => {
     expect(Object.isFrozen(HEADLINE_COLUMNS)).toBe(true);
+  });
+});
+
+/**
+ * Guardrail 1, at the one tile whose wording turns on something no reader could see for themselves.
+ *
+ * `pairedAssumption` used to branch on the treatment kind alone, and told everybody that the two
+ * runs "share a seed, a starting state and the same random wobble" and that "nothing else can
+ * differ". For a pair this bench built that is true by construction — one shared noise tape, one
+ * initial state, one seed. For a pair read in from another simulator's file it is unchecked and
+ * uncheckable, and `EXTERNAL_CROWD_DISCLOSURE` says so in as many words, so the two sentences
+ * would have sat on one screen contradicting each other with the confident one in the larger type.
+ *
+ * Both halves are held here. The constructed half asserts the ORIGINAL sentences survive word for
+ * word: gating that made an adapted run honest by making a simulated run vague would be a
+ * regression dressed as a fix, and only an exact-text assertion catches that. The asserted half
+ * asserts the shared-randomness claim is gone and the file's-claim framing is there instead.
+ *
+ * The adapted path is exercised end to end, through the real adapter, in the adapter's own
+ * `build.test.ts`. What this file adds is the third treatment kind: a shove pair cannot be read in
+ * from a file at all — `parse.ts` accepts a robot-presence or a null treatment and nothing else —
+ * so the disturbance branch has no adapted fixture and would otherwise go unread.
+ */
+describe("what a tile may claim about a pairing depends on who built it", () => {
+  const SHOVE: DisturbanceSpec = Object.freeze({
+    kind: "impulse" as const,
+    id: "shove",
+    atTick: 20,
+    durationTicks: 1,
+    magnitude: 1,
+    headingRad: 0,
+    targetUid: 0,
+  });
+
+  // One config per treatment kind, each simulated ONCE and read from two contexts that differ in
+  // the single field under test. Running the pair twice would double this file's cost to assert
+  // nothing extra: `pairedAssumption` reads the run's treatment and the pairing origin and nothing
+  // else, so the same run under both origins is the sharpest available comparison as well as the
+  // cheapest.
+  const CONFIGS = [
+    makeRunConfig({ treatment: { kind: "robot-presence" } }),
+    makeRunConfig({
+      disturbances: [SHOVE],
+      treatment: { kind: "disturbance", disturbanceId: SHOVE.id },
+    }),
+    makeRunConfig({ treatment: { kind: "none" } }),
+  ] as const;
+
+  const PAIRED_KEYS: readonly ColumnKey[] = Object.freeze(["trueEffectM", "worstMomentM"]);
+
+  function contextFor(config: (typeof CONFIGS)[number], pairingOrigin: PairingOrigin): ReportContext {
+    return buildContext({
+      ...contextInitFromConfig(config),
+      pairingOrigin,
+      params: PARAMS,
+      run: runPair(config),
+      band: null,
+      floor: null,
+      zeroRun: null,
+      frechetMeanM: null,
+    });
+  }
+
+  const constructed = CONFIGS.map((config) => contextFor(config, "constructed"));
+  const asserted = CONFIGS.map((config) => contextFor(config, "asserted"));
+
+  it("keeps every word of the constructed sentence, which is true by construction", () => {
+    for (const context of constructed) {
+      for (const key of PAIRED_KEYS) {
+        const assumption = COLUMNS[key].assumption(context);
+        expect(assumption).toContain(
+          "Both runs share a seed, a starting state and the same random wobble",
+        );
+        expect(assumption).not.toContain("the file's claim");
+      }
+    }
+    const robotPresence = constructed[0] as ReportContext;
+    expect(COLUMNS.trueEffectM.assumption(robotPresence)).toContain(
+      "Because nothing else can differ, the gap between a person's two paths is the robot's " +
+        "effect on them and nothing is estimated.",
+    );
+  });
+
+  it("drops the shared-randomness claim when the pairing was only asserted", () => {
+    for (const context of asserted) {
+      for (const key of PAIRED_KEYS) {
+        const assumption = COLUMNS[key].assumption(context);
+        expect(assumption).not.toContain("share a seed");
+        expect(assumption).not.toContain("the same random wobble");
+        expect(assumption).not.toContain("nothing else can differ");
+        expect(assumption).not.toContain("and of nothing else");
+      }
+    }
+  });
+
+  it("says instead what was checked, and whose claim the rest of it is", () => {
+    for (const context of asserted) {
+      for (const key of PAIRED_KEYS) {
+        const assumption = COLUMNS[key].assumption(context);
+        expect(assumption).toContain("a simulator this bench did not run");
+        expect(assumption).toContain("name the same people, share a clock and a length");
+        expect(assumption).toContain("What it could not check");
+        expect(assumption).toContain("share the same underlying randomness");
+        expect(assumption).toContain("the file's claim, not a finding of this bench's");
+      }
+    }
+  });
+
+  it("still names what the two runs are said to differ by, which is the treatment's job", () => {
+    // The origin gates the confidence, not the subject. A reader still has to be told whether the
+    // robot, one shove or nothing at all is what the file says the arms differ by: a sentence
+    // honest about its provenance and silent about its subject has explained nothing.
+    const [robot, shove, nothing] = asserted as readonly ReportContext[];
+    expect(COLUMNS.trueEffectM.assumption(robot as ReportContext)).toContain(
+      "differ only in whether the robot is there",
+    );
+    expect(COLUMNS.trueEffectM.assumption(shove as ReportContext)).toContain(
+      "one scheduled shove happened",
+    );
+    expect(COLUMNS.trueEffectM.assumption(nothing as ReportContext)).toContain(
+      "nothing was done to either of them",
+    );
+  });
+
+  it("writes the asserted sentences in English, not in code, and puts no figure in them", () => {
+    // Guardrail 12, plus the no-numeric-literal rule, over strings the catalogue scan above cannot
+    // reach: that scan builds its context from `contextWith`, whose pairing is always constructed,
+    // so every asserted branch would go unscanned however many of them there were.
+    for (const context of asserted) {
+      for (const key of PAIRED_KEYS) {
+        const assumption = COLUMNS[key].assumption(context);
+        expect(assumption.length).toBeGreaterThan(20);
+        expect(assumption).not.toMatch(CODE_IDENTIFIER_OR_SYNTAX);
+        expect(assumption).not.toMatch(/[0-9]/);
+      }
+    }
   });
 });

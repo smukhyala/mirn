@@ -2,7 +2,7 @@ import { makePairedRun, type PairedRun } from "../contracts/pairedRun.js";
 import { makeScene, type Scene } from "../contracts/scene.js";
 import { makeTrajectory, type Trajectory } from "../contracts/trajectory.js";
 import { fail } from "../core/errors.js";
-import type { Bodies, MeasuredRun } from "../job/report.js";
+import type { Bodies, MeasuredRun, PairingOrigin } from "../job/report.js";
 import type { ArmResult } from "../sim/run.js";
 import { identityFor, type IdentityMap } from "./identity.js";
 import { reconcileInitial, requireSameLength, type Reconciliation } from "./reconcile.js";
@@ -20,6 +20,24 @@ import { ROLE_DESCRIPTIONS, type Provenance, type RunRecord, type RunRole, type 
 export interface AdaptedRunSet {
   readonly kind: "adaptedRunSet";
   readonly run: MeasuredRun;
+  /**
+   * Always `asserted`, and carried here rather than left to each caller to remember.
+   *
+   * `buildContext` requires a `PairingOrigin` and a run this bench produced supplies it through
+   * `contextInitFromConfig`, which sets `constructed` for every simulator caller at once. An
+   * adapted run has no equivalent — it builds its init field by field out of this record — so
+   * without this field the origin would be a literal typed at each call site, and the failure mode
+   * of a literal typed at each call site is that one of them says the wrong thing and compiles.
+   * Getting it wrong here is not a cosmetic slip: it is the difference between a tile saying
+   * "nothing else can differ" and a tile saying that nobody checked, printed over the same number.
+   *
+   * It is a constant rather than something read off the file for the same reason it is a constant
+   * in `contextInitFromConfig`: reaching this function at all means the two arms arrived already
+   * paired, from a producer this bench cannot interrogate. No value a file could carry would make
+   * the pairing constructed, and a file claiming otherwise is making precisely the claim this
+   * field exists to mark as a claim.
+   */
+  readonly pairingOrigin: PairingOrigin;
   /** The pair in which nobody responded to the robot, if the run set carried one. */
   readonly zeroRun: MeasuredRun | null;
   /** Robot-absent runs differing only in noise, for a run-to-run band. Empty if none were given. */
@@ -246,6 +264,22 @@ function straightLineArrivalFrom(
   return straightLineM / fastestSpeed;
 }
 
+/**
+ * A parsed run set, assembled into the paired shapes the measurement layer speaks.
+ *
+ * **This WRITES INTO the buffers the run set handed it, and a caller still holding that `RunSet`
+ * needs to know.** `pairFrom` passes the parsed agents' own `Float64Array`s to `reconcileInitial`,
+ * which snaps the control arm's sample 0 onto the treated arm's IN PLACE — see that function's own
+ * warning, which has said so plainly since it was written while this entry point, the one anybody
+ * actually calls, said nothing. Nothing is copied on the way through: the arrays on the returned
+ * `MeasuredRun` are the same arrays the `RunSet` carries, so a caller that parses once, builds, and
+ * then reads the original expecting untouched input is reading edited data. Parse again if you need
+ * the file's own numbers back.
+ *
+ * The snap is bounded, checked and reported — `reconciliation` on the returned record carries the
+ * largest disagreement it closed — so this is a documented reconciliation rather than a silent
+ * repair. Documented at the door as well as inside is the point of this paragraph.
+ */
 export function buildAdapted(set: RunSet): AdaptedRunSet {
   const treatedRecord = requireRole(set, "treated");
   const controlRecord = requireRole(set, "control");
@@ -293,6 +327,7 @@ export function buildAdapted(set: RunSet): AdaptedRunSet {
   return Object.freeze({
     kind: "adaptedRunSet" as const,
     run: built.run,
+    pairingOrigin: "asserted" as const,
     zeroRun,
     replicates: Object.freeze(replicates),
     bodies: Object.freeze({

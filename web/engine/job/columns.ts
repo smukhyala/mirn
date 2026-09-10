@@ -147,12 +147,71 @@ const NEVER_BOTH_LEFT_START =
   "left where they were standing, and that moment never came, so there is nothing to measure.";
 
 /**
- * The paired estimator's own sentence is true only when the robot is the treatment.
+ * What this bench checked about a pair it did not build, said once so three sentences cannot drift
+ * apart from it or from `EXTERNAL_CROWD_DISCLOSURE`.
  *
- * Under a shove treatment the robot is in both arms, and under the null treatment nothing differs
- * at all, so quoting "differ only in whether the robot is there" would be false on screen.
+ * A reader can meet both this and that disclosure on the same screen, so they have to agree about
+ * what was checked and about what could not be. The list here is the same list, in the same order,
+ * and it is deliberately the narrow one: names, a clock, a length, and starting positions that
+ * agreed to within a whisker before `reconcileInitial` nudged them into exact agreement. Snapping
+ * is named rather than glossed over, because a reader who is told the starting positions "agree"
+ * without being told this bench edited them has been told the pleasant half of a true sentence.
+ */
+const ASSERTED_PAIRING_CHECKED =
+  "These two runs were produced by a simulator this bench did not run, and read in from a file. " +
+  "What it checked: that the two runs name the same people, share a clock and a length, and " +
+  "start in the same places to within a whisker, which it closed by nudging them into exact " +
+  "agreement. What it could not check: whether the two runs share the same underlying " +
+  "randomness, or whether anything else about them differs. ";
+
+/**
+ * The paired estimator's own sentence turns on two things, and for a long time it only asked about
+ * one of them.
+ *
+ * The first is WHAT the arms differ by, which is the treatment: under a shove treatment the robot
+ * is in both arms, and under the null treatment nothing differs at all, so quoting "differ only in
+ * whether the robot is there" would be false on screen.
+ *
+ * The second is HOW ANYBODY KNOWS they differ by only that, which is the pairing origin, and it
+ * matters more. For a pair this bench built, "both runs share a seed, a starting state and the
+ * same random wobble" is a fact about how the run was made: `runArm` takes one shared noise tape,
+ * so nothing else CAN differ, and the sentence claims no more than the construction guarantees.
+ * For a pair read in from another simulator's file, every word of that is unverified. There is no
+ * seed this bench set and no tape it owns, so it cannot check that the two runs shared their
+ * randomness — `EXTERNAL_CROWD_DISCLOSURE` says exactly that, in as many words, and this function
+ * printing the opposite two inches away would put the confident sentence where the reader looks
+ * first and the honest one in the small print underneath.
+ *
+ * So the shared-randomness clause and "nothing else can differ" are gated on the origin, not on
+ * the treatment. The asserted forms say what was actually checked, and then say plainly whose
+ * claim the rest of it is. They end on the limitation rather than on the reassurance, for the
+ * reason guardrail 1 gives: ending on the reassurance is the overclaim.
  */
 function pairedAssumption(ctx: ReportContext): string {
+  if (ctx.pairingOrigin === "asserted") {
+    if (ctx.run.pair.treatment.kind === "robot-presence") {
+      return (
+        ASSERTED_PAIRING_CHECKED +
+        "That they differ only in whether the robot is there is the file's claim, not a finding " +
+        "of this bench's, so the gap between a person's two paths is the robot's effect on them " +
+        "only as far as that claim holds."
+      );
+    }
+    if (ctx.run.pair.treatment.kind === "disturbance") {
+      return (
+        ASSERTED_PAIRING_CHECKED +
+        "That the robot is in both of them and that they differ only in whether one scheduled " +
+        "shove happened is the file's claim, not a finding of this bench's, so the gap between a " +
+        "person's two paths is the effect of that shove only as far as that claim holds."
+      );
+    }
+    return (
+      ASSERTED_PAIRING_CHECKED +
+      "That nothing was done to either of them is the file's claim, not a finding of this " +
+      "bench's. Anything other than a flat zero here is the measurement moving, or something " +
+      "about the two runs the file did not mention, and this bench cannot tell those apart."
+    );
+  }
   if (ctx.run.pair.treatment.kind === "robot-presence") {
     return (
       "Both runs share a seed, a starting state and the same random wobble, and differ only in " +

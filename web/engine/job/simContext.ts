@@ -1,5 +1,5 @@
 import { SIM_CONSTANTS, type RunConfig } from "../contracts/config.js";
-import type { Bodies } from "./report.js";
+import type { Bodies, PairingOrigin } from "./report.js";
 
 /**
  * The one module that turns a simulator configuration into what the report layer needs.
@@ -17,6 +17,22 @@ import type { Bodies } from "./report.js";
  */
 export interface SimContextInit {
   readonly dt: number;
+  /**
+   * Always `constructed`, and it is carried here rather than written out at each call site because
+   * that is what makes it impossible to get wrong.
+   *
+   * Everything that reports on a run this bench produced reaches `buildContext` by spreading
+   * `contextInitFromConfig(config)` — the console's preview, the drill, the runner, the family
+   * probe and every test that measures a simulated pair. Putting the field in this record means all
+   * of them state their pairing origin correctly without anybody editing them, and means the ONLY
+   * way to reach `buildContext` without saying `constructed` is to build the init by hand, which is
+   * exactly what the adapter's callers do and exactly the case that must not default.
+   *
+   * The value is a constant rather than a parameter because this function's input is a `RunConfig`,
+   * and a `RunConfig` is a MIRN simulator setting: reaching this function at all means `runPair`
+   * built both arms off one shared noise tape. See `PairingOrigin` in `report.ts`.
+   */
+  readonly pairingOrigin: PairingOrigin;
   readonly bodies: Bodies;
   readonly straightLineM: number;
   /**
@@ -44,6 +60,7 @@ export function contextInitFromConfig(config: RunConfig): SimContextInit {
 
   return Object.freeze({
     dt: config.dt,
+    pairingOrigin: "constructed" as const,
     bodies: Object.freeze({
       kind: "bodies" as const,
       robotRadiusM: SIM_CONSTANTS.robotRadiusM,

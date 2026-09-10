@@ -294,10 +294,47 @@ export interface MeasuredRun {
   readonly control: ArmResult;
 }
 
+/**
+ * How the pair came to be a pair: did this bench build it, or was it handed one and told it was?
+ *
+ * This is NOT a restatement of `PairedRun.treatment`. The treatment says what the two arms differ
+ * BY — the robot, a scheduled shove, nothing at all. This says how much anybody knows about what
+ * they differ by, and the two are independent: a robot-presence pair can arrive either way.
+ *
+ * `constructed` means this bench produced both arms itself. `runArm` draws them from ONE shared
+ * `NoiseTape`, from one initial state, under one seed, so "the two arms differ only in the
+ * treatment" is not a claim anybody makes about the run — it is a property of how the run was
+ * made, and `makePairedRun` asserts it besides. The tile that says "nothing else can differ" is
+ * saying something true by construction.
+ *
+ * `asserted` means the two arms were produced elsewhere and read in — `web/engine/adapter/`
+ * assembles them from a file another simulator wrote. What this bench then checks is real but
+ * narrow: that the two runs name the same people, share a clock and a length, and start in the
+ * same places to within a whisker, which `reconcileInitial` closes by nudging them into exact
+ * agreement. There is no tape and no seed it controls, so **whether the two runs shared their
+ * exogenous noise is not something it can check at all**, and neither is anything else about them.
+ * That they differ only in the treatment is the producer's claim.
+ *
+ * The field exists because a reader-facing sentence turns on that difference and nothing else in
+ * `ReportContext` could tell the two cases apart. `pairedAssumption` in `columns.ts` used to branch
+ * on the treatment kind alone and, for a robot-presence pair, told every reader that the two runs
+ * "share a seed, a starting state and the same random wobble" and that "nothing else can differ".
+ * On an adapted run set that is exactly the overclaim `EXTERNAL_CROWD_DISCLOSURE` was written to
+ * refuse — it says in as many words that whether the two runs shared their randomness was never
+ * checked and cannot be. Both sentences would have been on screen at once, two inches apart,
+ * contradicting each other, with the wrong one printed in the larger type.
+ *
+ * So the distinction is carried here rather than inferred anywhere, and it is required rather than
+ * defaulted: a new caller of `buildContext` has to say which kind of pairing it has, and a caller
+ * that forgets does not silently get the confident sentence.
+ */
+export type PairingOrigin = "constructed" | "asserted";
+
 /** Everything a column extractor is allowed to look at. Built once per run, never per column. */
 export interface ReportContext {
   readonly kind: "reportContext";
   readonly dt: number;
+  readonly pairingOrigin: PairingOrigin;
   readonly bodies: Bodies;
   readonly params: MeasurementParams;
   readonly run: MeasuredRun;
@@ -318,6 +355,8 @@ export interface ReportContext {
 
 export interface BuildContextInit {
   readonly dt: number;
+  /** See `PairingOrigin`. Required, never defaulted: a forgotten pairing origin is an overclaim. */
+  readonly pairingOrigin: PairingOrigin;
   readonly bodies: Bodies;
   readonly straightLineM: number;
   readonly straightLineArrivalS: number;
@@ -333,6 +372,7 @@ export function buildContext(init: BuildContextInit): ReportContext {
   return Object.freeze({
     kind: "reportContext" as const,
     dt: init.dt,
+    pairingOrigin: init.pairingOrigin,
     bodies: init.bodies,
     params: init.params,
     run: init.run,
