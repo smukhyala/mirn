@@ -279,6 +279,14 @@ export interface Bodies {
  * `RunResult` is structurally assignable to this, so `runPair`'s output needs no conversion. What
  * this leaves out is the point: no `RunConfig`, so nothing downstream can read a setting that only
  * MIRN's own simulator has.
+ *
+ * DELIBERATELY CARRIES NO `kind` FIELD. Every other record in this codebase does — see the
+ * TypeScript conventions in CLAUDE.md — but `RunResult.kind` is `"runResult"`, and giving this
+ * interface its own `kind` literal would break the very structural assignability the paragraph
+ * above depends on: `web/engine/adapter/build.ts`'s `buildAdapted` hands back a plain
+ * `{ pair, treated, control }` with no `kind` at all, and `runPair`'s `RunResult` flows into
+ * `buildContext` unchanged only because neither shape is required to match a discriminant this one
+ * doesn't have. Do not "fix" this by adding one.
  */
 export interface MeasuredRun {
   readonly pair: PairedRun;

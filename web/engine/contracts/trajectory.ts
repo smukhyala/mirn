@@ -11,9 +11,11 @@ import type { Vec2 } from "../core/vec.js";
  *    what makes the parity fixture exact: row-major (T, 2) float64 is byte-identical to this
  *    buffer, so `np.frombuffer(buf).reshape(T, 2)` round-trips with no reinterpretation.
  * 2. `agentUid: number` is added. Python has only `agent_id: str`. The uid is load-bearing here —
- *    it addresses the noise tape and it is the pairing key. The parity rule, asserted below and on
- *    the Python side, is that `agentId === "ped" + uid` for base agents, `"inj" + uid` for
- *    injected ones, and `"robot"` for uid -1.
+ *    it addresses the noise tape and it is the pairing key. The parity rule, followed by MIRN's own
+ *    producers on both sides, is that `agentId === "ped" + uid` for base agents, `"inj" + uid` for
+ *    injected ones, and `"robot"` for uid -1. That is a CONVENTION the producers keep, not an
+ *    assertion this factory makes: only the charset below is enforced, which is what lets
+ *    `web/engine/adapter/` mint `ext0`, `ext1`, ... for people a different simulator named.
  * 3. Read-only is advisory. JS cannot freeze a TypedArray's contents; `readonly` catches it at
  *    compile time and `Object.freeze` catches attribute assignment. This is the same posture
  *    contracts.py already documents for numpy's `writeable = False`: a mistake-catcher, not a
