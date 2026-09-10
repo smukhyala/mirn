@@ -27,6 +27,11 @@ describe("a run set read back in measures what it measured before", () => {
   const config = makeRunConfig({ nTicks: 500, crowd: { nPedestrians: 8 } });
   const built = buildAdapted(parseRunSet(fixtureText(config)));
 
+  // This is the test that would catch precision lost on the way through the file — a value that
+  // survived `JSON.stringify`/`JSON.parse` with a bit shaved off would show up here as a real pair
+  // reading a slightly different number from the one the simulator itself reports. The zero gate
+  // below cannot catch that: both arms of the zero pair carry identical inputs, so any precision
+  // loss would apply to both alike and cancel, leaving the pair at 0 regardless.
   it("reads the same effect as running it here", () => {
     const direct = runPair(config);
     expect(paired(built.run.pair).value).toBe(paired(direct.pair).value);
@@ -44,8 +49,11 @@ describe("a run set read back in measures what it measured before", () => {
 
   // THE GATE. A world in which nobody responds to the robot has a true effect of exactly nothing,
   // and two arms that differ nowhere give exactly nothing back. Any other value means an identity
-  // was mis-mapped, a sample was misaligned, or precision was lost on the way through the file.
-  // `toBe`, never `toBeCloseTo`: the exactness is available, so inexactness is a defect.
+  // was mis-mapped or a sample was misaligned — NOT precision lost in transit: both arms of this
+  // pair carry identical inputs, so any precision lost on the way through the file would be lost
+  // identically on both sides and cancel, leaving this reading at 0 either way. The test above is
+  // the one precision loss would show up in. `toBe`, never `toBeCloseTo`: the exactness is
+  // available here, so inexactness is a defect.
   it("reads EXACTLY nothing on the pair in which nobody responded to the robot", () => {
     expect(built.zeroRun).not.toBeNull();
     expect(paired((built.zeroRun as NonNullable<typeof built.zeroRun>).pair).value).toBe(0);

@@ -67,7 +67,7 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    readouts in document order in the static HTML, and it is line one of every CSV, because a file
    outlives the page it came from.
 
-   **There is now a second kind of number, and this guardrail is about keeping the two apart.**
+   **There are now three kinds of number, and this guardrail is about keeping them apart.**
    Guardrail 11 was amended on 2026-08-27 to let a real pedestrian recording be read in, for fitting
    the crowd and for checking the fit, and `web/fit.html` is where that was built. A reading off the simulator is still a number about an
    invented crowd and still carries the sentence above. A goodness-of-fit figure is not: it has real
@@ -82,6 +82,19 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    whole hazard of calibration is that it makes a toy feel like an instrument, and a reader who has
    just been shown that the invented crowd walks like a real one is exactly the reader most likely
    to believe the next number they see.
+
+   Guardrail 11 was amended again on 2026-09-09 to let a run set produced by somebody else's
+   simulator be read in and **measured**, through `web/engine/adapter/`, and that is a third kind
+   again rather than a repeat of the first. Both a reading off this bench's own simulator and a
+   reading off an adapted run set are disturbance numbers, the same shape and the same arithmetic —
+   the difference is what stands behind them. The first is about a crowd this bench built, can
+   reproduce, and has run a whole property-test suite against. The second is about a crowd this
+   bench did not build, has not characterised, and has tested nothing about beyond the shape of the
+   file it arrived in. Reusing the invented-crowd sentence over it would claim ownership this bench
+   does not have; reusing the fit sentence would claim a comparison against real people that was
+   never made. Neither carries it, which is why it has its own: `EXTERNAL_CROWD_DISCLOSURE` in
+   `web/engine/adapter/disclosure.ts`, checked clause by clause the same way by
+   `disclosure.test.ts`.
 
 2. **Never teach a conclusion the toy cannot support.** The crowd is invented, under either of
    the two kernels this bench runs, and fitting one to a real recording does not stop it being
@@ -281,14 +294,18 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     between, and the quantity this bench reports — a paired difference — is defined on it in a way
     it is never defined on a lone recording. So an externally simulated run set may now be
     **measured**, not merely fit against. `web/engine/adapter/__tests__/endToEnd.slow.test.ts` is
-    the proof of this rather than a demonstration of it: it generates a run set by running MIRN's
-    OWN simulator and serialising the result to the interchange format, reads it back through the
-    adapter, and asserts — `toBe(0)`, never `toBeCloseTo` — that a pair in which nobody responds to
-    the robot reads exactly nothing, with a companion assertion that the pair in which they do
-    respond reads something. A round trip through somebody else's file format that still reads
-    exactly zero on a world whose true effect is exactly zero is the paired invariant surviving the
-    trip; if it did not, the fix was to debug the identity map or the sample arithmetic, not to
-    loosen the assertion, and it did not come to that — the gate passed on the first run.
+    the proof that the round trip through the interchange format preserves that invariant — not
+    proof that any particular foreign producer's file will, since no foreign producer's file has
+    been read yet: it generates a run set by running MIRN's OWN simulator and serialising the
+    result to the interchange format, reads it back through the adapter, and asserts — `toBe(0)`,
+    never `toBeCloseTo` — that a pair in which nobody responds to the robot reads exactly nothing,
+    with a companion assertion that the pair in which they do respond reads something. A round trip
+    through the file format that still reads exactly zero on a world whose true effect is exactly
+    zero is the paired invariant surviving the format; if it did not, the fix was to debug the
+    identity map or the sample arithmetic, not to loosen the assertion, and it did not come to
+    that — the gate passed on the first run. Whether a specific other simulator's output actually
+    honours the two claims this bench cannot check itself — see `EXTERNAL_CROWD_DISCLOSURE` — is a
+    question for whoever reads that file in, not one this test can answer on their behalf.
 
     **This creates no physics-engine dependency, and that is not a technicality — it is why the
     refusal at the top of this guardrail still holds.** MIRN parses numbers another process wrote
@@ -400,6 +417,7 @@ that spec nor this note is permission to cross it.
 | Layer | Owner | How it is kept honest |
 |---|---|---|
 | The crowd, the robot, the world | **TypeScript only** | Property tests. There is no oracle and there should not be one |
+| The adapter (`web/engine/adapter/`) | **TypeScript only** | `endToEnd.slow.test.ts`, run against MIRN's own simulator output. No Python port, for the same reason the simulator itself has none — guardrail 9 keeps the shared surface to `web/engine/measure/`, and a parser kept honest in two languages would be two things to keep in step for no oracle benefit. Guardrail 8 attaches the moment a formula inside it (not just parsing and reassembly) exists in both languages |
 | Divergences | **Python is the oracle** | `divergence.*` — five subjects, path form and cloud form |
 | Estimators | **Python is the oracle** | `estimator.paired.per_run`, `estimator.cvm_residual.per_run` — each case carries a whole `RolloutPair` as literal arrays, and both sides rebuild it through the real contract factories |
 | The detection floor | **Python is the oracle** | `calibration.split_half_null.floor` — pins every individual split, the null mean, and the floor those splits are quantiled into |
