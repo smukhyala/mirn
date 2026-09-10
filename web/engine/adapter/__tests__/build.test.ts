@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { CODE_IDENTIFIER } from "../../../testing/identifiers.js";
+import { pedestrianById } from "../../contracts/scene.js";
 import { paired } from "../../measure/estimator/index.js";
 import { buildAdapted } from "../build.js";
+import { identityFor } from "../identity.js";
 import { parseRunSet } from "../parse.js";
 
 /** Two people walking straight; the treated arm nudges one of them sideways after the first step. */
@@ -142,6 +144,143 @@ describe("building a paired run from a run set", () => {
     });
   });
 
+  describe("uid ordering survives the two arms listing their people in different orders", () => {
+    // `pathsInUidOrder` joins each arm's agents by external id, never by list position — that is
+    // the entire point of `IdentityMap`. A fixture where both arms write "p-1, p-2" in the same
+    // order (as `text()` above does) cannot catch a regression to positional joining, because
+    // insertion order, sorted-string order and uid order all coincide there: it would pass against
+    // a correct implementation and a badly broken one alike. This is the bug `perAgentDeviationByUid`
+    // in `web/engine/job/report.ts` warns about by name, and it has shipped once already.
+    //
+    // These three ids are chosen so sorted-string order (alpha, bravo, charlie) differs from the
+    // order every list below writes them in, and the treated and control arms list them in
+    // different orders from each other.
+
+    const steps = 3;
+    const dt = 0.1;
+    const people = [
+      { id: "charlie", nudgeM: 0.1, baseY: 1 },
+      { id: "alpha", nudgeM: 0.3, baseY: 3 },
+      { id: "bravo", nudgeM: 0.5, baseY: 5 },
+    ] as const;
+
+    function pathFor(person: (typeof people)[number], isTreated: boolean): number[] {
+      const values: number[] = [];
+      for (let s = 0; s < steps; s++) {
+        const y = isTreated && s > 0 ? person.baseY + person.nudgeM : person.baseY;
+        values.push(s * 0.5, y);
+      }
+      return values;
+    }
+
+    function runSetText(treatedOrder: readonly string[], controlOrder: readonly string[]): string {
+      const byId = new Map<string, (typeof people)[number]>(
+        people.map((person) => [person.id, person]),
+      );
+      const treatedAgents = treatedOrder.map((id) => ({
+        id,
+        positions: pathFor(byId.get(id)!, true),
+      }));
+      const controlAgents = controlOrder.map((id) => ({
+        id,
+        positions: pathFor(byId.get(id)!, false),
+      }));
+      return JSON.stringify({
+        mirnTrajectoryFormat: 1,
+        scenario: { scenarioId: "s", widthM: 10, heightM: 8, dt, nSteps: steps },
+        provenance: {
+          producer: "omnisim", producerVersion: "0", simulator: "x", crowdModel: "y", build: "b",
+        },
+        bodies: { pedestrianRadiusM: 0.2, robotRadiusM: 0.3 },
+        treatment: { kind: "none" },
+        runs: [
+          { runId: "t", role: "treated", seed: 7, robotPresent: false, completion: null,
+            robot: null, agents: treatedAgents },
+          { runId: "c", role: "control", seed: 7, robotPresent: false, completion: null,
+            robot: null, agents: controlAgents },
+        ],
+      });
+    }
+
+    it("gives the same reading whichever order each arm lists its people in", () => {
+      const inOrder = buildAdapted(
+        parseRunSet(runSetText(["charlie", "alpha", "bravo"], ["charlie", "alpha", "bravo"])),
+      );
+      const reordered = buildAdapted(
+        parseRunSet(runSetText(["charlie", "alpha", "bravo"], ["bravo", "alpha", "charlie"])),
+      );
+      // Every value that goes into this reading is identical between the two files; only the
+      // ORDER each arm's agent list is written in differs. A positional join would pair the
+      // wrong nudges to the wrong people in the reordered file and read a different number.
+      expect(paired(reordered.run.pair).value).toBe(paired(inOrder.run.pair).value);
+    });
+
+    it("keeps each person's own path with them, not the slot they were listed in", () => {
+      const reordered = buildAdapted(
+        parseRunSet(runSetText(["charlie", "alpha", "bravo"], ["bravo", "alpha", "charlie"])),
+      );
+      const identity = identityFor(["charlie", "alpha", "bravo"]);
+      for (const person of people) {
+        const trajectory = pedestrianById(reordered.run.pair.treated, identity.agentIdOf(person.id));
+        const lastY = trajectory.positions[trajectory.positions.length - 1];
+        expect(lastY).toBeCloseTo(person.baseY + person.nudgeM, 9);
+      }
+    });
+  });
+
+  describe("the optional zero-response reference pair and replicate runs", () => {
+    it("builds a usable zeroRun that reads exactly nothing when both halves are supplied", () => {
+      const holder = JSON.parse(text(0.25)) as Record<string, unknown>;
+      const runs = holder["runs"] as Record<string, unknown>[];
+      // The zero pair has to actually be a pair in which nobody responds — reusing the main
+      // (nudged) treated/control arms here would build a "zero" pair that is not zero. `text(0)`
+      // is the fixture already used above for exactly that: identical arms, sharing the same
+      // agent ids ("p-1", "p-2") as the main pair, so the one identity map built from the main
+      // treated run's ids still applies to it.
+      const zeroRuns = (JSON.parse(text(0)) as { runs: Record<string, unknown>[] }).runs;
+      const zeroTreated = zeroRuns[0]!;
+      zeroTreated["runId"] = "zt";
+      zeroTreated["role"] = "zeroTreated";
+      const zeroControl = zeroRuns[1]!;
+      zeroControl["runId"] = "zc";
+      zeroControl["role"] = "zeroControl";
+      runs.push(zeroTreated, zeroControl);
+
+      const built = buildAdapted(parseRunSet(JSON.stringify(holder)));
+      expect(built.zeroRun).not.toBeNull();
+      const zeroRun = built.zeroRun!;
+      expect(zeroRun.pair.kind).toBe("pairedRun");
+      expect(zeroRun.pair.treated.pedestrians.length).toBe(2);
+      expect(paired(zeroRun.pair).value).toBe(0);
+      // And the main run is untouched by the zero pair being present: it still reads the real
+      // 0.25 m nudge, not the zero one.
+      expect(paired(built.run.pair).value).toBeGreaterThan(0);
+    });
+
+    it("populates replicates with one entry per replicate run, each holding every person's path", () => {
+      const holder = JSON.parse(text(0.25)) as Record<string, unknown>;
+      const runs = holder["runs"] as Record<string, unknown>[];
+      const replicateA = JSON.parse(JSON.stringify(runs[1])) as Record<string, unknown>;
+      replicateA["runId"] = "r-a";
+      replicateA["role"] = "replicate";
+      const replicateB = JSON.parse(JSON.stringify(runs[1])) as Record<string, unknown>;
+      replicateB["runId"] = "r-b";
+      replicateB["role"] = "replicate";
+      runs.push(replicateA, replicateB);
+
+      const built = buildAdapted(parseRunSet(JSON.stringify(holder)));
+      expect(built.replicates.length).toBe(2);
+      for (const replicate of built.replicates) {
+        expect(replicate.length).toBe(2);
+      }
+    });
+
+    it("carries no replicates when the run set names none", () => {
+      const built = buildAdapted(parseRunSet(text(0.25)));
+      expect(built.replicates.length).toBe(0);
+    });
+  });
+
   describe("no error message names a bare code identifier", () => {
     // Guardrail 12, same reasoning as the other adapter tests: this is read by somebody holding a
     // file another team produced, and it must never be handed a wire-level name like
@@ -187,6 +326,26 @@ describe("building a paired run from a run set", () => {
         run: () => buildAdapted(
           parseRunSet(withRunSet((holder) => {
             (holder["runs"] as { role: string }[])[1]!.role = "treated";
+          })),
+        ),
+      },
+      {
+        // This is the exact leak the review caught: `only()` used to interpolate the raw wire
+        // role ("zeroTreated") straight into its duplicate-run message, and the earlier version
+        // of this describe block only ever duplicated "treated" — lower-case, so it slipped past
+        // CODE_IDENTIFIER trivially and hid the bug. `zeroTreated` is camelCase and would have
+        // caught it immediately.
+        name: "two runs both claiming to be the zero-response treated arm",
+        run: () => buildAdapted(
+          parseRunSet(withRunSet((holder) => {
+            const runs = holder["runs"] as Record<string, unknown>[];
+            const zeroTreatedA = JSON.parse(JSON.stringify(runs[0])) as Record<string, unknown>;
+            zeroTreatedA["runId"] = "zt-a";
+            zeroTreatedA["role"] = "zeroTreated";
+            const zeroTreatedB = JSON.parse(JSON.stringify(runs[0])) as Record<string, unknown>;
+            zeroTreatedB["runId"] = "zt-b";
+            zeroTreatedB["role"] = "zeroTreated";
+            runs.push(zeroTreatedA, zeroTreatedB);
           })),
         ),
       },

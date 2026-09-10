@@ -6,7 +6,7 @@ import type { Bodies, MeasuredRun } from "../job/report.js";
 import type { ArmResult } from "../sim/run.js";
 import { identityFor, type IdentityMap } from "./identity.js";
 import { reconcileInitial, requireSameLength, type Reconciliation } from "./reconcile.js";
-import type { Provenance, RunRecord, RunRole, RunSet } from "./schema.js";
+import { ROLE_DESCRIPTIONS, type Provenance, type RunRecord, type RunRole, type RunSet } from "./schema.js";
 
 /**
  * A run set, assembled into the shapes the measurement layer already speaks.
@@ -37,12 +37,25 @@ export interface AdaptedRunSet {
   readonly provenance: Provenance;
 }
 
+/**
+ * Guardrail 12 again: `role` is a wire value (`treated`, `zeroTreated`, ...) and must never reach
+ * a message a reader sees directly. `ROLE_DESCRIPTIONS` is `schema.ts`'s own answer to this — the
+ * table `parse.ts` already reads from for the same reason — so this reuses it rather than growing
+ * a second phrasing of the same five roles.
+ */
+function describeRole(role: RunRole): string {
+  return ROLE_DESCRIPTIONS[role];
+}
+
 function only(set: RunSet, role: RunRole): RunRecord | null {
   let found: RunRecord | null = null;
   for (const run of set.runs) {
     if (run.role === role) {
       if (found !== null) {
-        fail(`this run set carries two runs playing the part '${role}', and it may carry one`);
+        fail(
+          `this run set carries two runs that are each ${describeRole(role)}, and it may carry ` +
+            `only one`,
+        );
       }
       found = run;
     }
@@ -57,7 +70,7 @@ function only(set: RunSet, role: RunRole): RunRecord | null {
 function requireRole(set: RunSet, role: RunRole): RunRecord {
   const found = only(set, role);
   if (found === null) {
-    fail(`this run set carries no run playing the part '${role}', so there is no pair in it`);
+    fail(`this run set carries no run that is ${describeRole(role)}, so there is no pair in it`);
   }
   return found;
 }
