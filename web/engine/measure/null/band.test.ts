@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { makeRunConfig } from "../../contracts/config.js";
 import { runPair } from "../../sim/run.js";
 import { deviation } from "../metrics.js";
-import { replicateBand } from "./band.js";
+import { bandFrom, replicateBand } from "./band.js";
 
 /**
  * A max-over-steps readout needs a max-over-steps null.
@@ -42,5 +42,37 @@ describe("replicateBand", () => {
     const worstMoment = deviation(runPair(makeRunConfig()).pair).maxM;
     expect(worstMoment).toBeGreaterThan(band.value);
     expect(worstMoment).toBeLessThan(band.peakValue);
+  });
+});
+
+/**
+ * `bandFrom` mirrors the run-collecting loop `replicateBand` runs internally: same replicate
+ * numbering, same `robot-presence` treatment (so the control arm is the robot-absent world), same
+ * config overrides. That loop is reproducible from outside `band.ts` — nothing in it is private
+ * state — so this test rebuilds it verbatim rather than reaching for a looser characterization,
+ * and proves the split moved the arithmetic without changing it.
+ */
+describe("a band can be computed from runs somebody else produced", () => {
+  it("gives the same answer as running them here, on the same runs", () => {
+    const config = makeRunConfig({ seed: 4242, nTicks: 60, crowd: { nPedestrians: 6 } });
+    const viaSimulator = replicateBand(config, 3);
+
+    const runs: (readonly Float64Array[])[] = [];
+    for (let replicate = 1; replicate <= 3; replicate++) {
+      const replicateConfig = makeRunConfig({
+        ...config,
+        replicate,
+        treatment: { kind: "robot-presence" },
+      });
+      runs.push(runPair(replicateConfig).control.positions);
+    }
+    const viaArrays = bandFrom(runs);
+
+    expect(viaArrays.value).toBe(viaSimulator.value);
+    expect(viaArrays.peakValue).toBe(viaSimulator.peakValue);
+  });
+
+  it("refuses fewer than two runs, because one run has nothing to differ from", () => {
+    expect(() => bandFrom([[new Float64Array([0, 0, 1, 1])]])).toThrow(/at least 2/);
   });
 });

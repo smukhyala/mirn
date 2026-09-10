@@ -4,6 +4,7 @@ import { makeRunConfig } from "../../../engine/contracts/config.js";
 import { ContractError } from "../../../engine/core/errors.js";
 import { COLUMNS, COLUMN_ORDER, type Reading, type ZeroReference } from "../../../engine/job/columns.js";
 import { buildContext, type MeasurementParams, type ReportContext } from "../../../engine/job/report.js";
+import { contextInitFromConfig } from "../../../engine/job/simContext.js";
 import { runPair } from "../../../engine/sim/run.js";
 import { anchorFor } from "../../../ui/labels.js";
 import {
@@ -120,7 +121,7 @@ const PARAMS: MeasurementParams = Object.freeze({
 function realContext(): ReportContext {
   const config = makeRunConfig({});
   return buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params: PARAMS,
     run: runPair(config),
     band: null,

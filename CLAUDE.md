@@ -67,7 +67,7 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    readouts in document order in the static HTML, and it is line one of every CSV, because a file
    outlives the page it came from.
 
-   **There is now a second kind of number, and this guardrail is about keeping the two apart.**
+   **There are now three kinds of number, and this guardrail is about keeping them apart.**
    Guardrail 11 was amended on 2026-08-27 to let a real pedestrian recording be read in, for fitting
    the crowd and for checking the fit, and `web/fit.html` is where that was built. A reading off the simulator is still a number about an
    invented crowd and still carries the sentence above. A goodness-of-fit figure is not: it has real
@@ -82,6 +82,19 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
    whole hazard of calibration is that it makes a toy feel like an instrument, and a reader who has
    just been shown that the invented crowd walks like a real one is exactly the reader most likely
    to believe the next number they see.
+
+   Guardrail 11 was amended again on 2026-09-09 to let a run set produced by somebody else's
+   simulator be read in and **measured**, through `web/engine/adapter/`, and that is a third kind
+   again rather than a repeat of the first. Both a reading off this bench's own simulator and a
+   reading off an adapted run set are disturbance numbers, the same shape and the same arithmetic —
+   the difference is what stands behind them. The first is about a crowd this bench built, can
+   reproduce, and has run a whole property-test suite against. The second is about a crowd this
+   bench did not build, has not characterised, and has tested nothing about beyond the shape of the
+   file it arrived in. Reusing the invented-crowd sentence over it would claim ownership this bench
+   does not have; reusing the fit sentence would claim a comparison against real people that was
+   never made. Neither carries it, which is why it has its own: `EXTERNAL_CROWD_DISCLOSURE` in
+   `web/engine/adapter/disclosure.ts`, checked clause by clause the same way by
+   `disclosure.test.ts`.
 
 2. **Never teach a conclusion the toy cannot support.** The crowd is invented, under either of
    the two kernels this bench runs, and fitting one to a real recording does not stop it being
@@ -263,6 +276,68 @@ Violating any of these breaks the lesson, so treat them as build errors rather t
     what a supplied ruler reads on a world whose true effect is exactly nothing, and that is the
     number worth having.
 
+    **A fourth refusal is narrowed by owner's decision on 2026-09-09, and this is the second time
+    this guardrail has moved rather than the first.** The 2026-08-27 amendment let a real
+    pedestrian recording in for fitting and for checking a fit, and refused it a disturbance
+    number for one arithmetic reason: **a corridor cannot be filmed twice.** There is no second
+    recording in which the same people, on the same day, walked past no robot, so the paired
+    quantity this whole bench measures does not exist in real trajectory data — only one arm of it
+    does.
+
+    **A simulator can be run twice.** That is the entire argument, and it is exactly why the
+    2026-08-27 refusal does not transfer to it. A run set produced by somebody else's simulator —
+    read in through `web/engine/adapter/` (`schema.ts`, `parse.ts`, `identity.ts`, `reconcile.ts`,
+    `build.ts`, `disclosure.ts`) — can carry a `treated` run and a `control` run of the *same room*,
+    started from the *same positions*, differing only in whether the robot was there. Both arms
+    exist, on the file's word (see `disclosure.ts`'s `EXTERNAL_CROWD_DISCLOSURE` for exactly what
+    that word does and does not cover), so guardrail 5's paired invariant has something to hold
+    between, and the quantity this bench reports — a paired difference — is defined on it in a way
+    it is never defined on a lone recording. So an externally simulated run set may now be
+    **measured**, not merely fit against. `web/engine/adapter/__tests__/endToEnd.slow.test.ts` is
+    the proof that the round trip through the interchange format preserves that invariant — not
+    proof that any particular foreign producer's file will, since no foreign producer's file has
+    been read yet: it generates a run set by running MIRN's OWN simulator and serialising the
+    result to the interchange format, reads it back through the adapter, and asserts — `toBe(0)`,
+    never `toBeCloseTo` — that a pair in which nobody responds to the robot reads exactly nothing,
+    with a companion assertion that the pair in which they do respond reads something. A round trip
+    through the file format that still reads exactly zero on a world whose true effect is exactly
+    zero is the paired invariant surviving the format; if it did not, the fix was to debug the
+    identity map or the sample arithmetic, not to loosen the assertion, and it did not come to
+    that — the gate passed on the first run. Whether a specific other simulator's output actually
+    honours the two claims this bench cannot check itself — see `EXTERNAL_CROWD_DISCLOSURE` — is a
+    question for whoever reads that file in, not one this test can answer on their behalf.
+
+    **This creates no physics-engine dependency, and that is not a technicality — it is why the
+    refusal at the top of this guardrail still holds.** MIRN parses numbers another process wrote
+    into a JSON document. It does not link against that simulator, does not import it, does not
+    install it, and does not execute it — `parseRunSet` reads text, `buildAdapted` reassembles
+    positions this bench already knows how to hold, and every ruler that runs on them afterward is
+    the same ruler this bench has always shipped. **What is still refused, because nobody lifted
+    it,** is unchanged from the paragraph above: no ROS, no planner benchmark, no trained model, no
+    physics-engine dependency. A JSON parser is not a dependency on the thing that wrote the JSON.
+
+    **What that costs elsewhere, stated so it is not discovered later:**
+
+    - **Guardrail 1 gains a THIRD kind of number.** A reading off this bench's own simulator carries
+      `INVENTED_CROWD_DISCLOSURE`. A goodness-of-fit figure carries `FIT_DISCLOSURE`. A reading off
+      an adapted run set is neither: it is a disturbance number, like the first kind, but about a
+      crowd this bench did not invent and whose physics it has not checked, tested or vouched for —
+      unlike the first kind. `EXTERNAL_CROWD_DISCLOSURE` in `web/engine/adapter/disclosure.ts` is
+      that third sentence, and its own long comment explains at length why the first kind's closing
+      line ("the same wobble") cannot be reused here: this bench did not run the two arms, did not
+      draw them from one noise tape it controls, and cannot check that they share their exogenous
+      randomness at all — that they differ only in the robot is the producer's claim, not this
+      bench's finding.
+    - **Guardrail 2 is unmoved and does more work than ever.** A crowd simulated by somebody else's
+      engine is still not a real crowd. It can demonstrate that a measurement is confounded and
+      that pairing removes the confound; it cannot say how large a real robot's effect is, and nor
+      could an adapted run before this decision, nor after it. Reading in another simulator's
+      output changes what this bench can measure the arithmetic of — never what conclusions the toy
+      can support.
+    - **`web/engine/adapter/` has no production surface yet, on purpose.** Task 7 is the round-trip
+      gate; there is still no sixth page, no console control and no permalink field that reads a
+      run set in. That is out of scope for this decision, not refused by it.
+
 12. **No bare code identifier on any surface a reader sees, and every term defined in plain English
     at first use.** Half of this guardrail genuinely died: `web/vocab.ts`, the `introduces`/`uses`
     front matter, `checkVocabulary` and `lintForwardTerms` all go, because with no reading order
@@ -342,6 +417,7 @@ that spec nor this note is permission to cross it.
 | Layer | Owner | How it is kept honest |
 |---|---|---|
 | The crowd, the robot, the world | **TypeScript only** | Property tests. There is no oracle and there should not be one |
+| The adapter (`web/engine/adapter/`) | **TypeScript only** | `endToEnd.slow.test.ts`, run against MIRN's own simulator output. No Python port, for the same reason the simulator itself has none — guardrail 9 keeps the shared surface to `web/engine/measure/`, and a parser kept honest in two languages would be two things to keep in step for no oracle benefit. Guardrail 8 attaches the moment a formula inside it (not just parsing and reassembly) exists in both languages |
 | Divergences | **Python is the oracle** | `divergence.*` — five subjects, path form and cloud form |
 | Estimators | **Python is the oracle** | `estimator.paired.per_run`, `estimator.cvm_residual.per_run` — each case carries a whole `RolloutPair` as literal arrays, and both sides rebuild it through the real contract factories |
 | The detection floor | **Python is the oracle** | `calibration.split_half_null.floor` — pins every individual split, the null mean, and the floor those splits are quantiled into |
@@ -388,6 +464,7 @@ entirely — Python-only estimators are not a parity question until something po
 | `identification`, `estimatorName`, `divergenceName` | The browser's wording is written for a reader and Python's for a paper, so the strings differ on purpose. Each suite asserts its own instead: that the paired estimator's is substantial, and that the constant-velocity residual's opens with `UNMET` |
 | `sinkhorn_w2` | Every step is `exp`/`log`, neither bit-portable, and a tolerance-based stopping rule halts at different iteration counts — ~1.2e-3 relative between adjacent stopping points. Python-only; the browser uses ADE, which is what the demo used anyway |
 | `replicateBand` | Not a two-implementation item at all: it re-runs the simulator, which is TypeScript-only by rule. It is also a *different* null from `split_half_null` — see the naming note in `null/band.ts` — and the two are never divided by one another |
+| `bandFrom` | The same exemption as `replicateBand`, and it gets its own row rather than inheriting one silently. It is `replicateBand`'s arithmetic, split out so a set of robot-absent runs produced elsewhere — an adapted run set's `replicate` runs — can be turned into the same floor without re-running anything. Splitting it did not move it across the line: it is still the run-to-run null, still a *different* null from `split_half_null`, and Python has no counterpart to compare it against because Python never had one |
 
 ---
 
@@ -467,8 +544,8 @@ command below is written so it runs as spelled from the repository root, with no
 
 ```bash
 npm run check                            # typecheck, vitest, vite build
-npm run test                             # 1173 tests across 87 files
-npx vitest run --exclude '**/*.slow.test.ts'   # 1131 of them
+npm run test                             # 1296 tests across 93 files
+npx vitest run --exclude '**/*.slow.test.ts'   # 1246 of them
 .venv/bin/python -m pytest -q            # 298 tests, ~6 min; one calibration test is 132 s of it
 .venv/bin/python -m pytest -q -m "not slow"   # 275 of them, minus the heavy nulls
 .venv/bin/python -m ruff check src tests
@@ -483,6 +560,8 @@ sentence claiming otherwise. Read them as shape, not as a target to hit:
 
 | | Measured | Where |
 |---|---|---|
+| `npm run test`, 1296 tests | 74.85 s | this agent's container, 2026-09-09, after the adapter gate landed |
+| the `.slow.test.ts` cut, 1246 tests | 19.42 s | same |
 | `npm run test`, 1173 tests | 76.3 s | the author's own machine, 2026-08-28 |
 | the `.slow.test.ts` cut, 1131 tests | 17.9 s | same |
 | `npm run test`, 1098 tests | 92.3 s at 1090 tests | cloud container, 2026-08-27, after the sweep landed |
@@ -509,22 +588,27 @@ here was never worth trusting.
 **There is no `--project engine` fast loop, and naming one was the mistake.** Cutting the suite by
 project cuts along the wrong seam: the three slowest files sit in both projects, and the engine
 project alone still carries two of them. Cutting by `.slow.test.ts` is the cut worth making, and it
-is what the third line above does. The seven it drops are `axes.slow.test.ts` (guardrail 3's
+is what the third line above does. The eight it drops are `axes.slow.test.ts` (guardrail 3's
 every-axis-moves-its-readout check), `cards.slow.test.ts` (what each of the drill's eight cards
 actually does, measured), `drill-verdict.slow.test.ts` (the whole drill driven card by card),
 `familyProbe.slow.test.ts` (what each method family reads on a world whose answer is exactly
-nothing), `method-run.slow.test.ts` (the method card driven end to end at the shipped settings) and
+nothing), `method-run.slow.test.ts` (the method card driven end to end at the shipped settings),
 `powerCurve.slow.test.ts` (the same families read on six worlds instead of one, which is why it
-alone is most of a minute) and `search.slow.test.ts` (the crowd fitted to a recording, forty-two
-candidates at a time). All seven re-run the simulator many times over, which is why they cost what
-they cost and why none of them can be made fast. So it is a working loop and not the gate.
+alone is most of a minute), `search.slow.test.ts` (the crowd fitted to a recording, forty-two
+candidates at a time), and now `endToEnd.slow.test.ts` (the adapter's round-trip gate). The first
+seven re-run the simulator many times over, which is why they cost what they cost and why none of
+them can be made fast. The eighth does not fit that description — measured at 101 ms, it is the
+cheapest file in the whole suite — and it sits in the cut anyway, on purpose: it belongs with the
+suite's other gates categorically (a whole-path proof against the real simulator, named for what it
+tests rather than for what it costs), not because dropping it buys back any time. So it is a working
+loop and not the gate, same as before, and the loop's speed no longer explains everything in it.
 
-**The value of the cut has now moved three times, in both directions, and the third move happened
-between two commits on one afternoon.** It once dropped 19 tests to save 9 seconds of 22. On the
-method card's commit it dropped 31 to save about 8 of 43, and this file said so and predicted the
-next feature would shrink it further. That prediction was wrong: it went back up to about 18 of 45.
-Then the sweep landed one slow file, and the cut now drops 36 tests to save about 64 seconds of 92 —
-the largest saving it has ever been, because that single file is most of a minute on its own.
+**The value of the cut has now moved four times, in both directions.** It once dropped 19 tests to
+save 9 seconds of 22. On the method card's commit it dropped 31 to save about 8 of 43, and this file
+said so and predicted the next feature would shrink it further. That prediction was wrong: it went
+back up to about 18 of 45. The sweep then landed one slow file and the cut dropped 36 tests to save
+about 64 seconds of 92 — at the time, the largest saving it had been. The adapter's gate moves it
+again, and in the same direction: 50 tests dropped to save about 55 of 75 seconds measured this run.
 
 So the line to take is not any number about the cut. It is that a documented saving is a measurement
 with a shelf life, that the shelf life can be one commit, and that a prediction about it written

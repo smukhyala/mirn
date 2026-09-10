@@ -4,6 +4,7 @@ import { runPair } from "../../sim/run.js";
 import { COLUMNS, type ColumnKey } from "../columns.js";
 import { AXES, AXIS_ORDER, type AxisEntry } from "../axes.js";
 import { buildContext, runReport, type MeasurementParams } from "../report.js";
+import { contextInitFromConfig } from "../simContext.js";
 import { CODE_IDENTIFIER_OR_SYNTAX } from "../../../testing/identifiers.js";
 
 /**
@@ -116,7 +117,7 @@ function columnAt(
   const config = makeRunConfig({ ...overrides, seed: BASE_SEED + seedIndex * SEED_STRIDE });
   const run = runPair(config);
   const context = buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params,
     run,
     band: null,

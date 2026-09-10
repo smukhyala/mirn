@@ -21,6 +21,7 @@ import {
   type UnitKey,
 } from "./engine/job/columns.js";
 import { buildContext, runReport, type ReportContext } from "./engine/job/report.js";
+import { contextInitFromConfig } from "./engine/job/simContext.js";
 import { makeMeasurementParams } from "./engine/job/spec.js";
 import { replicateBand } from "./engine/measure/null/band.js";
 import { runPair, type RunResult } from "./engine/sim/run.js";
@@ -304,7 +305,7 @@ function runCard(card: DrillCard): CardRun {
   });
   const run = runPair(config);
   const context = buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params,
     run,
     zeroRun: null,
@@ -339,7 +340,7 @@ function revealCard(cardRun: CardRun): CardReveal {
   const zeroConfig = makeRunConfig({ ...config, pedestriansSeeRobot: false });
   const zeroRun = runPair(zeroConfig);
   const context = buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params: cardRun.context.params,
     run: cardRun.run,
     zeroRun,

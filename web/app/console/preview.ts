@@ -1,7 +1,9 @@
 import { makeRunConfig, type RunConfig } from "../../engine/contracts/config.js";
+import { nPedestrians } from "../../engine/contracts/scene.js";
 import { fail } from "../../engine/core/errors.js";
 import { COLUMNS, type ColumnKey, type Reading } from "../../engine/job/columns.js";
 import { buildContext, runReport, type ReportContext } from "../../engine/job/report.js";
+import { contextInitFromConfig } from "../../engine/job/simContext.js";
 import { configForCell, paramsForCell } from "../../engine/job/spec.js";
 import { runPair, type RunResult } from "../../engine/sim/run.js";
 import { makePanelValues, PREVIEW_DEBOUNCE_PEOPLE, type PanelValues } from "./panel.js";
@@ -123,7 +125,7 @@ export function runPreview(settings: ConsoleSettings): Preview {
   const zeroRun = runPair(zeroConfig);
 
   const context = buildContext({
-    config,
+    ...contextInitFromConfig(config),
     params,
     run,
     zeroRun,
@@ -153,14 +155,19 @@ export function runPreview(settings: ConsoleSettings): Preview {
  * comments arguing against.
  */
 export function stampsFor(ctx: ReportContext): readonly SettingStamp[] {
-  const dt = ctx.config.dt;
+  const dt = ctx.dt;
   return Object.freeze([
     Object.freeze({
       // Not "people". The label and the unit are printed either side of the value, so a stamp
       // labelled with its own unit reads "people 18 people".
+      //
+      // Read off the treated scene rather than a config's `crowd.nPedestrians`, which `ctx` no
+      // longer carries: the report layer knows only data, not settings, and the paired invariant
+      // guarantees both arms hold the same crowd, so `nPedestrians` here is exactly the count the
+      // config asked for, under any treatment kind actually used.
       kind: "settingStamp" as const,
       label: "crowd",
-      value: ctx.config.crowd.nPedestrians,
+      value: nPedestrians(ctx.run.pair.treated),
       unit: "people" as const,
     }),
     Object.freeze({
@@ -187,7 +194,7 @@ export function stampsFor(ctx: ReportContext): readonly SettingStamp[] {
  */
 const GEOMETRIC_BOUND: Partial<Record<ColumnKey, (ctx: ReportContext) => number>> = Object.freeze({
   robotPathM: (ctx: ReportContext): number => ctx.straightLineM,
-  robotArrivalS: (ctx: ReportContext): number => ctx.straightLineM / ctx.config.robot.maxSpeed,
+  robotArrivalS: (ctx: ReportContext): number => ctx.straightLineArrivalS,
   minClearanceM: (): number => 0,
 });
 
